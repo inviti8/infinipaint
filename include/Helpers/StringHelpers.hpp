@@ -3,6 +3,8 @@
 #include <vector>
 #include <cstdint>
 #include <filesystem>
+#include <SDL3/SDL_time.h>
+#include <chrono>
 
 std::vector<std::string> split_string_by_token(std::string str, std::string token);
 
@@ -13,3 +15,5 @@ std::string read_file_to_string(const std::filesystem::path& filePath);
 bool is_valid_http_url(const std::string& str);
 std::string remove_carriage_returns_from_str(std::string s);
 std::string ensure_string_unique(const std::vector<std::string>& stringList, std::string str);
+std::chrono::system_clock::time_point sdl_time_to_chrono_time(const SDL_Time& t);
+std::string chrono_time_to_nice_date(const std::chrono::system_clock::time_point& t, SDL_DateFormat f);

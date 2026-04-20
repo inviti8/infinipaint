@@ -2,11 +2,13 @@
 #include <Helpers/Random.hpp>
 #include "ResourceDisplay/ImageResourceDisplay.hpp"
 #include "DrawingProgram/DrawingProgramCache.hpp"
+#include <SDL3/SDL_time.h>
 #include <fstream>
 
 GlobalConfig::GlobalConfig() {
     load_default_palette();
     displayName = Random::get().alphanumeric_str(10);
+    SDL_GetDateTimeLocalePreferences(&dateFormat, &timeFormat);
 }
 
 nlohmann::json GlobalConfig::get_config_json(const InputManager& input) const {

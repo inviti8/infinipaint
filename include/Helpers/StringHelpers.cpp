@@ -1,4 +1,6 @@
 #include "StringHelpers.hpp"
+#include <SDL3/SDL_timer.h>
+#include <chrono>
 #include <fstream>
 #include <algorithm>
 #include <regex>
@@ -113,4 +115,21 @@ std::string ensure_string_unique(const std::vector<std::string>& stringList, std
             break;
     }
     return str;
+}
+
+std::chrono::system_clock::time_point sdl_time_to_chrono_time(const SDL_Time& t) {
+    time_t unixTime = SDL_NS_TO_SECONDS(t);
+    return std::chrono::system_clock::from_time_t(unixTime);
+}
+
+std::string chrono_time_to_nice_date(const std::chrono::system_clock::time_point& t, SDL_DateFormat f) {
+    switch(f) {
+        case SDL_DATE_FORMAT_YYYYMMDD:
+            return std::format("{:%Y-%m-%d}", t);
+        case SDL_DATE_FORMAT_DDMMYYYY:
+            return std::format("{:%d %b, %Y}", t);
+        case SDL_DATE_FORMAT_MMDDYYYY:
+            return std::format("{:%b %d, %Y}", t);
+    }
+    return "";
 }

@@ -7,6 +7,11 @@ class FileSelectScreen : public Screen {
         virtual void gui_layout_run() override;
         virtual void draw(SkCanvas* canvas) override;
     private:
-        const std::vector<std::string>& get_file_list();
-        std::optional<std::vector<std::string>> fileListOptional;
+        struct FileInfo {
+            std::string fileName;
+            SDL_Time lastAccessTime;
+            std::string lastAccessDate;
+        };
+        const std::vector<FileInfo>& get_file_list();
+        std::optional<std::vector<FileInfo>> fileListOptional;
 };

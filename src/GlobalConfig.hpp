@@ -1,4 +1,5 @@
 #pragma once
+#include <SDL3/SDL_time.h>
 #include <nlohmann/json.hpp>
 #include <Helpers/VersionNumber.hpp>
 #include "InputManager.hpp"
@@ -68,6 +69,9 @@ class GlobalConfig {
 
         bool disableGraphicsDriverWorkarounds = false;
         int vsyncValue = 1;
+
+        SDL_DateFormat dateFormat = SDL_DATE_FORMAT_DDMMYYYY;
+        SDL_TimeFormat timeFormat = SDL_TIME_FORMAT_12HR;
 
         #ifndef __EMSCRIPTEN__
             bool applyDisplayScale = true;
