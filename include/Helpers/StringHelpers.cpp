@@ -1,8 +1,10 @@
 #include "StringHelpers.hpp"
+#include <SDL3/SDL_time.h>
 #include <SDL3/SDL_timer.h>
 #include <chrono>
 #include <fstream>
 #include <algorithm>
+#include <iostream>
 #include <regex>
 #include <SDL3/SDL_iostream.h>
 
@@ -117,19 +119,46 @@ std::string ensure_string_unique(const std::vector<std::string>& stringList, std
     return str;
 }
 
-std::chrono::system_clock::time_point sdl_time_to_chrono_time(const SDL_Time& t) {
-    time_t unixTime = SDL_NS_TO_SECONDS(t);
-    return std::chrono::system_clock::from_time_t(unixTime);
-}
-
-std::string chrono_time_to_nice_date(const std::chrono::system_clock::time_point& t, SDL_DateFormat f) {
-    switch(f) {
-        case SDL_DATE_FORMAT_YYYYMMDD:
-            return std::format("{:%Y-%m-%d}", t);
-        case SDL_DATE_FORMAT_DDMMYYYY:
-            return std::format("{:%d %b, %Y}", t);
-        case SDL_DATE_FORMAT_MMDDYYYY:
-            return std::format("{:%b %d, %Y}", t);
+std::string sdl_time_to_nice_access_time(const SDL_DateTime& t, SDL_DateFormat dF, SDL_TimeFormat tF) {
+    SDL_DateTime currentDt;
+    {
+        SDL_Time currentTime;
+        SDL_GetCurrentTime(&currentTime);
+        SDL_TimeToDateTime(currentTime, &currentDt, true);
+    }
+    if(currentDt.year == t.year && currentDt.month == t.month && currentDt.day == t.day) {
+        switch(tF) {
+            case SDL_TIME_FORMAT_24HR:
+                return std::format("{0}:{1:0>2}", t.hour, t.minute);
+            case SDL_TIME_FORMAT_12HR: {
+                std::string pmAm = t.hour >= 12 ? "PM" : "AM";
+                int displayedHour;
+                if(t.hour == 0)
+                    displayedHour = 12;
+                else if(t.hour > 12)
+                    displayedHour = t.hour - 12;
+                else
+                    displayedHour = t.hour;
+                return std::format("{0}:{1:0>2} {2}", displayedHour, t.minute, pmAm);
+            }
+        }
+    }
+    else {
+        switch(dF) {
+            case SDL_DATE_FORMAT_YYYYMMDD:
+                return std::format("{0}-{1}-{2}", t.year, t.month, t.day);
+            case SDL_DATE_FORMAT_DDMMYYYY:
+                if(currentDt.year == t.year)
+                    return std::format("{0} {1}", t.day, std::chrono::month(t.month));
+                else
+                    return std::format("{0} {1}, {2}", t.day, std::chrono::month(t.month), t.year);
+            case SDL_DATE_FORMAT_MMDDYYYY: {
+                if(currentDt.year == t.year)
+                    return std::format("{1} {0}", t.day, std::chrono::month(t.month));
+                else
+                    return std::format("{1} {0}, {2}", t.day, std::chrono::month(t.month), t.year);
+            }
+        }
     }
     return "";
 }

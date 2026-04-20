@@ -9,8 +9,8 @@ class FileSelectScreen : public Screen {
     private:
         struct FileInfo {
             std::string fileName;
-            SDL_Time lastAccessTime;
-            std::string lastAccessDate;
+            SDL_Time lastModifyTime;
+            std::string lastModifyDate;
         };
         const std::vector<FileInfo>& get_file_list();
         std::optional<std::vector<FileInfo>> fileListOptional;

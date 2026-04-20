@@ -7,6 +7,7 @@
 #include "../GUIStuff/Elements/ImageDisplay.hpp"
 #include "../World.hpp"
 #include "Helpers/StringHelpers.hpp"
+#include <SDL3/SDL_timer.h>
 
 FileSelectScreen::FileSelectScreen(MainProgram& m): Screen(m) {}
 
@@ -51,7 +52,7 @@ void FileSelectScreen::gui_layout_run() {
                         });
                     }
                     text_label(gui, fileList[i].fileName);
-                    text_label_light(gui, fileList[i].lastAccessDate);
+                    text_label_light(gui, fileList[i].lastModifyDate);
                 }
             }
         });
@@ -70,12 +71,20 @@ const std::vector<FileSelectScreen::FileInfo>& FileSelectScreen::get_file_list()
                 std::filesystem::path p = filesInPath[i];
                 std::string fExt = p.extension().string();
                 if(fExt == "." + World::FILE_EXTENSION) {
+                    std::filesystem::path fullPath = savePath / filesInPath[i];
+                    FileInfo fileInfoToAdd;
+                    fileInfoToAdd.fileName = p.stem().string();
+
                     SDL_PathInfo pathInfo;
-                    SDL_DateTime pathDt;
-                    SDL_GetPathInfo(savePath.string().c_str(), &pathInfo);
-                    SDL_TimeToDateTime(pathInfo.access_time, &pathDt, true);
-                    SDL_NS_TO_SECONDS(pathInfo.access_time);
-                    fL.emplace_back(p.stem().string(), pathInfo.access_time, chrono_time_to_nice_date(sdl_time_to_chrono_time(pathInfo.access_time), main.conf.dateFormat));
+                    if(SDL_GetPathInfo(fullPath.string().c_str(), &pathInfo)) {
+                        SDL_DateTime pathDt;
+                        fileInfoToAdd.lastModifyTime = pathInfo.modify_time;
+                        if(SDL_TimeToDateTime(pathInfo.modify_time, &pathDt, true)) {
+                            fileInfoToAdd.lastModifyDate = sdl_time_to_nice_access_time(pathDt, main.conf.dateFormat, main.conf.timeFormat);
+                        }
+                    }
+
+                    fL.emplace_back(fileInfoToAdd);
                 }
             }
         }
