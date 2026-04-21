@@ -24,7 +24,7 @@ void GridScrollArea::layout(const Clay_ElementId& id, const Options& o) {
     opts.entryCount = rowCount;
     uint16_t xPadding = 0;
     if(rowCount > 1 || (rowCount == 1 && ((options.entryCount + entriesPerRow) / entriesPerRow) > 1)) // More than 1 row or 1st row is full
-        xPadding = static_cast<float>(std::max<float>(rowWidth - (entriesPerRow * options.entryWidth), 0) / (entriesPerRow * 2));
+        xPadding = static_cast<float>(std::max<float>(rowWidth - (entriesPerRow * options.entryWidth), 0) / (entriesPerRow + 1));
 
     opts.elementContent = [&] (size_t rowIndex) {
         gui.new_id("grid row", [&] {

@@ -57,8 +57,7 @@ void FileSelectScreen::gui_layout_run() {
                     }
                 }) {
                     CLAY_AUTO_ID({
-                        .layout = { .sizing = {.width = CLAY_SIZING_FIXED(150), .height = CLAY_SIZING_GROW(0) }},
-                        .aspectRatio = { .aspectRatio = 1.0f }
+                        .layout = { .sizing = {.width = CLAY_SIZING_FIXED(150), .height = CLAY_SIZING_FIXED(150) }},
                     }) {
                         gui.element<ImageDisplay>("ico", ImageDisplay::Data{
                             .imgPath = main.conf.configPath / "saveThumbnails" / (fileList[i].fileName + ".jpg"),
