@@ -31,7 +31,7 @@ void ScrollArea::layout(const Clay_ElementId& id, const Options& options) {
         CLAY(localID, {
             .layout = {
                 .sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_GROW(0)},
-                .childAlignment = {.x = CLAY_ALIGN_X_LEFT, .y = CLAY_ALIGN_Y_TOP},
+                .childAlignment = {.x = opts.xAlign, .y = opts.yAlign},
                 .layoutDirection = opts.layoutDirection
             },
             .clip = {.horizontal = opts.clipHorizontal, .vertical = opts.clipVertical, .childOffset = {.x = scrollOffset.x(), .y = scrollOffset.y()}}

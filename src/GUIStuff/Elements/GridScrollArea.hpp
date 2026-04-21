@@ -10,7 +10,7 @@ class GridScrollArea : public Element {
         GridScrollArea(GUIManager& gui);
 
         struct Options {
-            float entryMaximumWidth;
+            float entryWidth;
             Clay_LayoutAlignmentX childAlignmentX = CLAY_ALIGN_X_LEFT;
             float entryHeight;
             size_t entryCount;

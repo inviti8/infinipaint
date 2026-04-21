@@ -1,5 +1,6 @@
 #include "ScrollAreaHelpers.hpp"
 #include "../GUIManager.hpp"
+#include "Helpers/ConvertVec.hpp"
 
 namespace GUIStuff { namespace ElementHelpers {
 
@@ -9,6 +10,8 @@ ScrollArea* scroll_area_many_entries(GUIManager& gui, const char* id, const Scro
         .clipHorizontal = options.clipHorizontal,
         .clipVertical = true,
         .showScrollbarY = true,
+        .xAlign = options.xAlign,
+        .yAlign = CLAY_ALIGN_Y_TOP,
         .innerContent = [&](const ScrollArea::InnerContentParameters& params) {
             if(options.innerContentExtraCallback) options.innerContentExtraCallback(params);
 
@@ -47,7 +50,7 @@ ScrollArea* scroll_area_many_entries(GUIManager& gui, const char* id, const Scro
                 for(size_t i = startPoint; i < endPoint; i++) {
                     gui.new_id(i - startPoint, [&] {
                         CLAY_AUTO_ID({
-                            .layout = { .sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_FIXED(options.entryHeight)}}
+                            .layout = { .sizing = {.width = options.xElementSize, .height = CLAY_SIZING_FIXED(options.entryHeight)}}
                         }) {
                             options.elementContent(i);
                         }

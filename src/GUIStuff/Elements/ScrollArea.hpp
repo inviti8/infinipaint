@@ -22,6 +22,8 @@ class ScrollArea : public Element {
             bool showScrollbarX = false;
             bool showScrollbarY = false;
             Clay_LayoutDirection layoutDirection = CLAY_TOP_TO_BOTTOM;
+            Clay_LayoutAlignmentX xAlign = CLAY_ALIGN_X_LEFT;
+            Clay_LayoutAlignmentY yAlign = CLAY_ALIGN_Y_TOP;
             std::function<void(const InnerContentParameters&)> innerContent;
         };
 

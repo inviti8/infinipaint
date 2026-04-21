@@ -2,6 +2,7 @@
 #include "../MainProgram.hpp"
 #include "../GUIHolder.hpp"
 #include "../GUIStuff/ElementHelpers/TextLabelHelpers.hpp"
+#include "../GUIStuff/ElementHelpers/ButtonHelpers.hpp"
 #include "Helpers/ConvertVec.hpp"
 #include "../GUIStuff/Elements/GridScrollArea.hpp"
 #include "../GUIStuff/Elements/ImageDisplay.hpp"
@@ -18,17 +19,30 @@ void FileSelectScreen::gui_layout_run() {
 
     CLAY_AUTO_ID({
         .layout = {
-            .sizing = {.width = CLAY_SIZING_FIXED(gui.io.windowSize.x()), .height = CLAY_SIZING_FIXED(gui.io.windowSize.y())},
-            .padding = {.top = 15},
-            .childGap = 15,
+            .sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_GROW(0)},
+            .padding = CLAY_PADDING_ALL(gui.io.theme->padding1),
+            .childGap = gui.io.theme->childGap1,
             .childAlignment = { .x = CLAY_ALIGN_X_CENTER, .y = CLAY_ALIGN_Y_TOP },
             .layoutDirection = CLAY_TOP_TO_BOTTOM,
         },
     }) {
-        text_label(gui, "File selector");
+        CLAY_AUTO_ID({
+            .layout = {
+                .sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_FIXED(40)},
+                .padding = CLAY_PADDING_ALL(gui.io.theme->padding1),
+                .childGap = gui.io.theme->childGap1,
+                .childAlignment = { .x = CLAY_ALIGN_X_LEFT, .y = CLAY_ALIGN_Y_CENTER },
+                .layoutDirection = CLAY_LEFT_TO_RIGHT,
+            }
+        }) {
+            svg_icon_button(gui, "main settings button", "data/icons/menu.svg", {
+                .drawType = SelectableButton::DrawType::TRANSPARENT_ALL
+            });
+            text_label(gui, "File selector");
+        }
         auto& fileList = get_file_list();
         gui.element<GridScrollArea>("File selector grid", GridScrollArea::Options{
-            .entryMaximumWidth = 200.0f,
+            .entryWidth = 200.0f,
             .childAlignmentX = CLAY_ALIGN_X_LEFT,
             .entryHeight = 220.0f,
             .entryCount = fileList.size(),
@@ -43,7 +57,7 @@ void FileSelectScreen::gui_layout_run() {
                     }
                 }) {
                     CLAY_AUTO_ID({
-                        .layout = { .sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_GROW(0) }},
+                        .layout = { .sizing = {.width = CLAY_SIZING_FIXED(150), .height = CLAY_SIZING_GROW(0) }},
                         .aspectRatio = { .aspectRatio = 1.0f }
                     }) {
                         gui.element<ImageDisplay>("ico", ImageDisplay::Data{
