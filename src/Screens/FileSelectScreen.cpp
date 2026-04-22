@@ -9,6 +9,7 @@
 #include "../GUIStuff/Elements/LayoutElement.hpp"
 #include "../World.hpp"
 #include "Helpers/StringHelpers.hpp"
+#include "DrawingProgramScreen.hpp"
 #include <SDL3/SDL_timer.h>
 
 #define MAIN_MENU_SIZE 300
@@ -139,8 +140,13 @@ void FileSelectScreen::file_view() {
         .entryHeight = 200.0f,
         .entryCount = fileList.size(),
         .elementContent = [&](size_t i) {
+            std::filesystem::path filePath = main.conf.configPath / folder / (fileList[i].fileName + ".infpnt");
             gui.element<SelectableButton>("file button", SelectableButton::Data{
-                .onClick = [&] {
+                .onClick = [&, filePath] {
+                    CustomEvents::emit_event<CustomEvents::OpenInfiniPaintFileEvent>({
+                        .isClient = false,
+                        .filePathSource = filePath
+                    });
                 },
                 .innerContent = [&](const SelectableButton::InnerContentCallbackParameters& c){
                     CLAY_AUTO_ID({
@@ -232,6 +238,11 @@ const std::vector<FileSelectScreen::FileInfo>& FileSelectScreen::get_file_list(c
         }
     }
     return fileListOptional.value();
+}
+
+void FileSelectScreen::input_open_infinipaint_file_callback(const CustomEvents::OpenInfiniPaintFileEvent& openFile) {
+    main.create_new_tab(openFile);
+    main.screen = std::make_unique<DrawingProgramScreen>(main);
 }
 
 void FileSelectScreen::draw(SkCanvas* canvas) {

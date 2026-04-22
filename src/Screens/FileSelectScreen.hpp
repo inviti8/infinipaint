@@ -6,6 +6,7 @@ class FileSelectScreen : public Screen {
         FileSelectScreen(MainProgram& m);
         virtual void gui_layout_run() override;
         virtual void draw(SkCanvas* canvas) override;
+        virtual void input_open_infinipaint_file_callback(const CustomEvents::OpenInfiniPaintFileEvent& openFile) override;
     private:
         struct FileInfo {
             std::string fileName;
