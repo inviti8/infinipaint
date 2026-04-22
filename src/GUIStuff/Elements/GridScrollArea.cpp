@@ -12,11 +12,13 @@ void GridScrollArea::layout(const Clay_ElementId& id, const Options& o) {
 
     options = o;
 
+    if(boundingBox.has_value())
+        rowWidth = boundingBox.value().width(); // Use grid element bounding box instead of inner content width because row width will decide whether a scroll bar appears or not, which will change the inner content width (circular dependency)
+
     ScrollBarManyEntriesOptions opts;
     opts.clipHorizontal = true;
     opts.entryHeight = options.entryHeight;
     opts.innerContentExtraCallback = [&, extraCallback = options.innerContentExtraCallback] (const ScrollArea::InnerContentParameters& contParams) {
-        rowWidth = std::fabs(contParams.containerDimensions.x());
         if(extraCallback) extraCallback(contParams);
     };
     size_t entriesPerRow = std::max<size_t>(rowWidth / options.entryWidth, 1);

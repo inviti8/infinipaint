@@ -258,9 +258,11 @@ void GUIManager::draw(SkCanvas* c, bool skiaAA) {
                     break;
                 }
                 case CLAY_RENDER_COMMAND_TYPE_SCISSOR_END: {
-                    canvas->restore();
-                    clipRectStack.pop_back();
-                    clip_rect_transform(canvas, clipRectStack, clipRect, clipNoDraw);
+                    if(!clipRectStack.empty()) {
+                        canvas->restore();
+                        clipRectStack.pop_back();
+                        clip_rect_transform(canvas, clipRectStack, clipRect, clipNoDraw);
+                    }
                     break;
                 }
                 case CLAY_RENDER_COMMAND_TYPE_CUSTOM: {
