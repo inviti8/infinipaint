@@ -61,7 +61,8 @@ class FileSelectScreen : public Screen {
         enum class FileViewType {
             LARGE_GRID,
             MEDIUM_GRID,
-            SMALL_GRID
+            SMALL_GRID,
+            LIST
         } fileViewType = FileViewType::LARGE_GRID;
 
         enum class MoreOptionsMenu {

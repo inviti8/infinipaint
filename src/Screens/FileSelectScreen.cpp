@@ -3,6 +3,7 @@
 #include "../GUIHolder.hpp"
 #include "../GUIStuff/ElementHelpers/TextLabelHelpers.hpp"
 #include "../GUIStuff/ElementHelpers/ButtonHelpers.hpp"
+#include "../GUIStuff/ElementHelpers/ScrollAreaHelpers.hpp"
 #include "Helpers/ConvertVec.hpp"
 #include "../GUIStuff/Elements/GridScrollArea.hpp"
 #include "../GUIStuff/Elements/ImageDisplay.hpp"
@@ -371,6 +372,10 @@ void FileSelectScreen::title_bar() {
                                     fileViewType = FileViewType::SMALL_GRID;
                                     moreOptionsMenu = MoreOptionsMenu::CLOSED;
                                 });
+                                text_transparent_option_button("List", "List", [&] {
+                                    fileViewType = FileViewType::LIST;
+                                    moreOptionsMenu = MoreOptionsMenu::CLOSED;
+                                });
                             }
                         }
                     }, LayoutElement::Callbacks{
@@ -441,43 +446,53 @@ void FileSelectScreen::file_view() {
     auto& gui = main.g.gui;
     std::filesystem::path folderPath = (selectedMenu == SelectedMenu::TRASH) ? trashPath : savePath;
 
-    Vector2f entrySize{0.0f, 0.0f};
-    Vector2f iconSize{0.0f, 0.0f};
-    switch(fileViewType) {
-        case FileViewType::LARGE_GRID:
-            entrySize = {200.0f, 220.0f};
-            iconSize = {150.0f, 150.0f};
-            break;
-        case FileViewType::MEDIUM_GRID:
-            entrySize = {170.0f, 190.0f};
-            iconSize = {120.0f, 120.0f};
-            break;
-        case FileViewType::SMALL_GRID:
-            entrySize = {140.0f, 160.0f};
-            iconSize = {90.0f, 90.0f};
-            break;
-    }
-
-    gui.element<GridScrollArea>("File selector grid", GridScrollArea::Options{
-        .entryWidth = entrySize.x(),
-        .childAlignmentX = CLAY_ALIGN_X_LEFT,
-        .entryHeight = entrySize.y(),
-        .entryCount = fileList.size(),
-        .elementContent = [&](size_t i) {
-            std::filesystem::path filePath = folderPath / (fileList[i].fileName + "." + World::FILE_EXTENSION);
-            gui.element<SelectableButton>("file button", SelectableButton::Data{
-                .isSelected = editMode && fileList[i].selected,
-                .onClick = [&, filePath, i] {
-                    if(editMode)
-                        fileList[i].selected = !fileList[i].selected;
-                    else {
-                        CustomEvents::emit_event<CustomEvents::OpenInfiniPaintFileEvent>({
-                            .isClient = false,
-                            .filePathSource = filePath
-                        });
+    auto fileButton = [&] (size_t i, bool isList, const Vector2f& iconSize) {
+        std::filesystem::path filePath = folderPath / (fileList[i].fileName + "." + World::FILE_EXTENSION);
+        gui.element<SelectableButton>("file button", SelectableButton::Data{
+            .isSelected = editMode && fileList[i].selected,
+            .onClick = [&, filePath, i] {
+                if(editMode)
+                    fileList[i].selected = !fileList[i].selected;
+                else {
+                    CustomEvents::emit_event<CustomEvents::OpenInfiniPaintFileEvent>({
+                        .isClient = false,
+                        .filePathSource = filePath
+                    });
+                }
+            },
+            .innerContent = [&](const SelectableButton::InnerContentCallbackParameters& c){
+                if(isList) {
+                    CLAY_AUTO_ID({
+                        .layout = {
+                            .sizing = { .width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_GROW(0)},
+                            .padding = CLAY_PADDING_ALL(gui.io.theme->padding1),
+                            .childGap = 6,
+                            .childAlignment = { .x = CLAY_ALIGN_X_LEFT, .y = CLAY_ALIGN_Y_CENTER },
+                            .layoutDirection = CLAY_LEFT_TO_RIGHT
+                        }
+                    }) {
+                        CLAY_AUTO_ID({
+                            .layout = { .sizing = {.width = CLAY_SIZING_FIXED(iconSize.x()), .height = CLAY_SIZING_FIXED(iconSize.y()) }},
+                        }) {
+                            gui.element<ImageDisplay>("ico", ImageDisplay::Data{
+                                .imgPath = folderPath / (fileList[i].fileName + ".jpg"),
+                                .radius = 20
+                            });
+                        }
+                        CLAY_AUTO_ID({
+                            .layout = {
+                                .sizing = { .width = CLAY_SIZING_FIT(0), .height = CLAY_SIZING_FIT(0)},
+                                .childGap = 6,
+                                .childAlignment = { .x = CLAY_ALIGN_X_LEFT, .y = CLAY_ALIGN_Y_CENTER },
+                                .layoutDirection = CLAY_TOP_TO_BOTTOM
+                            }
+                        }) {
+                            text_label(gui, fileList[i].fileName);
+                            text_label_light(gui, fileList[i].lastModifyDate);
+                        }
                     }
-                },
-                .innerContent = [&](const SelectableButton::InnerContentCallbackParameters& c){
+                }
+                else {
                     CLAY_AUTO_ID({
                         .layout = {
                             .sizing = { .width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_GROW(0)},
@@ -499,9 +514,49 @@ void FileSelectScreen::file_view() {
                         text_label_light(gui, fileList[i].lastModifyDate);
                     }
                 }
-            });
+            }
+        });
+    };
+
+    if(fileViewType == FileViewType::LIST) {
+        scroll_area_many_entries(gui, "File selector list", ScrollBarManyEntriesOptions{
+            .entryHeight = 150.0f,
+            .entryCount = fileList.size(),
+            .clipHorizontal = true,
+            .elementContent = [&](size_t i) {
+                fileButton(i, true, Vector2f{100.0f, 100.0f});
+            }
+        });
+    }
+    else {
+        Vector2f entrySize{0.0f, 0.0f};
+        Vector2f iconSize{0.0f, 0.0f};
+        switch(fileViewType) {
+            case FileViewType::LARGE_GRID:
+                entrySize = {200.0f, 220.0f};
+                iconSize = {150.0f, 150.0f};
+                break;
+            case FileViewType::MEDIUM_GRID:
+                entrySize = {170.0f, 190.0f};
+                iconSize = {120.0f, 120.0f};
+                break;
+            case FileViewType::SMALL_GRID:
+                entrySize = {140.0f, 160.0f};
+                iconSize = {90.0f, 90.0f};
+                break;
+            default:
+                break;
         }
-    });
+        gui.element<GridScrollArea>("File selector grid", GridScrollArea::Options{
+            .entryWidth = entrySize.x(),
+            .childAlignmentX = CLAY_ALIGN_X_LEFT,
+            .entryHeight = entrySize.y(),
+            .entryCount = fileList.size(),
+            .elementContent = [&](size_t i) {
+                fileButton(i, false, iconSize);
+            }
+        });
+    }
 }
 
 void FileSelectScreen::menu_black_box() {
