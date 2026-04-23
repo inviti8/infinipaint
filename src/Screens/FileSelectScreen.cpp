@@ -282,7 +282,7 @@ void FileSelectScreen::edit_action_bar() {
                 .childAlignment = { .x = CLAY_ALIGN_X_CENTER, .y = CLAY_ALIGN_Y_CENTER },
                 .layoutDirection = CLAY_LEFT_TO_RIGHT,
             },
-            .backgroundColor = convert_vec4<Clay_Color>(gui.io.theme->backColor2),
+            .backgroundColor = convert_vec4<Clay_Color>(gui.io.theme->backColor1),
         }) {
             if(selectedMenu == SelectedMenu::FILES) {
                 edit_action_bar_button("trash", "data/icons/trash.svg", "Trash", [&] {
@@ -379,7 +379,7 @@ void FileSelectScreen::title_bar() {
                                 .sizing = {.width = CLAY_SIZING_FIT(200), .height = CLAY_SIZING_FIT(0)},
                                 .layoutDirection = CLAY_TOP_TO_BOTTOM
                             },
-                            .backgroundColor = convert_vec4<Clay_Color>(gui.io.theme->backColor2),
+                            .backgroundColor = convert_vec4<Clay_Color>(gui.io.theme->backColor1),
                             .cornerRadius = CLAY_CORNER_RADIUS(4)
                         }) {
                             if(moreOptionsMenu == MoreOptionsMenu::MAIN) {
@@ -635,7 +635,7 @@ void FileSelectScreen::input_open_infinipaint_file_callback(const CustomEvents::
 }
 
 void FileSelectScreen::draw(SkCanvas* canvas) {
-    canvas->clear(main.g.gui.io.theme->backColor1);
+    canvas->clear(main.g.gui.io.theme->backColor0);
 }
 
 FileSelectScreen::~FileSelectScreen() {

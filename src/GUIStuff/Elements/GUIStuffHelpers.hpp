@@ -78,6 +78,7 @@ SkFont get_setup_skfont();
 struct Theme {
     SkColor4f fillColor1 = {0.8f, 0.785f, 1.0f, 1.0f};
     SkColor4f fillColor2 = {0.3f, 0.3f, 0.477f, 1.0f};
+    SkColor4f backColor0 = {0.0f, 0.0f, 0.0f, 1.0f};
     SkColor4f backColor1 = {0.0f, 0.0f, 0.0f, 1.0f};
     SkColor4f backColor2 = {1.0f, 1.0f, 1.0f, 1.0f};
     SkColor4f frontColor1 = {1.0f, 1.0f, 1.0f, 1.0f};
