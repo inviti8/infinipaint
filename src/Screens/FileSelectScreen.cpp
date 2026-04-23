@@ -234,6 +234,33 @@ void FileSelectScreen::move_selected_files(const std::filesystem::path& fromPath
     }
 }
 
+void FileSelectScreen::duplicate_selected_files(const std::filesystem::path& inPath) {
+    std::vector<std::string> toFolderListNames;
+
+    int globCount;
+    char** filesInPath = SDL_GlobDirectory(inPath.c_str(), "*", 0, &globCount);
+    if(filesInPath) {
+        for(int i = 0; i < globCount; i++) {
+            std::filesystem::path p(filesInPath[i]);
+            toFolderListNames.emplace_back(p.filename().stem());
+        }
+    }
+    else
+        SDL_CreateDirectory(inPath.string().c_str());
+
+    for(const FileInfo& f : fileList) {
+        if(f.selected) {
+            std::string newFileName = ensure_string_unique(toFolderListNames, f.fileName);
+            std::filesystem::path filePath = inPath / (f.fileName + World::DOT_FILE_EXTENSION);
+            std::filesystem::path thumbnailPath = inPath / (f.fileName + ".jpg");
+            std::filesystem::path newFilePath = inPath / (newFileName + "." + World::FILE_EXTENSION);
+            std::filesystem::path newThumbnailPath = inPath / (newFileName + ".jpg");
+            SDL_CopyFile(filePath.string().c_str(), newFilePath.string().c_str());
+            SDL_CopyFile(thumbnailPath.string().c_str(), newThumbnailPath.string().c_str());
+        }
+    }
+}
+
 void FileSelectScreen::delete_selected_files_in_trash() {
     for(const FileInfo& f : fileList) {
         if(f.selected) {
@@ -260,6 +287,11 @@ void FileSelectScreen::edit_action_bar() {
             if(selectedMenu == SelectedMenu::FILES) {
                 edit_action_bar_button("trash", "data/icons/trash.svg", "Trash", [&] {
                     move_selected_files(savePath, trashPath, TrashMoveType::MOVE_TO_TRASH);
+                    update_file_list(fileList, savePath, false);
+                    editMode = false;
+                });
+                edit_action_bar_button("duplicate", "data/icons/RemixIcon/file-copy-line.svg", "Duplicate", [&] {
+                    duplicate_selected_files(savePath);
                     update_file_list(fileList, savePath, false);
                     editMode = false;
                 });
