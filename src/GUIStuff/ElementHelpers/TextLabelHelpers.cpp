@@ -1,4 +1,5 @@
 #include "TextLabelHelpers.hpp"
+#include "../Elements/MutableTextLabel.hpp"
 
 namespace GUIStuff { namespace ElementHelpers {
 
@@ -38,6 +39,10 @@ void text_label_light_centered(GUIManager& gui, std::string_view val) {
     }) {
         CLAY_TEXT(gui.strArena.std_str_to_clay_str(val), CLAY_TEXT_CONFIG({.textColor = convert_vec4<Clay_Color>(gui.io.theme->frontColor2), .fontSize = gui.io.fontSize, .textAlignment = CLAY_TEXT_ALIGN_CENTER}));
     }
+}
+
+void mutable_text_label(GUIManager& gui, const char* id, const std::string& val) {
+    gui.element<MutableTextLabel>(id, val, CLAY_TEXT_CONFIG({.textColor = convert_vec4<Clay_Color>(gui.io.theme->frontColor1), .fontSize = gui.io.fontSize }));
 }
 
 }}

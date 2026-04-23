@@ -42,7 +42,6 @@ MainProgram::MainProgram():
     fonts(std::make_shared<FontData>()),
     g(*this)
 {
-    screen = std::make_unique<FileSelectScreen>(*this);
     Logger::get().add_log("WORLDFATAL", [&](const std::string& text) {
         *logFile << "[WORLDFATAL] " << text << std::endl;
         std::cout << "[WORLDFATAL] " << text << std::endl;
@@ -95,74 +94,67 @@ void MainProgram::init_net_library() {
 }
 
 void MainProgram::save_config() {
-    std::ofstream f(conf.configPath / "config.json");
-    if(f.is_open()) {
-        using json = nlohmann::json;
-        json j;
+    using json = nlohmann::json;
+    json j;
 
-        j["version"] = VersionConstants::CURRENT_VERSION_STRING;
-        j["settings"] = conf.get_config_json(input);
-        j["window"]["pos"] = window.writtenPos;
-        j["window"]["size"] = window.writtenSize;
-        j["window"]["maximized"] = window.maximized;
-        j["window"]["fullscreen"] = window.fullscreen;
-        j["fileselectorpath"] = conf.currentSearchPath;
-        j["toolConfig"] = toolConfig;
+    j["version"] = VersionConstants::CURRENT_VERSION_STRING;
+    j["settings"] = conf.get_config_json(input);
+    j["window"]["pos"] = window.writtenPos;
+    j["window"]["size"] = window.writtenSize;
+    j["window"]["maximized"] = window.maximized;
+    j["window"]["fullscreen"] = window.fullscreen;
+    j["fileselectorpath"] = conf.currentSearchPath;
+    j["toolConfig"] = toolConfig;
 
-        f << std::setw(4) << j;
-        f.close();
-    }
+    std::stringstream f;
+    f << std::setw(4) << j;
+    SDL_SaveFile((conf.configPath / "config.json").string().c_str(), f.view().data(), f.view().size());
     conf.save_palettes();
 }
 
 void MainProgram::load_config() {
-    std::ifstream f(conf.configPath / "config.json");
     conf.currentSearchPath = homePath;
-    if(f.is_open()) {
-        using json = nlohmann::json;
+    using json = nlohmann::json;
+
+    try {
+        json j(nlohmann::json::parse(read_file_to_string(conf.configPath / "config.json")));
+
+        VersionNumber version(0, 0, 1);
+        try {
+            std::string versionStr;
+            j.at("version").get_to(versionStr);
+            auto optVersion = version_str_to_version_numbers(versionStr);
+            if(optVersion.has_value())
+                version = optVersion.value();
+        }
+        catch(...) {}
 
         try {
-            json j;
-            f >> j;
-
-            VersionNumber version(0, 0, 1);
-            try {
-                std::string versionStr;
-                j.at("version").get_to(versionStr);
-                auto optVersion = version_str_to_version_numbers(versionStr);
-                if(optVersion.has_value())
-                    version = optVersion.value();
-            }
-            catch(...) {}
-
-            try {
-                conf.set_config_json(input, j["settings"], version);
-            }
-            catch(...) {}
+            conf.set_config_json(input, j["settings"], version);
+        }
+        catch(...) {}
 #ifndef __EMSCRIPTEN__
-            try {
-                j.at("window").at("size").get_to(window.size);
-                window.writtenSize = window.size;
-                j.at("window").at("pos").get_to(window.pos);
-                window.writtenPos = window.pos;
-                j.at("window").at("maximized").get_to(window.maximized);
-                j.at("window").at("fullscreen").get_to(window.fullscreen);
-            }
-            catch(...) {}
-            try {
-                j.at("fileselectorpath").get_to(conf.currentSearchPath);
-            }
-            catch(...) {
-                conf.currentSearchPath = homePath;
-            }
+        try {
+            j.at("window").at("size").get_to(window.size);
+            window.writtenSize = window.size;
+            j.at("window").at("pos").get_to(window.pos);
+            window.writtenPos = window.pos;
+            j.at("window").at("maximized").get_to(window.maximized);
+            j.at("window").at("fullscreen").get_to(window.fullscreen);
+        }
+        catch(...) {}
+        try {
+            j.at("fileselectorpath").get_to(conf.currentSearchPath);
+        }
+        catch(...) {
+            conf.currentSearchPath = homePath;
+        }
 #endif
-            try {
-                j.at("toolConfig").get_to(toolConfig);
-            }
-            catch(...) {}
-            f.close();
-        } catch(...) {}
-    }
+        try {
+            j.at("toolConfig").get_to(toolConfig);
+        }
+        catch(...) {}
+    } catch(...) {}
 #ifdef __EMSCRIPTEN__
     else
         conf.viewWebVersionWelcome = true;
@@ -465,5 +457,6 @@ void MainProgram::early_destroy() {
 }
 
 MainProgram::~MainProgram() {
+    screen = nullptr; // Destroy screen first to let destructor run
     NetLibrary::destroy();
 }

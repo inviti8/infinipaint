@@ -17,15 +17,6 @@ void PositionAdjustingPopupMenu::layout(const Clay_ElementId& id, Vector2f popup
 
     layoutElement = gui.element<LayoutElement>("popup", [&] (LayoutElement*, const Clay_ElementId& lId) {
         CLAY(lId, {
-            .layout = { 
-                .sizing = {.width = CLAY_SIZING_FIT(100), .height = CLAY_SIZING_FIT(0)},
-                .padding = CLAY_PADDING_ALL(gui.io.theme->padding1),
-                .childGap = 1,
-                .childAlignment = { .x = CLAY_ALIGN_X_CENTER, .y = CLAY_ALIGN_Y_TOP},
-                .layoutDirection = CLAY_TOP_TO_BOTTOM
-            },
-            .backgroundColor = convert_vec4<Clay_Color>(gui.io.theme->backColor1),
-            .cornerRadius = CLAY_CORNER_RADIUS(gui.io.theme->windowCorners1),
             .floating = {
                 .offset = {popupPos.x(), popupPos.y()},
                 .zIndex = gui.get_z_index(),

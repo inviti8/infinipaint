@@ -2,6 +2,7 @@
 #include "Helpers/SCollision.hpp"
 #include "Helpers/StringHelpers.hpp"
 #include "Helpers/FileDownloader.hpp"
+#include "Screens/FileSelectScreen.hpp"
 #include "VersionConstants.hpp"
 #include "include/gpu/GpuTypes.h"
 #include <SDL3/SDL_filesystem.h>
@@ -534,6 +535,8 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv) {
                 });
             }
         }
+
+        mS.m->screen = std::make_unique<FileSelectScreen>(*mS.m);
 
         mS.m->update(); // Run update once to make sure that callbacks dont crash
 

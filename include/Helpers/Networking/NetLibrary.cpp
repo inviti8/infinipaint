@@ -1,5 +1,4 @@
 #include "NetLibrary.hpp"
-#include <fstream>
 #include <nlohmann/json.hpp>
 #include <rtc/peerconnection.hpp>
 #include "../Logger.hpp"
@@ -175,29 +174,23 @@ void NetLibrary::init(const std::filesystem::path& p2pConfigPath) {
 }
 
 void NetLibrary::copy_default_p2p_config_to_path(const std::filesystem::path& newP2PConfigPath) {
-    std::ifstream checkIfFileAlreadyExists(newP2PConfigPath);
-    if(checkIfFileAlreadyExists.is_open()) { // Don't copy if P2P config exists already
+    try {
+        std::string readLocalP2PConfig = read_file_to_string(newP2PConfigPath); // If it doesnt fail, then file exists, so dont copy p2p config
         Logger::get().log("INFO", "Local P2P configuration already exists");
-        checkIfFileAlreadyExists.close();
         return;
-    }
-    std::ifstream defaultP2PConfig("data/config/default_p2p.json");
-    if(defaultP2PConfig.is_open()) {
-        nlohmann::json j;
-        defaultP2PConfig >> j;
-        defaultP2PConfig.close();
+    } catch(...) {}
 
-        std::ofstream newFile(newP2PConfigPath);
-        if(newFile.is_open()) {
-            newFile << std::setw(4) << j;
-            newFile.close();
+    try {
+        nlohmann::json j(nlohmann::json::parse(read_file_to_string("data/config/default_p2p.json")));
+        std::stringstream newFileSS;
+        newFileSS << std::setw(4) << j;
+        if(SDL_SaveFile(newP2PConfigPath.string().c_str(), newFileSS.view().data(), newFileSS.view().size()))
             Logger::get().log("INFO", "New P2P configuration created");
-        }
         else
             Logger::get().log("INFO", "[NetLibrary::copy_default_p2p_config_to_path] Could not open new p2p.json to write to");
-    }
-    else
+    } catch(...) {
         Logger::get().log("INFO", "[NetLibrary::copy_default_p2p_config_to_path] Could not open default_p2p.json");
+    }
 }
 
 std::string NetLibrary::get_random_server_local_id() {

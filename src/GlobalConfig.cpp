@@ -1,5 +1,6 @@
 #include "GlobalConfig.hpp"
 #include <Helpers/Random.hpp>
+#include "Helpers/StringHelpers.hpp"
 #include "ResourceDisplay/ImageResourceDisplay.hpp"
 #include "DrawingProgram/DrawingProgramCache.hpp"
 #include <SDL3/SDL_time.h>
@@ -132,32 +133,25 @@ void GlobalConfig::set_config_json(InputManager& input, const nlohmann::json& j,
 }
 
 void GlobalConfig::save_palettes() {
-    std::ofstream f(configPath / "palettes.json");
-    if(f.is_open()) {
-        using json = nlohmann::json;
-        json j;
-        auto palettesToSave = palettes;
-        palettesToSave.erase(palettesToSave.begin());
-        j = palettesToSave;
-        f << j;
-        f.close();
-    }
+    using json = nlohmann::json;
+    json j;
+    auto palettesToSave = palettes;
+    palettesToSave.erase(palettesToSave.begin());
+    nlohmann::to_json(j, palettesToSave);
+    std::stringstream f;
+    f << j;
+    SDL_SaveFile((configPath / "palettes.json").string().c_str(), f.view().data(), f.view().size());
 }
 
 void GlobalConfig::load_palettes() {
-    std::ifstream f(configPath / "palettes.json");
     load_default_palette();
-    if(f.is_open()) {
-        using json = nlohmann::json;
-        try {
-            json j;
-            f >> j;
-            std::vector<Palette> palettes;
-            j.get_to(palettes);
-            palettes.insert(palettes.end(), palettes.begin(), palettes.end());
-        } catch(...) {}
-        f.close();
-    }
+    using json = nlohmann::json;
+    try {
+        json j(nlohmann::json::parse(read_file_to_string(configPath / "palettes.json")));
+        std::vector<Palette> palettes;
+        j.get_to(palettes);
+        palettes.insert(palettes.end(), palettes.begin(), palettes.end());
+    } catch(...) {}
 }
 
 void GlobalConfig::load_default_palette() {
