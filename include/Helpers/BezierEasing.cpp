@@ -9,6 +9,8 @@
 
 BezierEasing BezierEasing::linear{0.0, 1.0, 0.0, 1.0};
 
+BezierEasing::BezierEasing() {}
+
 BezierEasing::BezierEasing(Eigen::Vector4f c):
     BezierEasing(c.x(), c.y(), c.z(), c.w()) {}
 

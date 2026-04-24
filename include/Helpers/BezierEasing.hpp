@@ -11,8 +11,10 @@
 
 class BezierEasing {
     public:
+        BezierEasing();
         BezierEasing(Eigen::Vector4f c);
         BezierEasing(float x1, float y1, float x2, float y2);
+        BezierEasing& operator=(const BezierEasing& b) = default;
         float operator() (float x) const;
         static BezierEasing linear;
     private:
