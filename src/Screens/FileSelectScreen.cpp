@@ -116,52 +116,58 @@ void FileSelectScreen::main_display() {
             .layoutDirection = CLAY_LEFT_TO_RIGHT
         },
     }) {
-        if(mainMenuOpen)
-            main_menu();
-        if(!(mainMenuOpen && main_menu_fills_screen())) {
+        mainMenuOpenAnim = gui.float_animation("main menu animation", {
+            .duration = 0.1f,
+            .easing = BezierEasing(0.36f, 0.0f, 0.64f, 1.0f)
+        });
+        actionBarOpenAnim = gui.float_animation("action bar animation", {
+            .duration = 0.1f,
+            .easing = BezierEasing(0.36f, 0.0f, 0.64f, 1.0f)
+        });
+        main_menu();
+        CLAY_AUTO_ID({
+            .layout = {
+                .sizing = {.width = CLAY_SIZING_FIXED(gui.io.windowSize.x()), .height = CLAY_SIZING_GROW(0)},
+                .childAlignment = { .x = CLAY_ALIGN_X_CENTER, .y = CLAY_ALIGN_Y_TOP },
+                .layoutDirection = CLAY_TOP_TO_BOTTOM,
+            },
+        }) {
             CLAY_AUTO_ID({
                 .layout = {
-                    .sizing = {.width = CLAY_SIZING_FIXED(gui.io.windowSize.x()), .height = CLAY_SIZING_GROW(0)},
+                    .sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_GROW(0)},
+                    .padding = CLAY_PADDING_ALL(gui.io.theme->padding1),
+                    .childGap = gui.io.theme->childGap1,
                     .childAlignment = { .x = CLAY_ALIGN_X_CENTER, .y = CLAY_ALIGN_Y_TOP },
                     .layoutDirection = CLAY_TOP_TO_BOTTOM,
                 },
             }) {
-                CLAY_AUTO_ID({
-                    .layout = {
-                        .sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_GROW(0)},
-                        .padding = CLAY_PADDING_ALL(gui.io.theme->padding1),
-                        .childGap = gui.io.theme->childGap1,
-                        .childAlignment = { .x = CLAY_ALIGN_X_CENTER, .y = CLAY_ALIGN_Y_TOP },
-                        .layoutDirection = CLAY_TOP_TO_BOTTOM,
-                    },
-                }) {
-                    if(editMode) {
-                        numberOfSelectedEntries = std::count_if(fileList.begin(), fileList.end(), [] (const FileInfo& f) { return f.selected; });
-                        edit_title_bar();
-                    }
+                if(editMode) {
+                    numberOfSelectedEntries = std::count_if(fileList.begin(), fileList.end(), [] (const FileInfo& f) { return f.selected; });
+                    if(numberOfSelectedEntries == 0)
+                        actionBarOpenAnim->animation_trigger_reverse();
                     else
-                        title_bar();
-                    switch(selectedMenu) {
-                        case SelectedMenu::FILES:
-                            file_view();
-                            break;
-                        case SelectedMenu::TRASH:
-                            file_view();
-                            break;
-                        case SelectedMenu::SETTINGS:
-                            break;
-                    }
-                    menu_black_box();
+                        actionBarOpenAnim->animation_trigger();
+                    edit_title_bar();
                 }
-                if(editMode && numberOfSelectedEntries != 0)
-                    edit_action_bar();
+                else {
+                    actionBarOpenAnim->animation_trigger_reverse();
+                    title_bar();
+                }
+                switch(selectedMenu) {
+                    case SelectedMenu::FILES:
+                        file_view();
+                        break;
+                    case SelectedMenu::TRASH:
+                        file_view();
+                        break;
+                    case SelectedMenu::SETTINGS:
+                        break;
+                }
+                menu_black_box();
             }
+            edit_action_bar();
         }
     }
-}
-
-bool FileSelectScreen::main_menu_fills_screen() {
-    return main.g.gui.io.windowSize.x() < MAIN_MENU_SIZE + 50;
 }
 
 void FileSelectScreen::edit_action_bar_button(const char* id, const std::string& svgPath, const char* text, const std::function<void()>& onClick) {
@@ -275,41 +281,45 @@ void FileSelectScreen::delete_selected_files_in_trash() {
 
 void FileSelectScreen::edit_action_bar() {
     auto& gui = main.g.gui;
-    gui.element<LayoutElement>("edit action bar", [&](LayoutElement*, const Clay_ElementId& lId) {
-        CLAY(lId, {
-            .layout = {
-                .sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_FIT(0)},
-                .childAlignment = { .x = CLAY_ALIGN_X_CENTER, .y = CLAY_ALIGN_Y_CENTER },
-                .layoutDirection = CLAY_LEFT_TO_RIGHT,
-            },
-            .backgroundColor = convert_vec4<Clay_Color>(gui.io.theme->backColor1),
-        }) {
-            if(selectedMenu == SelectedMenu::FILES) {
-                edit_action_bar_button("trash", "data/icons/trash.svg", "Trash", [&] {
-                    move_selected_files(savePath, trashPath, TrashMoveType::MOVE_TO_TRASH);
-                    update_file_list(fileList, savePath, false);
-                    editMode = false;
-                });
-                edit_action_bar_button("duplicate", "data/icons/RemixIcon/file-copy-line.svg", "Duplicate", [&] {
-                    duplicate_selected_files(savePath);
-                    update_file_list(fileList, savePath, false);
-                    editMode = false;
-                });
+    if(actionBarOpenAnim->get_val()) {
+        gui.element<LayoutElement>("edit action bar", [&](LayoutElement*, const Clay_ElementId& lId) {
+            CLAY(lId, {
+                .layout = {
+                    .sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_FIXED(50 * actionBarOpenAnim->get_val())},
+                    .childAlignment = { .x = CLAY_ALIGN_X_CENTER, .y = CLAY_ALIGN_Y_CENTER },
+                    .layoutDirection = CLAY_LEFT_TO_RIGHT,
+                },
+                .backgroundColor = convert_vec4<Clay_Color>(gui.io.theme->backColor1),
+            }) {
+                if(actionBarOpenAnim->is_at_end()) {
+                    if(selectedMenu == SelectedMenu::FILES) {
+                        edit_action_bar_button("trash", "data/icons/trash.svg", "Trash", [&] {
+                            move_selected_files(savePath, trashPath, TrashMoveType::MOVE_TO_TRASH);
+                            update_file_list(fileList, savePath, false);
+                            editMode = false;
+                        });
+                        edit_action_bar_button("duplicate", "data/icons/RemixIcon/file-copy-line.svg", "Duplicate", [&] {
+                            duplicate_selected_files(savePath);
+                            update_file_list(fileList, savePath, false);
+                            editMode = false;
+                        });
+                    }
+                    else if(selectedMenu == SelectedMenu::TRASH) {
+                        edit_action_bar_button("restore", "data/icons/RemixIcon/refresh-line.svg", "Restore", [&] {
+                            move_selected_files(trashPath, savePath, TrashMoveType::MOVE_OUT_OF_TRASH);
+                            update_file_list(fileList, trashPath, true);
+                            editMode = false;
+                        });
+                        edit_action_bar_button("delete", "data/icons/trash.svg", "Delete", [&] {
+                            delete_selected_files_in_trash();
+                            update_file_list(fileList, trashPath, true);
+                            editMode = false;
+                        });
+                    }
+                }
             }
-            else if(selectedMenu == SelectedMenu::TRASH) {
-                edit_action_bar_button("restore", "data/icons/RemixIcon/refresh-line.svg", "Restore", [&] {
-                    move_selected_files(trashPath, savePath, TrashMoveType::MOVE_OUT_OF_TRASH);
-                    update_file_list(fileList, trashPath, true);
-                    editMode = false;
-                });
-                edit_action_bar_button("delete", "data/icons/trash.svg", "Delete", [&] {
-                    delete_selected_files_in_trash();
-                    update_file_list(fileList, trashPath, true);
-                    editMode = false;
-                });
-            }
-        }
-    });
+        });
+    }
 }
 
 void FileSelectScreen::edit_title_bar() {
@@ -345,7 +355,7 @@ void FileSelectScreen::title_bar() {
         svg_icon_button(gui, "main settings button", "data/icons/menu.svg", {
             .drawType = SelectableButton::DrawType::TRANSPARENT_ALL,
             .onClick = [&] {
-                mainMenuOpen = true;
+                mainMenuOpenAnim->animation_trigger();
             }
         });
         switch(selectedMenu) {
@@ -446,32 +456,36 @@ void FileSelectScreen::icon_text_transparent_option_selected_button(const char* 
 }
 
 void FileSelectScreen::main_menu() {
-    auto& gui = main.g.gui;
-    gui.element<LayoutElement>("main menu popup", [&] (LayoutElement*, const Clay_ElementId& lId) {
-        CLAY(lId, {
-            .layout = {
-                .sizing = {.width = CLAY_SIZING_GROW(static_cast<float>(main_menu_fills_screen() ? 0 : 300)), .height = CLAY_SIZING_GROW(0)},
-                .padding = CLAY_PADDING_ALL(gui.io.theme->padding1),
-                .childGap = 0,
-                .layoutDirection = CLAY_TOP_TO_BOTTOM,
-            },
-        }) {
-            icon_text_transparent_option_selected_button("Files", "data/icons/folder.svg", "Files", selectedMenu == SelectedMenu::FILES, [&] {
-                selectedMenu = SelectedMenu::FILES;
-                update_file_list(fileList, savePath, false);
-                mainMenuOpen = false;
-            });
-            icon_text_transparent_option_selected_button("Trash", "data/icons/trash.svg", "Trash", selectedMenu == SelectedMenu::TRASH, [&] {
-                selectedMenu = SelectedMenu::TRASH;
-                update_file_list(fileList, trashPath, true);
-                mainMenuOpen = false;
-            });
-            icon_text_transparent_option_selected_button("Settings", "data/icons/RemixIcon/settings-3-line.svg", "Settings", selectedMenu == SelectedMenu::SETTINGS, [&] {
-                selectedMenu = SelectedMenu::SETTINGS;
-                mainMenuOpen = false;
-            });
-        }
-    });
+    if(!mainMenuOpenAnim->is_at_start()) {
+        auto& gui = main.g.gui;
+        gui.element<LayoutElement>("main menu popup", [&] (LayoutElement*, const Clay_ElementId& lId) {
+            CLAY(lId, {
+                .layout = {
+                    .sizing = {.width = CLAY_SIZING_FIXED(300.0f * mainMenuOpenAnim->get_val()), .height = CLAY_SIZING_GROW(0)},
+                    .padding = CLAY_PADDING_ALL(gui.io.theme->padding1),
+                    .childGap = 0,
+                    .layoutDirection = CLAY_TOP_TO_BOTTOM,
+                },
+            }) {
+                if(mainMenuOpenAnim->is_at_end()) {
+                    icon_text_transparent_option_selected_button("Files", "data/icons/folder.svg", "Files", selectedMenu == SelectedMenu::FILES, [&] {
+                        selectedMenu = SelectedMenu::FILES;
+                        update_file_list(fileList, savePath, false);
+                        mainMenuOpenAnim->animation_trigger_reverse();
+                    });
+                    icon_text_transparent_option_selected_button("Trash", "data/icons/trash.svg", "Trash", selectedMenu == SelectedMenu::TRASH, [&] {
+                        selectedMenu = SelectedMenu::TRASH;
+                        update_file_list(fileList, trashPath, true);
+                        mainMenuOpenAnim->animation_trigger_reverse();
+                    });
+                    icon_text_transparent_option_selected_button("Settings", "data/icons/RemixIcon/settings-3-line.svg", "Settings", selectedMenu == SelectedMenu::SETTINGS, [&] {
+                        selectedMenu = SelectedMenu::SETTINGS;
+                        mainMenuOpenAnim->animation_trigger_reverse();
+                    });
+                }
+            }
+        });
+    }
 }
 
 void FileSelectScreen::file_view() {
@@ -593,14 +607,14 @@ void FileSelectScreen::file_view() {
 
 void FileSelectScreen::menu_black_box() {
     auto& gui = main.g.gui;
-    if(mainMenuOpen) {
+    if(!mainMenuOpenAnim->is_at_start()) {
         gui.set_z_index(gui.get_z_index() + 1, [&] {
             gui.element<LayoutElement>("file list disable fill", [&] (LayoutElement* l, const Clay_ElementId& lId) {
                 CLAY(lId, {
                     .layout = {
                         .sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_GROW(0)},
                     },
-                    .backgroundColor = {0.0f, 0.0f, 0.0f, 0.6f},
+                    .backgroundColor = {0.0f, 0.0f, 0.0f, 0.6f * mainMenuOpenAnim->get_val()},
                     .floating = {
                         .zIndex = gui.get_z_index(),
                         .attachPoints = {
@@ -614,7 +628,7 @@ void FileSelectScreen::menu_black_box() {
             }, LayoutElement::Callbacks{
                 .mouseButton = [&] (LayoutElement* l, const InputManager::MouseButtonCallbackArgs& m) {
                     if(m.down && m.button == InputManager::MouseButton::LEFT && l->mouseHovering) {
-                        mainMenuOpen = false;
+                        mainMenuOpenAnim->animation_trigger_reverse();
                         gui.set_to_layout();
                     }
                 }

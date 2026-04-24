@@ -4,6 +4,7 @@
 #include "GUIManagerID.hpp"
 #include <clay.h>
 #include "Elements/Element.hpp"
+#include "GUIFloatAnimation.hpp"
 
 using namespace Eigen;
 
@@ -21,6 +22,8 @@ class GUIManager {
         void draw_force(SkCanvas* canvas, bool skiaAA);
         void set_to_layout();
         void layout_if_necessary();
+
+        GUIFloatAnimation* float_animation(const char* animationID, const GUIFloatAnimationData& animation);
 
         void update();
         void update_window(const Vector2f& windowPos, const Vector2f& windowSize, float guiScaleMultiplier);
@@ -101,6 +104,8 @@ class GUIManager {
 
         bool cursor_obstructed() const;
     private:
+        std::unordered_map<GUIManagerIDStack, GUIFloatAnimation> animations;
+
         void layout();
         void layout_begin();
         void layout_end();

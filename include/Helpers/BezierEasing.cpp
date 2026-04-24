@@ -7,7 +7,7 @@
 #include "BezierEasing.hpp"
 #include <cmath>
 
-BezierEasing BezierEasing::linear{0.0, 1.0, 0.0, 1.0};
+BezierEasing BezierEasing::linear{0.0, 0.0, 1.0, 1.0};
 
 BezierEasing::BezierEasing() {}
 

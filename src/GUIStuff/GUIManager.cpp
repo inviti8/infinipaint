@@ -506,6 +506,19 @@ void GUIManager::update_invalidated_draw_area_from_layout() {
 void GUIManager::update() {
     for(ElementContainer* e : orderedElements)
         e->elem->update();
+    for(auto& [id, animation] : animations)
+        animation.update(*this);
+}
+
+GUIFloatAnimation* GUIManager::float_animation(const char* animationID, const GUIFloatAnimationData& animation) {
+    GUIFloatAnimation* toRet = nullptr;
+    new_id(animationID, [&] {
+        auto [it, placed] = animations.emplace(idStack, animation);
+        GUIFloatAnimation& actualInternalAnim = it->second;
+        actualInternalAnim.isUsedThisFrame = true;
+        toRet = &actualInternalAnim;
+    });
+    return toRet;
 }
 
 void GUIManager::update_window(const Vector2f& windowPos, const Vector2f& windowSize, float guiScaleMultiplier) {
@@ -539,6 +552,8 @@ void GUIManager::layout() {
 void GUIManager::layout_begin() {
     for(auto& [id, e] : elements)
         e.isUsedThisFrame = false;
+    for(auto& [id, a] : animations)
+        a.isUsedThisFrame = false;
 
     Clay_SetLayoutDimensions(Clay_Dimensions(io.windowSize.x(), io.windowSize.y()));
     Clay_SetCurrentContext(clayInstance);
@@ -555,6 +570,9 @@ void GUIManager::layout_end() {
     if(!idStack.empty())
         throw std::runtime_error("[GUIManager::end] ID Stack is not empty on end (push_id and pop_id calls not equal)");
     std::erase_if(elements, [](auto& p) {
+        return !p.second.isUsedThisFrame;
+    });
+    std::erase_if(animations, [](auto& p) {
         return !p.second.isUsedThisFrame;
     });
     std::stable_sort(orderedElements.begin(), orderedElements.end(), [](ElementContainer* a, ElementContainer* b) {

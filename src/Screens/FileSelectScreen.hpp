@@ -1,7 +1,7 @@
 #pragma once
 #include "Screen.hpp"
 #include "nlohmann/json.hpp"
-
+#include "../GUIStuff/GUIManager.hpp"
 
 class FileSelectScreen : public Screen {
     public:
@@ -37,9 +37,11 @@ class FileSelectScreen : public Screen {
         TrashInfo trashInfo;
         std::vector<FileInfo> fileList;
 
+        GUIStuff::GUIFloatAnimation* mainMenuOpenAnim = nullptr;
+        GUIStuff::GUIFloatAnimation* actionBarOpenAnim = nullptr;
+
         void main_display();
         void main_menu();
-        bool main_menu_fills_screen();
         void file_view();
         void file_view_edit();
         void menu_black_box();
@@ -81,6 +83,4 @@ class FileSelectScreen : public Screen {
         void start_edit_mode();
         size_t numberOfSelectedEntries;
         bool editMode = false;
-
-        bool mainMenuOpen = false;
 };
