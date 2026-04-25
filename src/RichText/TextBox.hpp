@@ -107,7 +107,9 @@ class TextBox {
         };
 
         TextPosition move(Movement movement, TextPosition pos, std::optional<float>* previousX = nullptr, bool flipDependingOnTextDirection = false);
-        void set_width(float newWidth);
+        void set_max_width(float newWidth);
+        void set_max_height(float newMaxHeight);
+        void set_ellipsis(bool newEllipsis);
         TextPosition insert(TextPosition pos, std::string_view textToInsert, const std::optional<TextStyleModifier::ModifierMap>& inputModMap = std::nullopt);
         TextPosition remove(TextPosition p1, TextPosition p2);
         void set_font_data(const std::shared_ptr<FontData>& fD);
@@ -128,6 +130,8 @@ class TextBox {
             TAB,
             SELECT_ALL
         };
+
+        float get_width();
 
         void set_initial_text_style(const skia::textlayout::TextStyle& tStyle);
         void set_initial_text_style_modifier(const std::shared_ptr<TextStyleModifier>& modifier);
@@ -193,7 +197,9 @@ class TextBox {
         int get_line_number_at_from_byte_text_pos(TextPosition pos);
 
         bool newlinesAllowed = true;
-        float width = 0.0f;
+        bool ellipsis = false;
+        float width = 4.0f;
+        float maxHeight = 0.0f;
         bool needsRebuild = true;
         unsigned tabWidth = 4;
         std::shared_ptr<FontData> fontData;

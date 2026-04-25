@@ -159,7 +159,7 @@ template <typename T> void TextBox<T>::input_mouse_motion_callback(const InputMa
 template <typename T> void TextBox<T>::init_textbox(UpdateInputData& io) {
     if(!textbox) {
         textbox = std::make_shared<RichText::TextBox>();
-        textbox->set_width(std::numeric_limits<float>::max());
+        textbox->set_max_width(std::numeric_limits<float>::max());
         textbox->set_font_data(io.fonts);
         textbox->set_allow_newlines(false);
         cur = std::make_shared<RichText::TextBox::Cursor>();

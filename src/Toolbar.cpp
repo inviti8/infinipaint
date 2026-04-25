@@ -1039,7 +1039,8 @@ void Toolbar::chat_box() {
                         gui.new_id(id++, [&] {
                             gui.element<TextParagraph>("text", TextParagraph::Data{
                                 .text = build_paragraph_from_chat_message(chatMessage, 1.0f),
-                                .width = CHATBOX_WIDTH
+                                .maxGrowX = CHATBOX_WIDTH,
+                                .ellipsis = false
                             });
                         });
                     }
@@ -1088,7 +1089,8 @@ void Toolbar::chat_box() {
                                     }) {
                                         gui.element<TextParagraph>("message", TextParagraph::Data{
                                             .text = build_paragraph_from_chat_message(chatMessage, a),
-                                            .width = CHATBOX_WIDTH
+                                            .maxGrowX = CHATBOX_WIDTH,
+                                            .ellipsis = false
                                         });
                                     }
                                 });

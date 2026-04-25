@@ -76,7 +76,7 @@ void TextBoxCanvasComponent::set_data_from(const CanvasComponent& other) {
 
 void TextBoxCanvasComponent::init_text_box(DrawingProgram& drawP) {
     textBox->set_font_data(drawP.world.main.fonts); // Getting a segfault relating to the paragraph cache means that the font collection hasn't been set yet
-    textBox->set_width(d.p2.x() - d.p1.x() - TEXTBOX_PADDING * 2.0f);
+    textBox->set_max_width(d.p2.x() - d.p1.x() - TEXTBOX_PADDING * 2.0f);
 }
 
 void TextBoxCanvasComponent::draw(SkCanvas* canvas, const DrawData& drawData, const std::shared_ptr<void>& predrawData) const {

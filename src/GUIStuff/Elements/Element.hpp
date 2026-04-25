@@ -14,6 +14,7 @@ namespace GUIStuff {
             void set_bounding_box_from_elem_data(const Clay_ElementData& elemData);
             void set_parent_clipping_region(const std::optional<SCollision::AABB<float>>& bb);
             const std::optional<SCollision::AABB<float>>& get_bb() const;
+            void clear_bb();
             virtual ~Element() = default;
 
             int16_t zIndex;

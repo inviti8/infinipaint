@@ -3,6 +3,7 @@
 #include "Helpers/StringHelpers.hpp"
 #include "Helpers/FileDownloader.hpp"
 #include "Screens/FileSelectScreen.hpp"
+#include "Screens/DrawingProgramScreen.hpp"
 #include "VersionConstants.hpp"
 #include "include/gpu/GpuTypes.h"
 #include <SDL3/SDL_filesystem.h>

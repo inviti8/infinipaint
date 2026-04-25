@@ -3,7 +3,6 @@
 #include "TextStyleModifier.hpp"
 #include "cereal/archives/portable_binary.hpp"
 #include <include/core/SkFontMetrics.h>
-#include <limits>
 #include <modules/skparagraph/include/DartTypes.h>
 #include <modules/skparagraph/include/Metrics.h>
 #include <modules/skparagraph/include/Paragraph.h>
@@ -838,11 +837,34 @@ int TextBox::get_line_number_at_from_byte_text_pos(TextPosition pos) {
     return paragraphs[pos.fParagraphIndex].p->getLineNumberAt(renderPos.fTextByteIndex);
 }
 
-void TextBox::set_width(float newWidth) {
+void TextBox::set_max_width(float newWidth) {
     if(width != newWidth) {
         width = std::max(newWidth, 4.0f);
         needsRebuild = true;
     }
+}
+
+void TextBox::set_max_height(float newMaxHeight) {
+    if(maxHeight != newMaxHeight) {
+        maxHeight = newMaxHeight;
+        needsRebuild = true;
+    }
+}
+
+void TextBox::set_ellipsis(bool newEllipsis) {
+    if(ellipsis != newEllipsis) {
+        ellipsis = newEllipsis;
+        needsRebuild = true;
+    }
+}
+
+float TextBox::get_width() {
+    rebuild();
+    float toRet = 0.0f;
+    for(auto& p : paragraphs)
+        toRet = std::max(toRet, p.p->getLongestLine());
+    toRet += 1.0f;
+    return toRet;
 }
 
 float TextBox::get_height() {
@@ -875,6 +897,10 @@ void TextBox::rebuild() {
             ParagraphData& pData = paragraphs[pIndex];
             skia::textlayout::ParagraphStyle pStyle = pData.pStyleData.get_paragraph_style();
             pStyle.setTextStyle(tStyle);
+            if(ellipsis)
+                pStyle.setEllipsis(SkString("..."));
+            if(maxHeight != 0.0f)
+                pStyle.setHeight(maxHeight);
 
             if(!newlinesAllowed) {
                 pStyle.setTextHeightBehavior(skia::textlayout::kDisableAll);

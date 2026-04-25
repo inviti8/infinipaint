@@ -8,7 +8,10 @@ class TextParagraph : public Element {
     public:
         struct Data {
             RichText::TextData text;
-            float width;
+            float maxGrowX = 10000.0f;
+            float maxGrowY = 0.0f;
+            bool ellipsis = true;
+            bool allowNewlines = true;
             bool operator==(const Data& d) const = default;
             bool operator!=(const Data& d) const = default;
         };
@@ -18,6 +21,7 @@ class TextParagraph : public Element {
         virtual void clay_draw(SkCanvas* canvas, UpdateInputData& io, Clay_RenderCommand* command, bool skiaAA) override;
     private:
         Data d;
+        float fontSize;
         std::unique_ptr<RichText::TextBox> textbox;
 };
 

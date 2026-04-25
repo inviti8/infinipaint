@@ -9,6 +9,7 @@
 #include "../GUIStuff/Elements/ImageDisplay.hpp"
 #include "../GUIStuff/Elements/LayoutElement.hpp"
 #include "../GUIStuff/Elements/SVGIcon.hpp"
+#include "../GUIStuff/Elements/TextParagraph.hpp"
 #include "../GUIStuff/Elements/PositionAdjustingPopupMenu.hpp"
 #include "../World.hpp"
 #include "Helpers/StringHelpers.hpp"
@@ -527,7 +528,7 @@ void FileSelectScreen::file_view() {
                         }
                         CLAY_AUTO_ID({
                             .layout = {
-                                .sizing = { .width = CLAY_SIZING_FIT(0), .height = CLAY_SIZING_FIT(0)},
+                                .sizing = { .width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_FIT(0)},
                                 .childGap = 6,
                                 .childAlignment = { .x = CLAY_ALIGN_X_LEFT, .y = CLAY_ALIGN_Y_CENTER },
                                 .layoutDirection = CLAY_TOP_TO_BOTTOM
@@ -556,7 +557,24 @@ void FileSelectScreen::file_view() {
                                 .radius = 20
                             });
                         }
-                        text_label(gui, fileList[i].fileName);
+                        gui.element<LayoutElement>("file name layout elem", [&](LayoutElement* l, const Clay_ElementId& lId) {
+                            CLAY(lId, {
+                                .layout = {
+                                    .sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_FIT(0)},
+                                    .childAlignment = { .x = CLAY_ALIGN_X_CENTER, .y = CLAY_ALIGN_Y_TOP },
+                                },
+                            }) {
+                                if(l->get_bb()) {
+                                    RichText::TextData fileNameText;
+                                    fileNameText.paragraphs.emplace_back(fileList[i].fileName);
+                                    gui.element<TextParagraph>("file name", TextParagraph::Data{
+                                        .text = fileNameText,
+                                        .maxGrowX = l->get_bb().value().width(),
+                                        .maxGrowY = 0.0f
+                                    });
+                                }
+                            }
+                        });
                         text_label_light(gui, fileList[i].lastModifyDate);
                     }
                 }
@@ -569,6 +587,7 @@ void FileSelectScreen::file_view() {
             .entryHeight = 150.0f,
             .entryCount = fileList.size(),
             .clipHorizontal = true,
+            .xElementSize = CLAY_SIZING_FIT(0),
             .elementContent = [&](size_t i) {
                 fileButton(i, true, Vector2f{100.0f, 100.0f});
             }

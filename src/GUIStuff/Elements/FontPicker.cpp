@@ -90,17 +90,23 @@ void FontPicker::layout(const Clay_ElementId& id, std::string* newFontName, cons
 
         if(dropdownOpen) {
             gui.set_z_index(gui.get_z_index() + 1, [&] {
-                gui.element<LayoutElement>("Font picker floating element", [&] (LayoutElement*, const Clay_ElementId& lId) {
+                gui.element<LayoutElement>("DROPDOWN", [&](LayoutElement*, const Clay_ElementId& lId) {
+                    Clay_ElementData dropdownElemData = Clay_GetElementData(lId);
+                    float calculatedDropdownMaxHeight = 0.0f;
+                    if(dropdownElemData.found) {
+                        calculatedDropdownMaxHeight = std::max(gui.io.windowSize.y() - dropdownElemData.boundingBox.y - 2.0f, 0.0f);
+                        calculatedDropdownMaxHeight = std::min<float>(calculatedDropdownMaxHeight, 300);
+                    }
                     CLAY(lId, {
                         .layout = {
-                            .sizing = {.width = CLAY_SIZING_FIXED(250), .height = CLAY_SIZING_FIT(0, 300)},
-                            .layoutDirection = CLAY_TOP_TO_BOTTOM
+                            .sizing = {.width = CLAY_SIZING_FIXED(250), .height = CLAY_SIZING_FIT(0, calculatedDropdownMaxHeight)},
+                            .childGap = 0
                         },
                         .backgroundColor = convert_vec4<Clay_Color>(gui.io.theme->backColor1),
                         .cornerRadius = CLAY_CORNER_RADIUS(4),
                         .floating = {
                             .offset = {
-                                .y = 2
+                                .y = 4
                             },
                             .zIndex = gui.get_z_index(),
                             .attachPoints = {
@@ -114,16 +120,17 @@ void FontPicker::layout(const Clay_ElementId& id, std::string* newFontName, cons
                             .width = CLAY_BORDER_OUTSIDE(1)
                         }
                     }) {
-                        scroll_area_many_entries(gui, "Font Selector", {
+                        ElementHelpers::scroll_area_many_entries(gui, "dropdown scroll area", {
                             .entryHeight = ENTRY_HEIGHT,
                             .entryCount = sortedFontList.size(),
                             .clipHorizontal = true,
-                            .elementContent = [&] (size_t i) {
+                            .growing = true,
+                            .elementContent = [&](size_t i) {
                                 bool selectedEntry = val == i;
-                                gui.element<LayoutElement>("elem", [&](LayoutElement*, const Clay_ElementId& lId2) {
-                                    CLAY(lId2, {
+                                gui.element<LayoutElement>("elem", [&] (LayoutElement*, const Clay_ElementId& lId) {
+                                    CLAY(lId, {
                                         .layout = {
-                                            .sizing = {.width = CLAY_SIZING_FIXED(250), .height = CLAY_SIZING_FIXED(25)},
+                                            .sizing = {.width = CLAY_SIZING_FIXED(250), .height = CLAY_SIZING_GROW(0)},
                                             .childGap = 1,
                                             .childAlignment = {.x = CLAY_ALIGN_X_LEFT, .y = CLAY_ALIGN_Y_TOP},
                                             .layoutDirection = CLAY_TOP_TO_BOTTOM
@@ -138,7 +145,7 @@ void FontPicker::layout(const Clay_ElementId& id, std::string* newFontName, cons
                                             entryColor = gui.io.theme->backColor1;
                                         CLAY_AUTO_ID({
                                             .layout = {
-                                                .sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_FIXED(25)},
+                                                .sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_GROW(0)},
                                                 .padding = {.left = 2, .right = 2},
                                                 .childAlignment = {.x = CLAY_ALIGN_X_LEFT, .y = CLAY_ALIGN_Y_CENTER}
                                             },
@@ -147,7 +154,9 @@ void FontPicker::layout(const Clay_ElementId& id, std::string* newFontName, cons
                                             TextParagraph::Data d;
                                             RichText::TextData::Paragraph& par = d.text.paragraphs.emplace_back();
                                             par.text = sortedFontList[i];
-                                            d.width = 10000.0f; // Setting width to numeric_limits::max will lead to multiplying it by any number greater than 1 to = infinity, which will cause issues
+
+                                            d.allowNewlines = false;
+                                            d.ellipsis = false;
 
                                             RichText::PositionedTextStyleMod& positionedMod = d.text.tStyleMods.emplace_back();
                                             positionedMod.pos = {0, 0};
@@ -174,13 +183,6 @@ void FontPicker::layout(const Clay_ElementId& id, std::string* newFontName, cons
                                             gui.set_to_layout();
                                     }
                                 });
-                            },
-                            .innerContentExtraCallback = [&](const ScrollArea::InnerContentParameters& innerContentParams) {
-                                if(jumpToFontName) {
-                                    if(val != std::numeric_limits<size_t>::max())
-                                        innerContentParams.scrollOffset->y() = -static_cast<float>(val) * ENTRY_HEIGHT;
-                                    jumpToFontName = false;
-                                }
                             }
                         });
                     }

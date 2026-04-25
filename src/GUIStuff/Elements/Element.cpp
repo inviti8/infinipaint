@@ -18,6 +18,10 @@ namespace GUIStuff {
 
     void Element::clay_draw(SkCanvas* canvas, UpdateInputData& io, Clay_RenderCommand* command, bool skiaAA) {}
 
+    void Element::clear_bb() {
+        boundingBox = std::nullopt;
+    }
+
     void Element::set_bounding_box_from_elem_data(const Clay_ElementData& elemData) {
         if(elemData.found)
             boundingBox = {{elemData.boundingBox.x, elemData.boundingBox.y}, {elemData.boundingBox.x + elemData.boundingBox.width, elemData.boundingBox.y + elemData.boundingBox.height}};
