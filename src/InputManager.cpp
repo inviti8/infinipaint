@@ -816,10 +816,20 @@ void InputManager::backend_touch_finger_motion_update(const SDL_TouchFingerEvent
     isTouchDevice = true;
 }
 
-void InputManager::backend_window_resize_update(const SDL_WindowEvent& e) {
+void InputManager::update_safe_area() {
+    SDL_Rect safeArea;
+    if(SDL_GetWindowSafeArea(main.window.sdlWindow, &safeArea))
+        main.window.safeArea = SCollision::AABB<float>({safeArea.x, safeArea.y}, {safeArea.x + safeArea.w, safeArea.y + safeArea.h});
+    else
+        main.window.safeArea = SCollision::AABB<float>({0, 0}, {main.window.size.x(), main.window.size.y()});
+}
+
+void InputManager::backend_window_resize_update() {
+    update_safe_area();
     WindowResizeCallbackArgs w;
-    w.size = {e.data1, e.data2};
     w.density = main.window.density;
+    w.size = main.window.size;
+    w.safeArea = main.window.safeArea;
     main.input_window_resize_callback(w);
 }
 

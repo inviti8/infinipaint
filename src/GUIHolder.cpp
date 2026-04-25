@@ -100,7 +100,7 @@ void GUIHolder::update() {
 
 void GUIHolder::window_update() {
     calculate_final_gui_scale();
-    gui.update_window({0, 0}, main.window.size.cast<float>(), final_gui_scale());
+    gui.update_window(main.window.safeArea.min, main.window.safeArea.dim(), final_gui_scale());
 }
 
 float GUIHolder::final_gui_scale() {

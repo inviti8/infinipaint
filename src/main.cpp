@@ -520,6 +520,8 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv) {
             SDL_SetWindowFullscreen(mS.window, true);
 #endif
 
+        mS.m->input.update_safe_area();
+
         mS.m->window.canCreateSurfaces = true;
         resize_window(mS);
 
@@ -657,7 +659,7 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
                 }
                 resize_window(mS);
                 mS.m->update_scale_and_density();
-                mS.m->input.backend_window_resize_update(event->window);
+                mS.m->input.backend_window_resize_update();
                 get_refresh_rate(mS);
                 break;
             case SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED:
@@ -673,6 +675,10 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
                 mS.m->window.maximized = false;
                 get_refresh_rate(mS);
                 break;
+            case SDL_EVENT_WINDOW_SAFE_AREA_CHANGED: {
+                mS.m->input.backend_window_resize_update();
+                break;
+            }
             case SDL_EVENT_MOUSE_MOTION:
                 #ifdef _WIN32
                     if(!mS.m->conf.tabletOptions.ignoreMouseMovementWhenPenInProximity || !mS.m->input.pen.inProximity)

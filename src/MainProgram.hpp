@@ -45,6 +45,9 @@ class MainProgram {
 
         struct Window {
             std::chrono::steady_clock::duration lastFrameTime = std::chrono::milliseconds(16);
+
+            SCollision::AABB<float> safeArea;
+
             Vector2i size = {-1, -1};
             Vector2i pos = {-1, -1};
             Vector2i writtenSize = {-1, -1};
