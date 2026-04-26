@@ -526,12 +526,12 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv) {
         mS.m->window.canCreateSurfaces = true;
         resize_window(mS);
 
-        mS.m->screen = std::make_unique<PhoneDrawingProgramScreen>(*mS.m);
+        mS.m->screen = std::make_unique<FileSelectScreen>(*mS.m);
 
         if(listOfFilesToOpenFromCommand.empty()) {
-            mS.m->create_new_tab({
-                .isClient = false
-            });
+            //mS.m->create_new_tab({
+            //    .isClient = false
+            //});
         }
         else {
             for(std::filesystem::path& f : listOfFilesToOpenFromCommand) {

@@ -72,13 +72,12 @@ void window_fill_side_bar(GUIManager& gui, const char* id, const WindowFillSideB
                             .layoutDirection = CLAY_LEFT_TO_RIGHT
                         }
                     }) {
-                        float paddingElementWidth = (gui.io.windowSize.x() - gui.io.safeWindowRect.width()) / 2.0f;
                         CLAY_AUTO_ID({
-                            .layout = {.sizing = {.width = CLAY_SIZING_FIXED(paddingElementWidth), .height = CLAY_SIZING_FIT(0)}}
+                            .layout = {.sizing = {.width = CLAY_SIZING_FIXED(gui.io.safeWindowRect.min.x()), .height = CLAY_SIZING_FIT(0)}}
                         }) {}
                         innerContent();
                         CLAY_AUTO_ID({
-                            .layout = {.sizing = {.width = CLAY_SIZING_FIXED(paddingElementWidth), .height = CLAY_SIZING_FIT(0)}}
+                            .layout = {.sizing = {.width = CLAY_SIZING_FIXED(gui.io.windowSize.x() - gui.io.safeWindowRect.max.x()), .height = CLAY_SIZING_FIT(0)}}
                         }) {}
                     }
                 }
@@ -99,13 +98,12 @@ void window_fill_side_bar(GUIManager& gui, const char* id, const WindowFillSideB
                             .layoutDirection = CLAY_LEFT_TO_RIGHT
                         }
                     }) {
-                        float paddingElementWidth = (gui.io.windowSize.x() - gui.io.safeWindowRect.width()) / 2.0f;
                         CLAY_AUTO_ID({
-                            .layout = {.sizing = {.width = CLAY_SIZING_FIXED(paddingElementWidth), .height = CLAY_SIZING_FIT(0)}}
+                            .layout = {.sizing = {.width = CLAY_SIZING_FIXED(gui.io.safeWindowRect.min.x()), .height = CLAY_SIZING_FIT(0)}}
                         }) {}
                         innerContent();
                         CLAY_AUTO_ID({
-                            .layout = {.sizing = {.width = CLAY_SIZING_FIXED(paddingElementWidth), .height = CLAY_SIZING_FIT(0)}}
+                            .layout = {.sizing = {.width = CLAY_SIZING_FIXED(gui.io.windowSize.x() - gui.io.safeWindowRect.max.x()), .height = CLAY_SIZING_FIT(0)}}
                         }) {}
                     }
                     CLAY_AUTO_ID({
@@ -132,13 +130,12 @@ void window_fill_side_bar(GUIManager& gui, const char* id, const WindowFillSideB
                             .layoutDirection = CLAY_TOP_TO_BOTTOM
                         }
                     }) {
-                        float paddingElementHeight = (gui.io.windowSize.y() - gui.io.safeWindowRect.height()) / 2.0f;
                         CLAY_AUTO_ID({
-                            .layout = {.sizing = {.width = CLAY_SIZING_FIT(0), .height = CLAY_SIZING_FIXED(paddingElementHeight)}}
+                            .layout = {.sizing = {.width = CLAY_SIZING_FIT(0), .height = CLAY_SIZING_FIXED(gui.io.safeWindowRect.min.y())}}
                         }) {}
                         innerContent();
                         CLAY_AUTO_ID({
-                            .layout = {.sizing = {.width = CLAY_SIZING_FIT(0), .height = CLAY_SIZING_FIXED(paddingElementHeight)}}
+                            .layout = {.sizing = {.width = CLAY_SIZING_FIT(0), .height = CLAY_SIZING_FIXED(gui.io.windowSize.y() - gui.io.safeWindowRect.max.y())}}
                         }) {}
                     }
                 }
@@ -159,13 +156,12 @@ void window_fill_side_bar(GUIManager& gui, const char* id, const WindowFillSideB
                             .layoutDirection = CLAY_TOP_TO_BOTTOM
                         }
                     }) {
-                        float paddingElementHeight = (gui.io.windowSize.y() - gui.io.safeWindowRect.height()) / 2.0f;
                         CLAY_AUTO_ID({
-                            .layout = {.sizing = {.width = CLAY_SIZING_FIT(0), .height = CLAY_SIZING_FIXED(paddingElementHeight)}}
+                            .layout = {.sizing = {.width = CLAY_SIZING_FIT(0), .height = CLAY_SIZING_FIXED(gui.io.safeWindowRect.min.y())}}
                         }) {}
                         innerContent();
                         CLAY_AUTO_ID({
-                            .layout = {.sizing = {.width = CLAY_SIZING_FIT(0), .height = CLAY_SIZING_FIXED(paddingElementHeight)}}
+                            .layout = {.sizing = {.width = CLAY_SIZING_FIT(0), .height = CLAY_SIZING_FIXED(gui.io.windowSize.y() - gui.io.safeWindowRect.max.y())}}
                         }) {}
                     }
                     CLAY_AUTO_ID({
@@ -175,6 +171,12 @@ void window_fill_side_bar(GUIManager& gui, const char* id, const WindowFillSideB
                 break;
             }
         }
+    });
+}
+
+void window_safe_area_layout(GUIManager& gui, const char* id, const std::function<void()>& innerContent) {
+    gui.element<LayoutElement>(id, [&] (LayoutElement* l, const Clay_ElementId& lId) {
+        innerContent();
     });
 }
 

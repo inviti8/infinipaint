@@ -11,7 +11,7 @@ void PositionAdjustingPopupMenu::layout(const Clay_ElementId& id, Vector2f popup
         auto& bb = layoutElement->get_bb().value();
         if((popupPos.y() + bb.height()) > gui.io.windowSize.y())
             popupPos.y() -= bb.height();
-        if((popupPos.x() + bb.width()) > gui.io.windowSize.y())
+        if((popupPos.x() + bb.width()) > gui.io.windowSize.x())
             popupPos.x() -= bb.width();
     }
 
