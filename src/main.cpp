@@ -4,6 +4,7 @@
 #include "Helpers/FileDownloader.hpp"
 #include "Screens/FileSelectScreen.hpp"
 #include "Screens/DesktopDrawingProgramScreen.hpp"
+#include "Screens/PhoneDrawingProgramScreen.hpp"
 #include "VersionConstants.hpp"
 #include "include/gpu/GpuTypes.h"
 #include <SDL3/SDL_filesystem.h>
@@ -525,6 +526,8 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv) {
         mS.m->window.canCreateSurfaces = true;
         resize_window(mS);
 
+        mS.m->screen = std::make_unique<PhoneDrawingProgramScreen>(*mS.m);
+
         if(listOfFilesToOpenFromCommand.empty()) {
             mS.m->create_new_tab({
                 .isClient = false
@@ -538,8 +541,6 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv) {
                 });
             }
         }
-
-        mS.m->screen = std::make_unique<DrawingProgramScreen>(*mS.m);
 
         mS.m->update(); // Run update once to make sure that callbacks dont crash
 

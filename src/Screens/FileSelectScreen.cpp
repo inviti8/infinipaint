@@ -13,7 +13,7 @@
 #include "../GUIStuff/Elements/PositionAdjustingPopupMenu.hpp"
 #include "../World.hpp"
 #include "Helpers/StringHelpers.hpp"
-#include "DrawingProgramScreen.hpp"
+#include "PhoneDrawingProgramScreen.hpp"
 #include <SDL3/SDL_time.h>
 #include <SDL3/SDL_timer.h>
 
@@ -157,6 +157,8 @@ void FileSelectScreen::main_display() {
                 switch(selectedMenu) {
                     case SelectedMenu::FILES:
                         file_view();
+                        if(!editMode)
+                            create_file_button();
                         break;
                     case SelectedMenu::TRASH:
                         file_view();
@@ -169,6 +171,35 @@ void FileSelectScreen::main_display() {
             edit_action_bar();
         }
     }
+}
+
+void FileSelectScreen::create_file_button() {
+    auto& gui = main.g.gui;
+    gui.set_z_index(gui.get_z_index() + 2, [&] {
+        gui.element<LayoutElement>("create file button floating area", [&](LayoutElement*, const Clay_ElementId& lId) {
+            CLAY(lId, {
+                .layout = {.sizing = {.width = CLAY_SIZING_FIT(0), .height = CLAY_SIZING_FIT(0)}},
+                .floating = {
+                    .offset = {-5, -5},
+                    .zIndex = gui.get_z_index(),
+                    .attachPoints = {
+                        .element = CLAY_ATTACH_POINT_RIGHT_BOTTOM,
+                        .parent = CLAY_ATTACH_POINT_RIGHT_BOTTOM
+                    },
+                    .attachTo = CLAY_ATTACH_TO_PARENT
+                }
+            }) {
+                svg_icon_button(gui, "add button", "data/icons/plus.svg", {
+                    .onClick = [&] {
+                        main.create_new_tab({
+                            .isClient = false
+                        });
+                        main.screen = std::make_unique<PhoneDrawingProgramScreen>(main);
+                    }
+                });
+            }
+        });
+    });
 }
 
 void FileSelectScreen::edit_action_bar_button(const char* id, const std::string& svgPath, const char* text, const std::function<void()>& onClick) {
@@ -664,7 +695,7 @@ void FileSelectScreen::start_edit_mode() {
 
 void FileSelectScreen::input_open_infinipaint_file_callback(const CustomEvents::OpenInfiniPaintFileEvent& openFile) {
     main.create_new_tab(openFile);
-    main.screen = std::make_unique<DrawingProgramScreen>(main);
+    main.screen = std::make_unique<PhoneDrawingProgramScreen>(main);
 }
 
 void FileSelectScreen::draw(SkCanvas* canvas) {

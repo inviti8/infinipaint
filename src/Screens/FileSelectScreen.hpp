@@ -43,6 +43,7 @@ class FileSelectScreen : public Screen {
         void main_display();
         void main_menu();
         void file_view();
+        void create_file_button();
         void file_view_edit();
         void menu_black_box();
         void edit_action_bar();
