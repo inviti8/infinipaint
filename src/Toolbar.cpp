@@ -216,7 +216,7 @@ void Toolbar::layout_run() {
     if(drawGui) {
         CLAY_AUTO_ID({
             .layout = {
-                .sizing = {.width = CLAY_SIZING_FIT(gui.io.windowSize.x()), .height = CLAY_SIZING_FIT(gui.io.windowSize.y())},
+                .sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_GROW(0)},
                 .padding = CLAY_PADDING_ALL(io.theme->padding1),
                 .childGap = io.theme->childGap1,
                 .childAlignment = { .x = CLAY_ALIGN_X_CENTER, .y = CLAY_ALIGN_Y_TOP},

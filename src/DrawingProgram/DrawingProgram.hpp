@@ -84,6 +84,7 @@ class DrawingProgram {
         void update_downloading_dropped_files();
 
         void selection_action_menu(Vector2f popupPos);
+        void right_click_action_menu(Vector2f popupPos, const std::function<void()>& innerContent);
         void popup_menu_action_button(const char* id, const char* text, const std::function<void()>& onClick);
         void rebuild_cache();
 

@@ -438,36 +438,59 @@ void DrawingProgram::selection_action_menu(Vector2f popupPos) {
 
     GUIStuff::GUIManager& gui = world.main.g.gui;
 
+    right_click_action_menu(popupPos, [&] {
+        text_label_light(gui, "Selection menu");
+        popup_menu_action_button("Paste", "Paste", [&, popupPos] {
+            selection.deselect_all();
+            selection.paste_clipboard(popupPos * world.main.g.final_gui_scale());
+        });
+        popup_menu_action_button("Paste Image", "Paste Image", [&, popupPos] {
+            selection.deselect_all();
+            world.main.input.call_paste(CustomEvents::PasteEvent::DataType::IMAGE, {
+                .pastePosition = popupPos * world.main.g.final_gui_scale()
+            });
+        });
+        if(selection.is_something_selected()) {
+            popup_menu_action_button("Copy", "Copy", [&] {
+                selection.selection_to_clipboard();
+            });
+            popup_menu_action_button("Cut", "Cut", [&] {
+                selection.selection_to_clipboard();
+                selection.delete_all();
+            });
+            popup_menu_action_button("Delete", "Delete", [&] {
+                selection.delete_all();
+            });
+            popup_menu_action_button("Bring to front of layer", "Bring to front of layer", [&] {
+                selection.push_selection_to_front();
+            });
+            popup_menu_action_button("Send to back of layer", "Send to back of layer", [&] {
+                selection.push_selection_to_back();
+            });
+        }
+    });
+}
+
+void DrawingProgram::right_click_action_menu(Vector2f popupPos, const std::function<void()>& innerContent) {
+    using namespace GUIStuff;
+    using namespace ElementHelpers;
+
+    GUIStuff::GUIManager& gui = world.main.g.gui;
+
     gui.set_z_index(-1, [&] {
         gui.element<PositionAdjustingPopupMenu>("Selection popup menu", popupPos, [&] {
-            text_label_light(gui, "Selection menu");
-            popup_menu_action_button("Paste", "Paste", [&, popupPos] {
-                selection.deselect_all();
-                selection.paste_clipboard(popupPos * world.main.g.final_gui_scale());
-            });
-            popup_menu_action_button("Paste Image", "Paste Image", [&, popupPos] {
-                selection.deselect_all();
-                world.main.input.call_paste(CustomEvents::PasteEvent::DataType::IMAGE, {
-                    .pastePosition = popupPos * world.main.g.final_gui_scale()
-                });
-            });
-            if(selection.is_something_selected()) {
-                popup_menu_action_button("Copy", "Copy", [&] {
-                    selection.selection_to_clipboard();
-                });
-                popup_menu_action_button("Cut", "Cut", [&] {
-                    selection.selection_to_clipboard();
-                    selection.delete_all();
-                });
-                popup_menu_action_button("Delete", "Delete", [&] {
-                    selection.delete_all();
-                });
-                popup_menu_action_button("Bring to front of layer", "Bring to front of layer", [&] {
-                    selection.push_selection_to_front();
-                });
-                popup_menu_action_button("Send to back of layer", "Send to back of layer", [&] {
-                    selection.push_selection_to_back();
-                });
+            CLAY_AUTO_ID({
+                .layout = { 
+                    .sizing = {.width = CLAY_SIZING_FIT(100), .height = CLAY_SIZING_FIT(0)},
+                    .padding = CLAY_PADDING_ALL(gui.io.theme->padding1),
+                    .childGap = 1,
+                    .childAlignment = { .x = CLAY_ALIGN_X_CENTER, .y = CLAY_ALIGN_Y_TOP},
+                    .layoutDirection = CLAY_TOP_TO_BOTTOM
+                },
+                .backgroundColor = convert_vec4<Clay_Color>(gui.io.theme->backColor1),
+                .cornerRadius = CLAY_CORNER_RADIUS(gui.io.theme->windowCorners1)
+            }) {
+                innerContent();
             }
         }, LayoutElement::Callbacks{
             .mouseButton = [&](LayoutElement* l, const InputManager::MouseButtonCallbackArgs& button) {

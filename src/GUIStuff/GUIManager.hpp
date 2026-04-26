@@ -26,7 +26,7 @@ class GUIManager {
         GUIFloatAnimation* float_animation(const char* animationID, const GUIFloatAnimationData& animation);
 
         void update();
-        void update_window(const Vector2f& windowPos, const Vector2f& windowSize, float guiScaleMultiplier);
+        void update_window(const Vector2f& windowRect, const SCollision::AABB<float>& safeWindowRect, float guiScaleMultiplier);
 
         UpdateInputData io;
 

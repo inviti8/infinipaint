@@ -73,7 +73,7 @@ template <typename T> void TextBox<T>::clay_draw(SkCanvas* canvas, UpdateInputDa
 
 template <typename T> void TextBox<T>::select() {
     if(!is_selected()) {
-        SCollision::AABB<float> rect = {(boundingBox.value().min + gui.io.windowPos) * gui.io.guiScaleMultiplier, (boundingBox.value().max + gui.io.windowPos) * gui.io.guiScaleMultiplier};
+        SCollision::AABB<float> rect = {boundingBox.value().min * gui.io.guiScaleMultiplier, boundingBox.value().max * gui.io.guiScaleMultiplier};
         unsigned id = gui.io.input->set_text_box_front(rect, userInfo.textInputProps);
         edit = TextEditData(id, textbox, cur);
     }

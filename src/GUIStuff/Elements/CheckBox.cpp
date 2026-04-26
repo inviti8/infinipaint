@@ -2,6 +2,7 @@
 #include <include/core/SkPath.h>
 #include <include/core/SkPathBuilder.h>
 #include "../GUIManager.hpp"
+#include "../../TimePoint.hpp"
 
 namespace GUIStuff {
 

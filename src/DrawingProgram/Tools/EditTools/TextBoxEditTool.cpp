@@ -282,34 +282,27 @@ void TextBoxEditTool::right_click_popup_gui(Toolbar& t, Vector2f popupPos) {
     auto& gui = drawP.world.main.g.gui;
     auto& a = static_cast<TextBoxCanvasComponent&>(comp->obj->get_comp());
 
-    gui.set_z_index(-1, [&] {
-        gui.element<PositionAdjustingPopupMenu>("Text popup menu", popupPos, [&] {
-            text_label_light(gui, "Text menu");
-            InputManager& input = drawP.world.main.input;
-            drawP.popup_menu_action_button("Paste", "Paste", [&] {
-                drawP.world.main.input.call_paste(CustomEvents::PasteEvent::DataType::TEXT, { .allowRichText = true });
-            });
-            drawP.popup_menu_action_button("Paste without formatting", "Paste without formatting", [&] {
-                drawP.world.main.input.call_paste(CustomEvents::PasteEvent::DataType::TEXT, { .allowRichText = false });
-            });
-            if(a.cursor->selectionBeginPos != a.cursor->selectionEndPos) {
-                drawP.popup_menu_action_button("Copy", "Copy", [&] {
-                    input.set_clipboard_plain_and_richtext_pair(a.textBox->process_copy(*a.cursor));
-                });
-                drawP.popup_menu_action_button("Cut", "Cut", [&] {
-                    userInput->do_textbox_operation_with_undo([&]() {
-                        input.set_clipboard_plain_and_richtext_pair(a.textBox->process_cut(*a.cursor));
-                    });
-                    commit_update_and_layout_func();
-                    set_styles_at_selection(a);
-                });
-            }
-        }, LayoutElement::Callbacks{
-            .mouseButton = [&](LayoutElement*, const InputManager::MouseButtonCallbackArgs& button) {
-                if(button.down && button.button != InputManager::MouseButton::RIGHT)
-                    drawP.clear_right_click_popup();
-            }
+    drawP.right_click_action_menu(popupPos, [&] {
+        text_label_light(gui, "Text menu");
+        InputManager& input = drawP.world.main.input;
+        drawP.popup_menu_action_button("Paste", "Paste", [&] {
+            drawP.world.main.input.call_paste(CustomEvents::PasteEvent::DataType::TEXT, { .allowRichText = true });
         });
+        drawP.popup_menu_action_button("Paste without formatting", "Paste without formatting", [&] {
+            drawP.world.main.input.call_paste(CustomEvents::PasteEvent::DataType::TEXT, { .allowRichText = false });
+        });
+        if(a.cursor->selectionBeginPos != a.cursor->selectionEndPos) {
+            drawP.popup_menu_action_button("Copy", "Copy", [&] {
+                input.set_clipboard_plain_and_richtext_pair(a.textBox->process_copy(*a.cursor));
+            });
+            drawP.popup_menu_action_button("Cut", "Cut", [&] {
+                userInput->do_textbox_operation_with_undo([&]() {
+                    input.set_clipboard_plain_and_richtext_pair(a.textBox->process_cut(*a.cursor));
+                });
+                commit_update_and_layout_func();
+                set_styles_at_selection(a);
+            });
+        }
     });
 }
 

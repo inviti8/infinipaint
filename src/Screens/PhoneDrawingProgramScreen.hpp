@@ -8,5 +8,6 @@ class PhoneDrawingProgramScreen : public DrawingProgramScreen {
         virtual void update() override;
         virtual void gui_layout_run() override;
     private:
+        void top_toolbar();
         void main_display();
 };

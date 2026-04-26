@@ -74,11 +74,8 @@ void GUIManager::clip_rect_transform(SkCanvas* canvas, std::vector<SCollision::A
         SCollision::AABB<float> c = clipRect.value();
         c.min *= io.guiScaleMultiplier;
         c.max *= io.guiScaleMultiplier;
-        c.min += io.windowPos;
-        c.max += io.windowPos;
         canvas->clipIRect(c.get_sk_irect());
     }
-    canvas->translate(io.windowPos.x(), io.windowPos.y());
     canvas->scale(io.guiScaleMultiplier, io.guiScaleMultiplier);
 }
 
@@ -286,7 +283,6 @@ void GUIManager::draw(SkCanvas* c, bool skiaAA) {
 
 void GUIManager::draw_force(SkCanvas* canvas, bool skiaAA) {
     canvas->save();
-    canvas->translate(io.windowPos.x(), io.windowPos.y());
     canvas->scale(io.guiScaleMultiplier, io.guiScaleMultiplier);
 
     for(size_t i = 0; i < static_cast<size_t>(renderCommands.length); i++) {
@@ -521,13 +517,15 @@ GUIFloatAnimation* GUIManager::float_animation(const char* animationID, const GU
     return toRet;
 }
 
-void GUIManager::update_window(const Vector2f& windowPos, const Vector2f& windowSize, float guiScaleMultiplier) {
-    if(io.windowPos != windowPos || io.windowSize != windowSize || io.guiScaleMultiplier != guiScaleMultiplier) {
+void GUIManager::update_window(const Vector2f& windowSize, const SCollision::AABB<float>& safeWindowRect, float guiScaleMultiplier) {
+    if(io.windowSize != windowSize || io.safeWindowRect != safeWindowRect || io.guiScaleMultiplier != guiScaleMultiplier) {
         io.redrawSurface = true;
         set_to_layout();
     }
-    io.windowPos = windowPos;
     io.windowSize = windowSize / guiScaleMultiplier;
+    io.safeWindowRect = safeWindowRect;
+    io.safeWindowRect.min /= guiScaleMultiplier;
+    io.safeWindowRect.max /= guiScaleMultiplier;
     io.guiScaleMultiplier = guiScaleMultiplier;
 }
 
@@ -692,19 +690,16 @@ void GUIManager::input_key_callback(const InputManager::KeyCallbackArgs& key) {
 }
 
 void GUIManager::input_mouse_button_callback(InputManager::MouseButtonCallbackArgs button) {
-    button.pos -= io.windowPos;
     button.pos /= io.guiScaleMultiplier;
     mouse_callback(button.pos, [&button] (ElementContainer* e) { e->elem->input_mouse_button_callback(button); });
 }
 
 void GUIManager::input_mouse_motion_callback(InputManager::MouseMotionCallbackArgs motion) {
-    motion.pos -= io.windowPos;
     motion.pos /= io.guiScaleMultiplier;
     mouse_callback(motion.pos, [&motion] (ElementContainer* e) { e->elem->input_mouse_motion_callback(motion); });
 }
 
 void GUIManager::input_mouse_wheel_callback(InputManager::MouseWheelCallbackArgs wheel) {
-    wheel.mousePos -= io.windowPos;
     wheel.mousePos /= io.guiScaleMultiplier;
     mouse_callback(wheel.mousePos, [&wheel] (ElementContainer* e) { e->elem->input_mouse_wheel_callback(wheel); });
 }

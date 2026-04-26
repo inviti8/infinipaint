@@ -1,6 +1,7 @@
 #pragma once
 #include "GUIStuff/Elements/ScrollArea.hpp"
 #include "DrawData.hpp"
+#include "TimePoint.hpp"
 #include "Helpers/FileDownloader.hpp"
 #include <filesystem>
 #include <modules/skparagraph/include/Paragraph.h>

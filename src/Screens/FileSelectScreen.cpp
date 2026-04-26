@@ -128,7 +128,7 @@ void FileSelectScreen::main_display() {
         main_menu();
         CLAY_AUTO_ID({
             .layout = {
-                .sizing = {.width = CLAY_SIZING_FIXED(gui.io.windowSize.x()), .height = CLAY_SIZING_GROW(0)},
+                .sizing = {.width = CLAY_SIZING_FIXED(gui.io.safeWindowRect.width()), .height = CLAY_SIZING_GROW(0)},
                 .childAlignment = { .x = CLAY_ALIGN_X_CENTER, .y = CLAY_ALIGN_Y_TOP },
                 .layoutDirection = CLAY_TOP_TO_BOTTOM,
             },

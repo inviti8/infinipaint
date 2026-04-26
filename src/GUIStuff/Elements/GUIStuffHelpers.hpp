@@ -1,7 +1,6 @@
 #pragma once
 #include "Helpers/ConvertVec.hpp"
 #include <include/core/SkCanvas.h>
-#include "../../TimePoint.hpp"
 #include <Eigen/Dense>
 #include <include/core/SkFont.h>
 #include <include/core/SkFontMgr.h>
@@ -12,7 +11,6 @@
 #include <Helpers/SCollision.hpp>
 #include <Helpers/Serializers.hpp>
 #include <nlohmann/json.hpp>
-#include "../../RichText/TextBox.hpp"
 #include "../../InputManager.hpp"
 #include "../GUIManagerID.hpp"
 
@@ -108,8 +106,8 @@ struct UpdateInputData {
     float deltaTime = 0.0f;
 
     float guiScaleMultiplier = 1.0f;
-    Vector2f windowPos = {0.0f, 0.0f};
     Vector2f windowSize = {0.0f, 0.0f};
+    SCollision::AABB<float> safeWindowRect;
 
     std::shared_ptr<FontData> fonts;
     sk_sp<SkTypeface> textTypeface;
