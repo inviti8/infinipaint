@@ -137,8 +137,6 @@ void FileSelectScreen::main_display() {
             CLAY_AUTO_ID({
                 .layout = {
                     .sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_GROW(0)},
-                    .padding = CLAY_PADDING_ALL(gui.io.theme->padding1),
-                    .childGap = gui.io.theme->childGap1,
                     .childAlignment = { .x = CLAY_ALIGN_X_CENTER, .y = CLAY_ALIGN_Y_TOP },
                     .layoutDirection = CLAY_TOP_TO_BOTTOM,
                 },
@@ -155,7 +153,13 @@ void FileSelectScreen::main_display() {
                     actionBarOpenAnim->animation_trigger_reverse();
                     title_bar();
                 }
-                window_safe_area_layout(gui, "center area element", [&] {
+                CLAY_AUTO_ID({
+                    .layout = {
+                        .sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_GROW(0)},
+                        .layoutDirection = CLAY_LEFT_TO_RIGHT
+                    },
+                }) {
+                    window_gap_side_bar(gui, "main display left fill", WindowFillSideBarConfig::Direction::LEFT);
                     CLAY_AUTO_ID({
                         .layout = {
                             .sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_GROW(0)},
@@ -178,7 +182,9 @@ void FileSelectScreen::main_display() {
                                 break;
                         }
                     }
-                });
+                    window_gap_side_bar(gui, "main display right fill", WindowFillSideBarConfig::Direction::RIGHT);
+                }
+                window_gap_side_bar(gui, "main display bottom fill", WindowFillSideBarConfig::Direction::BOTTOM);
                 menu_black_box();
             }
             edit_action_bar();
@@ -199,7 +205,7 @@ void FileSelectScreen::create_file_button() {
                         .element = CLAY_ATTACH_POINT_RIGHT_BOTTOM,
                         .parent = CLAY_ATTACH_POINT_RIGHT_BOTTOM
                     },
-                    .attachTo = CLAY_ATTACH_TO_ROOT
+                    .attachTo = CLAY_ATTACH_TO_PARENT
                 }
             }) {
                 svg_icon_button(gui, "add button", "data/icons/plus.svg", {
@@ -369,22 +375,27 @@ void FileSelectScreen::edit_action_bar() {
 
 void FileSelectScreen::edit_title_bar() {
     auto& gui = main.g.gui;
-    CLAY_AUTO_ID({
-        .layout = {
-            .sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_FIT(0)},
-            .childGap = gui.io.theme->childGap1,
-            .childAlignment = { .x = CLAY_ALIGN_X_LEFT, .y = CLAY_ALIGN_Y_CENTER },
-            .layoutDirection = CLAY_LEFT_TO_RIGHT,
-        }
-    }) {
-        svg_icon_button(gui, "close edit mode button", "data/icons/close.svg", {
-            .drawType = SelectableButton::DrawType::TRANSPARENT_ALL,
-            .onClick = [&] {
-                editMode = false;
+    window_fill_side_bar(gui, "edit top toolbar", {
+        .dir = WindowFillSideBarConfig::Direction::TOP,
+        .backgroundColor = gui.io.theme->backColor0
+    }, [&] {
+        CLAY_AUTO_ID({
+            .layout = {
+                .sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_FIT(0)},
+                .childGap = gui.io.theme->childGap1,
+                .childAlignment = { .x = CLAY_ALIGN_X_LEFT, .y = CLAY_ALIGN_Y_CENTER },
+                .layoutDirection = CLAY_LEFT_TO_RIGHT,
             }
-        });
-        mutable_text_label(gui, "select files label", (numberOfSelectedEntries == 0) ? "Select files" : (std::to_string(numberOfSelectedEntries) + " selected"));
-    }
+        }) {
+            svg_icon_button(gui, "close edit mode button", "data/icons/close.svg", {
+                .drawType = SelectableButton::DrawType::TRANSPARENT_ALL,
+                .onClick = [&] {
+                    editMode = false;
+                }
+            });
+            mutable_text_label(gui, "select files label", (numberOfSelectedEntries == 0) ? "Select files" : (std::to_string(numberOfSelectedEntries) + " selected"));
+        }
+    });
 }
 
 void FileSelectScreen::title_bar() {
@@ -516,8 +527,6 @@ void FileSelectScreen::main_menu() {
                 CLAY(lId, {
                     .layout = {
                         .sizing = {.width = CLAY_SIZING_FIXED(300.0f * mainMenuOpenAnim->get_val()), .height = CLAY_SIZING_GROW(0)},
-                        .padding = CLAY_PADDING_ALL(gui.io.theme->padding1),
-                        .childGap = 0,
                         .layoutDirection = CLAY_TOP_TO_BOTTOM,
                     },
                 }) {

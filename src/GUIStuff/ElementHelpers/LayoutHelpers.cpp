@@ -75,7 +75,11 @@ void window_fill_side_bar(GUIManager& gui, const char* id, const WindowFillSideB
                         CLAY_AUTO_ID({
                             .layout = {.sizing = {.width = CLAY_SIZING_FIXED(gui.io.safeWindowRect.min.x()), .height = CLAY_SIZING_FIT(0)}}
                         }) {}
-                        innerContent();
+                        CLAY_AUTO_ID({
+                            .layout = {.sizing = {.width = CLAY_SIZING_FIXED(gui.io.safeWindowRect.width()), .height = CLAY_SIZING_FIT(0)}}
+                        }) {
+                            innerContent();
+                        }
                         CLAY_AUTO_ID({
                             .layout = {.sizing = {.width = CLAY_SIZING_FIXED(gui.io.windowSize.x() - gui.io.safeWindowRect.max.x()), .height = CLAY_SIZING_FIT(0)}}
                         }) {}
@@ -101,7 +105,11 @@ void window_fill_side_bar(GUIManager& gui, const char* id, const WindowFillSideB
                         CLAY_AUTO_ID({
                             .layout = {.sizing = {.width = CLAY_SIZING_FIXED(gui.io.safeWindowRect.min.x()), .height = CLAY_SIZING_FIT(0)}}
                         }) {}
-                        innerContent();
+                        CLAY_AUTO_ID({
+                            .layout = {.sizing = {.width = CLAY_SIZING_FIXED(gui.io.safeWindowRect.width()), .height = CLAY_SIZING_FIT(0)}}
+                        }) {
+                            innerContent();
+                        }
                         CLAY_AUTO_ID({
                             .layout = {.sizing = {.width = CLAY_SIZING_FIXED(gui.io.windowSize.x() - gui.io.safeWindowRect.max.x()), .height = CLAY_SIZING_FIT(0)}}
                         }) {}
@@ -133,7 +141,11 @@ void window_fill_side_bar(GUIManager& gui, const char* id, const WindowFillSideB
                         CLAY_AUTO_ID({
                             .layout = {.sizing = {.width = CLAY_SIZING_FIT(0), .height = CLAY_SIZING_FIXED(gui.io.safeWindowRect.min.y())}}
                         }) {}
-                        innerContent();
+                        CLAY_AUTO_ID({
+                            .layout = {.sizing = {.width = CLAY_SIZING_FIT(0), .height = CLAY_SIZING_FIXED(gui.io.safeWindowRect.height())}}
+                        }) {
+                            innerContent();
+                        }
                         CLAY_AUTO_ID({
                             .layout = {.sizing = {.width = CLAY_SIZING_FIT(0), .height = CLAY_SIZING_FIXED(gui.io.windowSize.y() - gui.io.safeWindowRect.max.y())}}
                         }) {}
@@ -159,7 +171,11 @@ void window_fill_side_bar(GUIManager& gui, const char* id, const WindowFillSideB
                         CLAY_AUTO_ID({
                             .layout = {.sizing = {.width = CLAY_SIZING_FIT(0), .height = CLAY_SIZING_FIXED(gui.io.safeWindowRect.min.y())}}
                         }) {}
-                        innerContent();
+                        CLAY_AUTO_ID({
+                            .layout = {.sizing = {.width = CLAY_SIZING_FIT(0), .height = CLAY_SIZING_FIXED(gui.io.safeWindowRect.height())}}
+                        }) {
+                            innerContent();
+                        }
                         CLAY_AUTO_ID({
                             .layout = {.sizing = {.width = CLAY_SIZING_FIT(0), .height = CLAY_SIZING_FIXED(gui.io.windowSize.y() - gui.io.safeWindowRect.max.y())}}
                         }) {}
@@ -174,10 +190,29 @@ void window_fill_side_bar(GUIManager& gui, const char* id, const WindowFillSideB
     });
 }
 
-void window_safe_area_layout(GUIManager& gui, const char* id, const std::function<void()>& innerContent) {
-    gui.element<LayoutElement>(id, [&] (LayoutElement* l, const Clay_ElementId& lId) {
-        innerContent();
-    });
+void window_gap_side_bar(GUIManager& gui, const char* id, const WindowFillSideBarConfig::Direction& dir) {
+    switch(dir) {
+        case WindowFillSideBarConfig::Direction::TOP:
+            CLAY_AUTO_ID({
+                .layout = {.sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_FIXED(gui.io.safeWindowRect.min.y())}}
+            }) {}
+            break;
+        case WindowFillSideBarConfig::Direction::BOTTOM:
+            CLAY_AUTO_ID({
+                .layout = {.sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_FIXED(gui.io.windowSize.y() - gui.io.safeWindowRect.max.y())}}
+            }) {}
+            break;
+        case WindowFillSideBarConfig::Direction::LEFT:
+            CLAY_AUTO_ID({
+                .layout = {.sizing = {.width = CLAY_SIZING_FIXED(gui.io.safeWindowRect.min.x()), .height = CLAY_SIZING_GROW(0)}}
+            }) {}
+            break;
+        case WindowFillSideBarConfig::Direction::RIGHT:
+            CLAY_AUTO_ID({
+                .layout = {.sizing = {.width = CLAY_SIZING_FIXED(gui.io.windowSize.x() - gui.io.safeWindowRect.max.x()), .height = CLAY_SIZING_GROW(0)}}
+            }) {}
+            break;
+    }
 }
 
 }}

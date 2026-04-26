@@ -21,6 +21,6 @@ struct WindowFillSideBarConfig {
 };
 
 void window_fill_side_bar(GUIManager& gui, const char* id, const WindowFillSideBarConfig& config, const std::function<void()>& innerContent);
-void window_safe_area_layout(GUIManager& gui, const char* id, const std::function<void()>& innerContent);
+void window_gap_side_bar(GUIManager& gui, const char* id, const WindowFillSideBarConfig::Direction& dir);
 
 }}
