@@ -2,25 +2,15 @@
 #include "../MainProgram.hpp"
 
 DrawingProgramScreen::DrawingProgramScreen(MainProgram& m):
-    Screen(m),
-    toolbar(m)
+    Screen(m)
 {}
 
 void DrawingProgramScreen::update() {
-    toolbar.update();
     main.world->focus_update();
 }
 
 void DrawingProgramScreen::draw(SkCanvas* canvas) {
     main.draw_world(canvas, main.world, main.world->drawData);
-}
-
-void DrawingProgramScreen::gui_layout_run() {
-    toolbar.layout_run();
-}
-
-bool DrawingProgramScreen::app_close_requested() {
-    return toolbar.app_close_requested();
 }
 
 void DrawingProgramScreen::input_add_file_to_canvas_callback(const CustomEvents::AddFileToCanvasEvent& addFile) {
@@ -54,41 +44,10 @@ void DrawingProgramScreen::input_drop_text_callback(const InputManager::DropCall
 }
 
 void DrawingProgramScreen::input_key_callback(const InputManager::KeyCallbackArgs& key) {
-    switch(key.key) {
-        case InputManager::KEY_NOGUI: {
-            if(key.down && !key.repeat) {
-                toolbar.drawGui = !toolbar.drawGui;
-                main.g.gui.set_to_layout();
-            }
-            break;
-        }
-        case InputManager::KEY_SAVE: {
-            if(key.down && !key.repeat)
-                toolbar.save_func();
-            break;
-        }
-        case InputManager::KEY_SAVE_AS: {
-            if(key.down && !key.repeat)
-                toolbar.save_as_func();
-            break;
-        }
-        case InputManager::KEY_OPEN_CHAT: {
-            if(key.down && !key.repeat)
-                toolbar.open_chatbox();
-            break;
-        }
-    }
     main.world->input_key_callback(key);
 }
 
 void DrawingProgramScreen::input_text_key_callback(const InputManager::KeyCallbackArgs& key) {
-    switch(key.key) {
-        case InputManager::KEY_GENERIC_ESCAPE: {
-            if(key.down && !key.repeat)
-                toolbar.close_chatbox();
-            break;
-        }
-    }
     main.world->input_text_key_callback(key);
 }
 

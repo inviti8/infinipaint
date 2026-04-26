@@ -1,14 +1,11 @@
 #pragma once
 #include "Screen.hpp"
-#include "../Toolbar.hpp"
 
 class DrawingProgramScreen : public Screen {
     public:
         DrawingProgramScreen(MainProgram& m);
         virtual void update() override;
         virtual void draw(SkCanvas* canvas) override;
-        virtual void gui_layout_run() override;
-        virtual bool app_close_requested() override;
         virtual void input_add_file_to_canvas_callback(const CustomEvents::AddFileToCanvasEvent& addFile) override;
         virtual void input_open_infinipaint_file_callback(const CustomEvents::OpenInfiniPaintFileEvent& openFile) override;
         virtual void input_paste_callback(const CustomEvents::PasteEvent& paste) override;
@@ -30,6 +27,4 @@ class DrawingProgramScreen : public Screen {
         virtual void input_finger_motion_callback(const InputManager::FingerMotionCallbackArgs& motion) override;
         virtual void input_window_resize_callback(const InputManager::WindowResizeCallbackArgs& w) override;
         virtual void input_window_scale_callback(const InputManager::WindowScaleCallbackArgs& w) override;
-    private:
-        Toolbar toolbar;
 };
