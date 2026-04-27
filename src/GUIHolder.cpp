@@ -10,9 +10,6 @@ GUIHolder::GUIHolder(MainProgram& m):
 {
     gui.io.textTypeface = main.fonts->map["Roboto"];
     gui.io.fonts = main.fonts;
-    gui.io.layoutRun = [&] {
-        main.screen->gui_layout_run();
-    };
     gui.io.input = &main.input;
 
     // NOTE: On windows, when the native file picker is open, any call to MakeFromFile fails

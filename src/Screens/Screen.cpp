@@ -29,5 +29,6 @@ void Screen::input_finger_touch_callback(const InputManager::FingerTouchCallback
 void Screen::input_finger_motion_callback(const InputManager::FingerMotionCallbackArgs& motion) {}
 void Screen::input_window_resize_callback(const InputManager::WindowResizeCallbackArgs& w) {}
 void Screen::input_window_scale_callback(const InputManager::WindowScaleCallbackArgs& w) {}
+void Screen::input_app_terminate_callback() {}
 
 Screen::~Screen() {}

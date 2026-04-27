@@ -527,7 +527,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv) {
         mS.m->window.canCreateSurfaces = true;
         resize_window(mS);
 
-        mS.m->screen = std::make_unique<FileSelectScreen>(*mS.m);
+        mS.m->set_screen(std::make_unique<FileSelectScreen>(*mS.m));
 
         if(listOfFilesToOpenFromCommand.empty()) {
             //mS.m->create_new_tab({
@@ -634,9 +634,14 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
 #endif
         switch(event->type) {
             case SDL_EVENT_QUIT:
+                Logger::get().log("INFO", "[SDL_AppEvent] Quit");
                 if(mS.m->app_close_requested())
                     return SDL_APP_SUCCESS;
                 break;
+            case SDL_EVENT_TERMINATING:
+                Logger::get().log("INFO", "[SDL_AppEvent] Terminate");
+                mS.m->input_app_terminate_callback();
+                return SDL_APP_SUCCESS;
             case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
                 if(event->window.windowID == SDL_GetWindowID(mS.window)) {
                     if(mS.m->app_close_requested())

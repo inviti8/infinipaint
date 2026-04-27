@@ -1,6 +1,5 @@
 #include "MainProgram.hpp"
 #include "CustomEvents.hpp"
-#include "Screens/FileSelectScreen.hpp"
 #include "VersionConstants.hpp"
 #include <SDL3/SDL_render.h>
 #include <SDL3/SDL_video.h>
@@ -16,12 +15,9 @@
 #include <cereal/types/vector.hpp>
 #include <cereal/types/unordered_map.hpp>
 #include <Eigen/Core>
-#include <fstream>
 #include <cereal/archives/json.hpp>
 #include <Helpers/Serializers.hpp>
 #include <nlohmann/json.hpp>
-#include "Screens/DrawingProgramScreen.hpp"
-#include "Screens/FileSelectScreen.hpp"
 
 #include <include/core/SkSurface.h>
 #ifdef USE_SKIA_BACKEND_GRAPHITE
@@ -42,6 +38,10 @@ MainProgram::MainProgram():
     fonts(std::make_shared<FontData>()),
     g(*this)
 {
+    g.gui.io.layoutRun = [&] {
+        screen->gui_layout_run();
+    };
+
     Logger::get().add_log("WORLDFATAL", [&](const std::string& text) {
         *logFile << "[WORLDFATAL] " << text << std::endl;
         std::cout << "[WORLDFATAL] " << text << std::endl;
@@ -263,6 +263,10 @@ void MainProgram::switch_to_tab(size_t wIndex) {
     worldIndex = wIndex;
 }
 
+void MainProgram::input_app_terminate_callback() {
+    screen->input_app_terminate_callback();
+}
+
 void MainProgram::post_callback() {
     close_set_to_close_tabs();
     g.post_callback();
@@ -275,6 +279,7 @@ void MainProgram::input_add_file_to_canvas_callback(const CustomEvents::AddFileT
 
 void MainProgram::input_open_infinipaint_file_callback(const CustomEvents::OpenInfiniPaintFileEvent& openFile) {
     screen->input_open_infinipaint_file_callback(openFile);
+    g.gui.set_to_layout();
     post_callback();
 }
 
@@ -415,6 +420,12 @@ void MainProgram::input_window_scale_callback(const InputManager::WindowScaleCal
 void MainProgram::toggle_full_screen() {
     window.fullscreen = !window.fullscreen;
     SDL_SetWindowFullscreen(window.sdlWindow, window.fullscreen);
+}
+
+void MainProgram::set_screen(std::unique_ptr<Screen> newScreen) {
+    screen = std::move(newScreen);
+    g.gui.set_to_layout();
+    g.gui.io.redrawSurface = true;
 }
 
 void MainProgram::close_set_to_close_tabs() {

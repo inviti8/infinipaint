@@ -50,11 +50,10 @@ void FileSelectScreen::gui_layout_run() {
 
 void FileSelectScreen::update_file_list(std::vector<FileInfo>& fL, const std::filesystem::path& savePath, bool trashUpdate) {
     constexpr SDL_Time NS_IN_DAY = SDL_SECONDS_TO_NS(24 * 3600);
+    constexpr int64_t DAYS_TO_DELETION = 30;
 
     SDL_Time currentTime;
     SDL_GetCurrentTime(&currentTime);
-
-    SDL_Time afterThirtyDays = currentTime + NS_IN_DAY * 30;
 
     fL.clear();
     int globCount;
@@ -77,22 +76,21 @@ void FileSelectScreen::update_file_list(std::vector<FileInfo>& fL, const std::fi
                     else
                         fileInfoToAdd.lastModifyTime = it->second.trashTime;
 
-                    if(fileInfoToAdd.lastModifyTime >= afterThirtyDays) {
+                    int64_t daysSinceMovedToTrash = (currentTime - fileInfoToAdd.lastModifyTime) / NS_IN_DAY;
+
+                    if(daysSinceMovedToTrash >= DAYS_TO_DELETION) {
                         // Remove file and thumbnail
                         SDL_RemovePath(fullPath.string().c_str());
                         SDL_RemovePath((savePath / fileInfoToAdd.fileName / ".jpg").string().c_str());
                         trashInfo.files.erase(it);
                         continue;
                     }
-
-                    int64_t daysToDeletion = (afterThirtyDays - fileInfoToAdd.lastModifyTime) / NS_IN_DAY;
-
-                    if(daysToDeletion == 0)
+                    else if(daysSinceMovedToTrash == 29)
                         fileInfoToAdd.lastModifyDate = "Today";
-                    else if(daysToDeletion == 1)
+                    else if(daysSinceMovedToTrash == 28)
                         fileInfoToAdd.lastModifyDate = "Tomorrow";
                     else
-                        fileInfoToAdd.lastModifyDate = std::to_string(daysToDeletion) + " days";
+                        fileInfoToAdd.lastModifyDate = std::to_string(DAYS_TO_DELETION - daysSinceMovedToTrash - 1) + " days";
                 }
                 else {
                     SDL_PathInfo pathInfo;
@@ -209,7 +207,7 @@ void FileSelectScreen::create_file_button() {
                             .isClient = false,
                             .filePathEmptyAutoSaveDir = savePath
                         });
-                        main.screen = std::make_unique<PhoneDrawingProgramScreen>(main);
+                        main.set_screen(std::make_unique<PhoneDrawingProgramScreen>(main));
                     }
                 });
             }
@@ -738,7 +736,7 @@ void FileSelectScreen::start_edit_mode() {
 
 void FileSelectScreen::input_open_infinipaint_file_callback(const CustomEvents::OpenInfiniPaintFileEvent& openFile) {
     main.create_new_tab(openFile);
-    main.screen = std::make_unique<PhoneDrawingProgramScreen>(main);
+    main.set_screen(std::make_unique<PhoneDrawingProgramScreen>(main));
 }
 
 void FileSelectScreen::input_global_back_button_callback() {
@@ -746,6 +744,8 @@ void FileSelectScreen::input_global_back_button_callback() {
         mainMenuOpenAnim->animation_trigger_reverse();
     else if(editMode)
         editMode = false;
+    else
+        main.setToQuit = true;
     main.g.gui.set_to_layout();
 }
 

@@ -91,8 +91,6 @@ class MainProgram {
         std::ofstream* logFile;
         std::deque<UserLogMessage> logMessages;
 
-        std::unique_ptr<Screen> screen;
-
         MainProgram();
         void update();
         void draw_world(SkCanvas* canvas, std::shared_ptr<World> worldToDraw, const DrawData& drawData);
@@ -116,6 +114,7 @@ class MainProgram {
         float get_scale_and_density_factor_gui();
         bool app_close_requested();
         void toggle_full_screen();
+        void set_screen(std::unique_ptr<Screen> newScreen);
 
         void refresh_draw_surfaces();
 
@@ -135,6 +134,7 @@ class MainProgram {
         void input_open_infinipaint_file_callback(const CustomEvents::OpenInfiniPaintFileEvent& openFile);
         void input_paste_callback(const CustomEvents::PasteEvent& paste);
 
+        void input_app_terminate_callback();
         void input_global_back_button_callback();
         bool input_keybind_callback(const Vector2ui32& newKey);
         void input_drop_file_callback(const InputManager::DropCallbackArgs& drop);
@@ -167,6 +167,7 @@ class MainProgram {
         void post_callback();
 
         std::string gen_random_display_name();
+        std::unique_ptr<Screen> screen;
 
         void gui();
         void draw_grid(SkCanvas* canvas);

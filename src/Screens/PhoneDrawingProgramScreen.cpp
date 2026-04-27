@@ -7,6 +7,7 @@
 #include "../GUIStuff/ElementHelpers/LayoutHelpers.hpp"
 #include "../GUIStuff/ElementHelpers/TextLabelHelpers.hpp"
 #include "FileSelectScreen.hpp"
+#include <Helpers/Logger.hpp>
 
 using namespace GUIStuff;
 using namespace ElementHelpers;
@@ -58,7 +59,7 @@ void PhoneDrawingProgramScreen::top_toolbar() {
                 .onClick = [&] {
                     main.world->save_to_file(main.world->filePath);
                     main.set_tab_to_close(main.world.get());
-                    main.screen = std::make_unique<FileSelectScreen>(main);
+                    main.set_screen(std::make_unique<FileSelectScreen>(main));
                 }
             });
             text_label(gui, main.world->name);
@@ -69,6 +70,15 @@ void PhoneDrawingProgramScreen::top_toolbar() {
 void PhoneDrawingProgramScreen::input_global_back_button_callback() {
     main.world->save_to_file(main.world->filePath);
     main.set_tab_to_close(main.world.get());
-    main.screen = std::make_unique<FileSelectScreen>(main);
+    main.set_screen(std::make_unique<FileSelectScreen>(main));
     main.g.gui.set_to_layout();
+}
+
+bool PhoneDrawingProgramScreen::app_close_requested() {
+    main.world->save_to_file(main.world->filePath);
+    return true;
+}
+
+void PhoneDrawingProgramScreen::input_app_terminate_callback() {
+    main.world->save_to_file(main.world->filePath);
 }

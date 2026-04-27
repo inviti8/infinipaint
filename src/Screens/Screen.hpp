@@ -31,6 +31,7 @@ class Screen {
         virtual void input_finger_motion_callback(const InputManager::FingerMotionCallbackArgs& motion);
         virtual void input_window_resize_callback(const InputManager::WindowResizeCallbackArgs& w);
         virtual void input_window_scale_callback(const InputManager::WindowScaleCallbackArgs& w);
+        virtual void input_app_terminate_callback();
 
         virtual ~Screen();
     protected:
