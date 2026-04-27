@@ -28,6 +28,9 @@ FileSelectScreen::FileSelectScreen(MainProgram& m): Screen(m) {
     trashPath = main.conf.configPath / "trash";
     trashInfoPath = main.conf.configPath / "trashInfo.json";
 
+    SDL_CreateDirectory(savePath.string().c_str());
+    SDL_CreateDirectory(trashPath.string().c_str());
+
     try {
         nlohmann::json j(nlohmann::json::parse(read_file_to_string(trashInfoPath)));
         j.get_to(trashInfo);
@@ -60,7 +63,7 @@ void FileSelectScreen::update_file_list(std::vector<FileInfo>& fL, const std::fi
         for(int i = 0; i < globCount; i++) {
             std::filesystem::path p = filesInPath[i];
             std::string fExt = p.extension().string();
-            if(fExt == "." + World::FILE_EXTENSION) {
+            if(fExt == World::DOT_FILE_EXTENSION) {
                 std::filesystem::path fullPath = savePath / filesInPath[i];
                 FileInfo fileInfoToAdd;
                 fileInfoToAdd.fileName = p.stem().string();
@@ -134,60 +137,52 @@ void FileSelectScreen::main_display() {
                 .layoutDirection = CLAY_TOP_TO_BOTTOM,
             },
         }) {
+            if(editMode) {
+                numberOfSelectedEntries = std::count_if(fileList.begin(), fileList.end(), [] (const FileInfo& f) { return f.selected; });
+                if(numberOfSelectedEntries == 0)
+                    actionBarOpenAnim->animation_trigger_reverse();
+                else
+                    actionBarOpenAnim->animation_trigger();
+                edit_title_bar();
+            }
+            else {
+                actionBarOpenAnim->animation_trigger_reverse();
+                title_bar();
+            }
             CLAY_AUTO_ID({
                 .layout = {
                     .sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_GROW(0)},
-                    .childAlignment = { .x = CLAY_ALIGN_X_CENTER, .y = CLAY_ALIGN_Y_TOP },
-                    .layoutDirection = CLAY_TOP_TO_BOTTOM,
+                    .layoutDirection = CLAY_LEFT_TO_RIGHT
                 },
             }) {
-                if(editMode) {
-                    numberOfSelectedEntries = std::count_if(fileList.begin(), fileList.end(), [] (const FileInfo& f) { return f.selected; });
-                    if(numberOfSelectedEntries == 0)
-                        actionBarOpenAnim->animation_trigger_reverse();
-                    else
-                        actionBarOpenAnim->animation_trigger();
-                    edit_title_bar();
-                }
-                else {
-                    actionBarOpenAnim->animation_trigger_reverse();
-                    title_bar();
-                }
+                window_gap_side_bar(gui, "main display left fill", WindowFillSideBarConfig::Direction::LEFT);
                 CLAY_AUTO_ID({
                     .layout = {
                         .sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_GROW(0)},
-                        .layoutDirection = CLAY_LEFT_TO_RIGHT
+                        .padding = CLAY_PADDING_ALL(gui.io.theme->padding1),
+                        .childGap = gui.io.theme->childGap1,
+                        .childAlignment = { .x = CLAY_ALIGN_X_CENTER, .y = CLAY_ALIGN_Y_TOP },
+                        .layoutDirection = CLAY_TOP_TO_BOTTOM,
                     },
                 }) {
-                    window_gap_side_bar(gui, "main display left fill", WindowFillSideBarConfig::Direction::LEFT);
-                    CLAY_AUTO_ID({
-                        .layout = {
-                            .sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_GROW(0)},
-                            .padding = CLAY_PADDING_ALL(gui.io.theme->padding1),
-                            .childGap = gui.io.theme->childGap1,
-                            .childAlignment = { .x = CLAY_ALIGN_X_CENTER, .y = CLAY_ALIGN_Y_TOP },
-                            .layoutDirection = CLAY_TOP_TO_BOTTOM,
-                        },
-                    }) {
-                        switch(selectedMenu) {
-                            case SelectedMenu::FILES:
-                                file_view();
-                                if(!editMode)
-                                    create_file_button();
-                                break;
-                            case SelectedMenu::TRASH:
-                                file_view();
-                                break;
-                            case SelectedMenu::SETTINGS:
-                                break;
-                        }
+                    switch(selectedMenu) {
+                        case SelectedMenu::FILES:
+                            file_view();
+                            if(!editMode)
+                                create_file_button();
+                            break;
+                        case SelectedMenu::TRASH:
+                            file_view();
+                            break;
+                        case SelectedMenu::SETTINGS:
+                            break;
                     }
-                    window_gap_side_bar(gui, "main display right fill", WindowFillSideBarConfig::Direction::RIGHT);
                 }
-                window_gap_side_bar(gui, "main display bottom fill", WindowFillSideBarConfig::Direction::BOTTOM);
-                menu_black_box();
+                window_gap_side_bar(gui, "main display right fill", WindowFillSideBarConfig::Direction::RIGHT);
             }
+            window_gap_side_bar(gui, "main display bottom fill", WindowFillSideBarConfig::Direction::BOTTOM);
             edit_action_bar();
+            menu_black_box();
         }
     }
 }
@@ -211,7 +206,8 @@ void FileSelectScreen::create_file_button() {
                 svg_icon_button(gui, "add button", "data/icons/plus.svg", {
                     .onClick = [&] {
                         main.create_new_tab({
-                            .isClient = false
+                            .isClient = false,
+                            .filePathEmptyAutoSaveDir = savePath
                         });
                         main.screen = std::make_unique<PhoneDrawingProgramScreen>(main);
                     }
@@ -254,24 +250,18 @@ void FileSelectScreen::move_selected_files(const std::filesystem::path& fromPath
     SDL_GetCurrentTime(&currentTime);
 
     std::vector<std::string> toFolderListNames;
-
-    int globCount;
-    char** filesInPath = SDL_GlobDirectory(toPath.c_str(), "*", 0, &globCount);
-    if(filesInPath) {
-        for(int i = 0; i < globCount; i++) {
-            std::filesystem::path p(filesInPath[i]);
-            toFolderListNames.emplace_back(p.filename().stem());
-        }
-    }
-    else
+    try {
+        toFolderListNames = glob_path_as_string_list(toPath, "*", 0, [&](const auto& p){ return p.stem().string();});
+    } catch(...) {
         SDL_CreateDirectory(toPath.string().c_str());
+    }
 
     for(const FileInfo& f : fileList) {
         if(f.selected) {
             std::string newFileName = ensure_string_unique(toFolderListNames, f.fileName);
-            std::filesystem::path filePath = fromPath / (f.fileName + "." + World::FILE_EXTENSION);
+            std::filesystem::path filePath = fromPath / (f.fileName + World::DOT_FILE_EXTENSION);
             std::filesystem::path thumbnailPath = fromPath / (f.fileName + ".jpg");
-            std::filesystem::path newFilePath = toPath / (newFileName + "." + World::FILE_EXTENSION);
+            std::filesystem::path newFilePath = toPath / (newFileName + World::DOT_FILE_EXTENSION);
             std::filesystem::path newThumbnailPath = toPath / (newFileName + ".jpg");
             SDL_RenamePath(filePath.string().c_str(), newFilePath.string().c_str());
             SDL_RenamePath(thumbnailPath.string().c_str(), newThumbnailPath.string().c_str());
@@ -293,24 +283,18 @@ void FileSelectScreen::move_selected_files(const std::filesystem::path& fromPath
 
 void FileSelectScreen::duplicate_selected_files(const std::filesystem::path& inPath) {
     std::vector<std::string> toFolderListNames;
-
-    int globCount;
-    char** filesInPath = SDL_GlobDirectory(inPath.c_str(), "*", 0, &globCount);
-    if(filesInPath) {
-        for(int i = 0; i < globCount; i++) {
-            std::filesystem::path p(filesInPath[i]);
-            toFolderListNames.emplace_back(p.filename().stem());
-        }
-    }
-    else
+    try {
+        toFolderListNames = glob_path_as_string_list(inPath, "*", 0, [&](const auto& p){ return p.stem().string();});
+    } catch(...) {
         SDL_CreateDirectory(inPath.string().c_str());
+    }
 
     for(const FileInfo& f : fileList) {
         if(f.selected) {
             std::string newFileName = ensure_string_unique(toFolderListNames, f.fileName);
             std::filesystem::path filePath = inPath / (f.fileName + World::DOT_FILE_EXTENSION);
             std::filesystem::path thumbnailPath = inPath / (f.fileName + ".jpg");
-            std::filesystem::path newFilePath = inPath / (newFileName + "." + World::FILE_EXTENSION);
+            std::filesystem::path newFilePath = inPath / (newFileName + World::DOT_FILE_EXTENSION);
             std::filesystem::path newThumbnailPath = inPath / (newFileName + ".jpg");
             SDL_CopyFile(filePath.string().c_str(), newFilePath.string().c_str());
             SDL_CopyFile(thumbnailPath.string().c_str(), newThumbnailPath.string().c_str());
@@ -333,43 +317,67 @@ void FileSelectScreen::delete_selected_files_in_trash() {
 void FileSelectScreen::edit_action_bar() {
     auto& gui = main.g.gui;
     if(actionBarOpenAnim->get_val()) {
-        gui.element<LayoutElement>("edit action bar", [&](LayoutElement*, const Clay_ElementId& lId) {
-            CLAY(lId, {
-                .layout = {
-                    .sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_FIXED(50 * actionBarOpenAnim->get_val())},
-                    .childAlignment = { .x = CLAY_ALIGN_X_CENTER, .y = CLAY_ALIGN_Y_CENTER },
-                    .layoutDirection = CLAY_LEFT_TO_RIGHT,
+    gui.set_z_index(gui.get_z_index() + 3, [&] {
+        CLAY_AUTO_ID({
+            .layout = {
+                .sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_GROW(0)},
+                .layoutDirection = CLAY_TOP_TO_BOTTOM
+            },
+            .floating = {
+                .zIndex = gui.get_z_index(),
+                .attachPoints = {
+                    .element = CLAY_ATTACH_POINT_LEFT_TOP,
+                    .parent = CLAY_ATTACH_POINT_LEFT_TOP,
                 },
-                .backgroundColor = convert_vec4<Clay_Color>(gui.io.theme->backColor1),
-            }) {
-                if(actionBarOpenAnim->is_at_end()) {
-                    if(selectedMenu == SelectedMenu::FILES) {
-                        edit_action_bar_button("trash", "data/icons/trash.svg", "Trash", [&] {
-                            move_selected_files(savePath, trashPath, TrashMoveType::MOVE_TO_TRASH);
-                            update_file_list(fileList, savePath, false);
-                            editMode = false;
-                        });
-                        edit_action_bar_button("duplicate", "data/icons/RemixIcon/file-copy-line.svg", "Duplicate", [&] {
-                            duplicate_selected_files(savePath);
-                            update_file_list(fileList, savePath, false);
-                            editMode = false;
-                        });
-                    }
-                    else if(selectedMenu == SelectedMenu::TRASH) {
-                        edit_action_bar_button("restore", "data/icons/RemixIcon/refresh-line.svg", "Restore", [&] {
-                            move_selected_files(trashPath, savePath, TrashMoveType::MOVE_OUT_OF_TRASH);
-                            update_file_list(fileList, trashPath, true);
-                            editMode = false;
-                        });
-                        edit_action_bar_button("delete", "data/icons/trash.svg", "Delete", [&] {
-                            delete_selected_files_in_trash();
-                            update_file_list(fileList, trashPath, true);
-                            editMode = false;
-                        });
-                    }
-                }
+                .attachTo = CLAY_ATTACH_TO_PARENT,
             }
-        });
+        }) {
+            CLAY_AUTO_ID({
+                .layout = { .sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_GROW(0)}},
+            }) {}
+            window_fill_side_bar(gui, "edit action bar bottom fill", {
+                .dir = WindowFillSideBarConfig::Direction::BOTTOM,
+                .backgroundColor = gui.io.theme->backColor1
+            }, [&] {
+                gui.element<LayoutElement>("edit action bar", [&](LayoutElement*, const Clay_ElementId& lId) {
+                    CLAY(lId, {
+                        .layout = {
+                            .sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_FIXED(50 * actionBarOpenAnim->get_val())},
+                            .childAlignment = { .x = CLAY_ALIGN_X_CENTER, .y = CLAY_ALIGN_Y_CENTER },
+                            .layoutDirection = CLAY_LEFT_TO_RIGHT,
+                        }
+                    }) {
+                        if(actionBarOpenAnim->is_at_end()) {
+                            if(selectedMenu == SelectedMenu::FILES) {
+                                edit_action_bar_button("trash", "data/icons/trash.svg", "Trash", [&] {
+                                    move_selected_files(savePath, trashPath, TrashMoveType::MOVE_TO_TRASH);
+                                    update_file_list(fileList, savePath, false);
+                                    editMode = false;
+                                });
+                                edit_action_bar_button("duplicate", "data/icons/RemixIcon/file-copy-line.svg", "Duplicate", [&] {
+                                    duplicate_selected_files(savePath);
+                                    update_file_list(fileList, savePath, false);
+                                    editMode = false;
+                                });
+                            }
+                            else if(selectedMenu == SelectedMenu::TRASH) {
+                                edit_action_bar_button("restore", "data/icons/RemixIcon/refresh-line.svg", "Restore", [&] {
+                                    move_selected_files(trashPath, savePath, TrashMoveType::MOVE_OUT_OF_TRASH);
+                                    update_file_list(fileList, trashPath, true);
+                                    editMode = false;
+                                });
+                                edit_action_bar_button("delete", "data/icons/trash.svg", "Delete", [&] {
+                                    delete_selected_files_in_trash();
+                                    update_file_list(fileList, trashPath, true);
+                                    editMode = false;
+                                });
+                            }
+                        }
+                    }
+                });
+            });
+        }
+    });
     }
 }
 
@@ -560,7 +568,7 @@ void FileSelectScreen::file_view() {
     std::filesystem::path folderPath = (selectedMenu == SelectedMenu::TRASH) ? trashPath : savePath;
 
     auto fileButton = [&] (size_t i, bool isList, const Vector2f& iconSize) {
-        std::filesystem::path filePath = folderPath / (fileList[i].fileName + "." + World::FILE_EXTENSION);
+        std::filesystem::path filePath = folderPath / (fileList[i].fileName + World::DOT_FILE_EXTENSION);
         gui.element<SelectableButton>("file button", SelectableButton::Data{
             .isSelected = editMode && fileList[i].selected,
             .onClick = [&, filePath, i] {
@@ -653,7 +661,7 @@ void FileSelectScreen::file_view() {
             .entryHeight = 150.0f,
             .entryCount = fileList.size(),
             .clipHorizontal = true,
-            .xElementSize = CLAY_SIZING_FIT(0),
+            .xElementSize = CLAY_SIZING_GROW(0),
             .elementContent = [&](size_t i) {
                 fileButton(i, true, Vector2f{100.0f, 100.0f});
             }

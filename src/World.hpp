@@ -110,7 +110,7 @@ class World {
 
         bool hasUnsavedLocalChanges = false;
 
-        void load_empty_canvas();
+        void load_empty_canvas(const std::optional<std::filesystem::path>& filePathEmptyAutoSaveDir = std::nullopt);
 
         Vector3f get_random_cursor_color();
         void init_client_data_list();

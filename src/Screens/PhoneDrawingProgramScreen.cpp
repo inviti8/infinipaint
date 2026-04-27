@@ -5,6 +5,7 @@
 #include "../GUIStuff/Elements/LayoutElement.hpp"
 #include "../GUIStuff/ElementHelpers/ButtonHelpers.hpp"
 #include "../GUIStuff/ElementHelpers/LayoutHelpers.hpp"
+#include "../GUIStuff/ElementHelpers/TextLabelHelpers.hpp"
 #include "FileSelectScreen.hpp"
 
 using namespace GUIStuff;
@@ -55,10 +56,12 @@ void PhoneDrawingProgramScreen::top_toolbar() {
             svg_icon_button(gui, "back exit button", "data/icons/RemixIcon/arrow-left-s-line.svg", {
                 .drawType = SelectableButton::DrawType::TRANSPARENT_ALL,
                 .onClick = [&] {
+                    main.world->save_to_file(main.world->filePath);
                     main.set_tab_to_close(main.world.get());
                     main.screen = std::make_unique<FileSelectScreen>(main);
                 }
             });
+            text_label(gui, main.world->name);
         }
     });
 }

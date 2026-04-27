@@ -28,6 +28,7 @@
         android:name="android.hardware.type.pc"
         android:required="false" />
 
+    <uses-permission android:name="android.permission" />
     <!-- Audio recording support -->
     <!-- if you want to record audio, uncomment this. -->
     <!-- <uses-permission android:name="android.permission.RECORD_AUDIO" /> -->

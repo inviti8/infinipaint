@@ -63,11 +63,11 @@ World::World(MainProgram& initMain, const CustomEvents::OpenInfiniPaintFileEvent
         init_client(worldInfo.netSource);
     else {
         init_client_data_list();
+        set_name(name);
         if(worldInfo.filePathSource.has_value())
             load_from_file(worldInfo.filePathSource.value(), worldInfo.fileDataBuffer);
         else
-            load_empty_canvas();
-        set_name(name);
+            load_empty_canvas(worldInfo.filePathEmptyAutoSaveDir);
         #ifdef ENABLE_ORDERED_LIST_TEST
             listDebugTest = netObjMan.make_obj<NetworkingObjects::NetObjOrderedList<uint16_t>>();
         #endif
@@ -432,9 +432,10 @@ void World::start_hosting(const std::string& initNetSource, const std::string& s
 
 void World::autosave_to_directory(const std::filesystem::path& directoryToSaveAt) {
     std::vector<std::string> strList;
-    for(auto& entry : std::filesystem::directory_iterator(directoryToSaveAt)) {
-        if(entry.path().has_stem() && entry.path().has_extension() && entry.path().extension() == ("." + FILE_EXTENSION))
-            strList.emplace_back(entry.path().stem().string());
+    try {
+        strList = glob_path_as_string_list(directoryToSaveAt, ("*" + World::DOT_FILE_EXTENSION).c_str(), 0, [&](const auto& p){ return p.stem().string();});
+    }
+    catch(...) {
     }
     std::string nameToSaveUnder = ensure_string_unique(strList, name);
     save_to_file(directoryToSaveAt / std::filesystem::path(nameToSaveUnder + "." + FILE_EXTENSION));
@@ -482,11 +483,14 @@ void World::save_to_file(const std::filesystem::path& filePathToSaveAt) {
     }
 }
 
-void World::load_empty_canvas() {
+void World::load_empty_canvas(const std::optional<std::filesystem::path>& filePathEmptyAutoSaveDir) {
     gridMan.server_init_no_file();
     bMan.server_init_no_file();
     drawProg.server_init_no_file();
     canvasTheme.server_init_no_file();
+
+    if(filePathEmptyAutoSaveDir.has_value())
+        autosave_to_directory(filePathEmptyAutoSaveDir.value());
 }
 
 void World::load_from_file(const std::filesystem::path& filePathToLoadFrom, std::string_view buffer) {

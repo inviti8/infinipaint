@@ -1,8 +1,10 @@
 #pragma once
+#include <SDL3/SDL_filesystem.h>
 #include <string>
 #include <vector>
 #include <cstdint>
 #include <filesystem>
+#include <functional>
 #include <SDL3/SDL_time.h>
 
 std::vector<std::string> split_string_by_token(std::string str, std::string token);
@@ -15,3 +17,4 @@ bool is_valid_http_url(const std::string& str);
 std::string remove_carriage_returns_from_str(std::string s);
 std::string ensure_string_unique(const std::vector<std::string>& stringList, std::string str);
 std::string sdl_time_to_nice_access_time(const SDL_DateTime& t, SDL_DateFormat dF, SDL_TimeFormat tF);
+std::vector<std::string> glob_path_as_string_list(const std::filesystem::path& folder, const char* globStr, SDL_GlobFlags globFlags, const std::function<std::string(const std::filesystem::path)>& pathToStr);

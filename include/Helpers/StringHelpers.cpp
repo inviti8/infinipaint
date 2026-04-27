@@ -2,9 +2,7 @@
 #include <SDL3/SDL_time.h>
 #include <SDL3/SDL_timer.h>
 #include <chrono>
-#include <fstream>
-#include <algorithm>
-#include <iostream>
+#include <SDL3/SDL_filesystem.h>
 #include <regex>
 #include <SDL3/SDL_iostream.h>
 
@@ -161,4 +159,15 @@ std::string sdl_time_to_nice_access_time(const SDL_DateTime& t, SDL_DateFormat d
         }
     }
     return "";
+}
+
+std::vector<std::string> glob_path_as_string_list(const std::filesystem::path& folder, const char* globStr, SDL_GlobFlags globFlags, const std::function<std::string(const std::filesystem::path)>& pathToStr) {
+    int globCount;
+    char** filesInPath = SDL_GlobDirectory(folder.c_str(), globStr, globFlags, &globCount);
+    if(!filesInPath)
+        throw std::runtime_error("[glob_path_as_string_list] SDL_GlobDirectory failed");
+    std::vector<std::string> toRet(globCount);
+    for(int i = 0; i < globCount; i++)
+        toRet[i] = pathToStr(std::filesystem::path(filesInPath[i]));
+    return toRet;
 }
