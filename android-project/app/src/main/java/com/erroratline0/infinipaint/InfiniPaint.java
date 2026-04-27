@@ -1,5 +1,6 @@
 package com.erroratline0.infinipaint;
 
+import android.content.Context;
 import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
@@ -7,6 +8,7 @@ import android.view.Window;
 import android.view.WindowManager;
 
 import org.libsdl.app.SDLActivity;
+import org.libsdl.app.SDLSurface;
 
 /**
  * A sample wrapper class that just calls SDLActivity
@@ -24,5 +26,13 @@ public class InfiniPaint extends SDLActivity {
         // Transparent navigation
         //if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q)
         //    window.setNavigationBarContrastEnforced(false);
+    }
+
+    protected void get_window_insets() {
+        Window window = this.getWindow();
+    }
+
+    protected SDLSurface createSDLSurface(Context context) {
+        return new InfiniPaintSurface(context);
     }
 }

@@ -382,6 +382,7 @@ void FileSelectScreen::edit_title_bar() {
         CLAY_AUTO_ID({
             .layout = {
                 .sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_FIT(0)},
+                .padding = CLAY_PADDING_ALL(gui.io.theme->padding1),
                 .childGap = gui.io.theme->childGap1,
                 .childAlignment = { .x = CLAY_ALIGN_X_LEFT, .y = CLAY_ALIGN_Y_CENTER },
                 .layoutDirection = CLAY_LEFT_TO_RIGHT,
@@ -407,6 +408,7 @@ void FileSelectScreen::title_bar() {
         CLAY_AUTO_ID({
             .layout = {
                 .sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_GROW(0)},
+                .padding = CLAY_PADDING_ALL(gui.io.theme->padding1),
                 .childGap = gui.io.theme->childGap1,
                 .childAlignment = {.x = CLAY_ALIGN_X_LEFT, .y = CLAY_ALIGN_Y_CENTER},
                 .layoutDirection = CLAY_LEFT_TO_RIGHT
@@ -527,6 +529,7 @@ void FileSelectScreen::main_menu() {
                 CLAY(lId, {
                     .layout = {
                         .sizing = {.width = CLAY_SIZING_FIXED(300.0f * mainMenuOpenAnim->get_val()), .height = CLAY_SIZING_GROW(0)},
+                        .padding = CLAY_PADDING_ALL(gui.io.theme->padding1),
                         .layoutDirection = CLAY_TOP_TO_BOTTOM,
                     },
                 }) {
