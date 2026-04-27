@@ -843,6 +843,13 @@ void InputManager::backend_key_down_update(const SDL_KeyboardEvent& e) {
     auto kPress = e.key;
     auto kMod = e.mod;
 
+#ifdef __ANDROID__
+    if(kPress == SDLK_AC_BACK) {
+        main.input_global_back_button_callback();
+        return;
+    }
+#endif
+
     if(kPress != SDLK_LSHIFT && kPress != SDLK_RSHIFT && kPress != SDLK_LCTRL && kPress != SDLK_RCTRL &&
        kPress != SDLK_LGUI  && kPress != SDLK_RGUI &&
        kPress != SDLK_LALT   && kPress != SDLK_RALT) {

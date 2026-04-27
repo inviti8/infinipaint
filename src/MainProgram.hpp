@@ -135,6 +135,7 @@ class MainProgram {
         void input_open_infinipaint_file_callback(const CustomEvents::OpenInfiniPaintFileEvent& openFile);
         void input_paste_callback(const CustomEvents::PasteEvent& paste);
 
+        void input_global_back_button_callback();
         bool input_keybind_callback(const Vector2ui32& newKey);
         void input_drop_file_callback(const InputManager::DropCallbackArgs& drop);
         void input_drop_text_callback(const InputManager::DropCallbackArgs& drop);

@@ -672,16 +672,16 @@ void FileSelectScreen::file_view() {
         Vector2f iconSize{0.0f, 0.0f};
         switch(fileViewType) {
             case FileViewType::LARGE_GRID:
-                entrySize = {200.0f, 220.0f};
-                iconSize = {150.0f, 150.0f};
+                entrySize = {170.0f, 190.0f};
+                iconSize = {130.0f, 130.0f};
                 break;
             case FileViewType::MEDIUM_GRID:
-                entrySize = {170.0f, 190.0f};
-                iconSize = {120.0f, 120.0f};
+                entrySize = {140.0f, 160.0f};
+                iconSize = {100.0f, 100.0f};
                 break;
             case FileViewType::SMALL_GRID:
-                entrySize = {140.0f, 160.0f};
-                iconSize = {90.0f, 90.0f};
+                entrySize = {110.0f, 130.0f};
+                iconSize = {70.0f, 70.0f};
                 break;
             default:
                 break;
@@ -739,6 +739,14 @@ void FileSelectScreen::start_edit_mode() {
 void FileSelectScreen::input_open_infinipaint_file_callback(const CustomEvents::OpenInfiniPaintFileEvent& openFile) {
     main.create_new_tab(openFile);
     main.screen = std::make_unique<PhoneDrawingProgramScreen>(main);
+}
+
+void FileSelectScreen::input_global_back_button_callback() {
+    if(!mainMenuOpenAnim->is_at_start())
+        mainMenuOpenAnim->animation_trigger_reverse();
+    else if(editMode)
+        editMode = false;
+    main.g.gui.set_to_layout();
 }
 
 void FileSelectScreen::draw(SkCanvas* canvas) {

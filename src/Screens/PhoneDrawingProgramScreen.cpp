@@ -65,3 +65,10 @@ void PhoneDrawingProgramScreen::top_toolbar() {
         }
     });
 }
+
+void PhoneDrawingProgramScreen::input_global_back_button_callback() {
+    main.world->save_to_file(main.world->filePath);
+    main.set_tab_to_close(main.world.get());
+    main.screen = std::make_unique<FileSelectScreen>(main);
+    main.g.gui.set_to_layout();
+}

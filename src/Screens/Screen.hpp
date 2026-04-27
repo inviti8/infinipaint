@@ -12,6 +12,7 @@ class Screen {
         virtual void input_add_file_to_canvas_callback(const CustomEvents::AddFileToCanvasEvent& addFile);
         virtual void input_open_infinipaint_file_callback(const CustomEvents::OpenInfiniPaintFileEvent& openFile);
         virtual void input_paste_callback(const CustomEvents::PasteEvent& paste);
+        virtual void input_global_back_button_callback();
         virtual void input_drop_file_callback(const InputManager::DropCallbackArgs& drop);
         virtual void input_drop_text_callback(const InputManager::DropCallbackArgs& drop);
         virtual void input_key_callback(const InputManager::KeyCallbackArgs& key);

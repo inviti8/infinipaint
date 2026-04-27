@@ -284,6 +284,11 @@ void MainProgram::input_paste_callback(const CustomEvents::PasteEvent& paste) {
     post_callback();
 }
 
+void MainProgram::input_global_back_button_callback() {
+    screen->input_global_back_button_callback();
+    post_callback();
+}
+
 bool MainProgram::input_keybind_callback(const Vector2ui32& newKey) {
     if(keybindWaiting.has_value()) {
         unsigned v = keybindWaiting.value();

@@ -204,6 +204,7 @@ void initialize_sdl(MainStruct& mS, int wWidth, int wHeight) {
     SDL_SetHint(SDL_HINT_PEN_MOUSE_EVENTS, "0");
     SDL_SetHint(SDL_HINT_MOUSE_TOUCH_EVENTS, "0");
     SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, "0");
+    SDL_SetHint(SDL_HINT_ANDROID_TRAP_BACK_BUTTON, "1");
     SDL_SetHint(SDL_HINT_EMSCRIPTEN_KEYBOARD_ELEMENT, "#canvas"); // Ensures that SDL only grabs input when browser is focused on canvas
 
     if(!SDL_Init(SDL_INIT_VIDEO))

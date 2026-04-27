@@ -10,6 +10,7 @@ bool Screen::app_close_requested() { return true; }
 void Screen::input_add_file_to_canvas_callback(const CustomEvents::AddFileToCanvasEvent& addFile) {}
 void Screen::input_open_infinipaint_file_callback(const CustomEvents::OpenInfiniPaintFileEvent& openFile) {}
 void Screen::input_paste_callback(const CustomEvents::PasteEvent& paste) {}
+void Screen::input_global_back_button_callback() {}
 void Screen::input_drop_file_callback(const InputManager::DropCallbackArgs& drop) {}
 void Screen::input_drop_text_callback(const InputManager::DropCallbackArgs& drop) {}
 void Screen::input_key_callback(const InputManager::KeyCallbackArgs& key) {}

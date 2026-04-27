@@ -9,6 +9,7 @@ class FileSelectScreen : public Screen {
         virtual void gui_layout_run() override;
         virtual void draw(SkCanvas* canvas) override;
         virtual void input_open_infinipaint_file_callback(const CustomEvents::OpenInfiniPaintFileEvent& openFile) override;
+        virtual void input_global_back_button_callback() override;
 
         struct TrashInfo {
             struct TrashFile {
