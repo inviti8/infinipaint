@@ -1,8 +1,9 @@
 #pragma once
 #include "../SharedTypes.hpp"
-#include "Tools/ScreenshotTool.hpp"
 #include "nlohmann/json.hpp"
 #include "../GUIStuff/GUIManager.hpp"
+#include "../WorldScreenshot.hpp"
+#include "Tools/DrawingProgramToolBase.hpp"
 
 class ToolConfiguration {
     public:
@@ -44,7 +45,7 @@ class ToolConfiguration {
         struct ScreenshotToolConfig {
             int setDimensionSize = 1000;
             bool setDimensionIsX = true;
-            ScreenshotTool::ScreenshotType selectedType = ScreenshotTool::ScreenshotType::SCREENSHOT_JPG;
+            WorldScreenshotInfo::ScreenshotType selectedType = WorldScreenshotInfo::ScreenshotType::JPG;
             NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ScreenshotToolConfig, setDimensionSize, setDimensionIsX, selectedType)
         } screenshot;
 

@@ -4,35 +4,14 @@
 #include "../../DrawData.hpp"
 #include "DrawingProgramToolBase.hpp"
 #include "Helpers/SCollision.hpp"
-#include <include/core/SkAlphaType.h>
-#include <include/core/SkColorType.h>
-#include <include/core/SkPaint.h>
-#include <include/core/SkPathTypes.h>
-#include <include/core/SkStream.h>
-#include <include/core/SkSurface.h>
-#include <include/core/SkImage.h>
-#include <include/core/SkData.h>
-#include <include/core/SkPathBuilder.h>
-#include <include/svg/SkSVGCanvas.h>
-#include <include/encode/SkPngEncoder.h>
-#include <include/encode/SkWebpEncoder.h>
-#include <include/encode/SkJpegEncoder.h>
-#include <include/gpu/GpuTypes.h>
 #include <filesystem>
-#ifdef USE_SKIA_BACKEND_GRAPHITE
-    #include <include/gpu/graphite/Surface.h>
-#elif USE_SKIA_BACKEND_GANESH
-    #include <include/gpu/ganesh/GrDirectContext.h>
-    #include <include/gpu/ganesh/SkSurfaceGanesh.h>
-#endif
+#include <include/core/SkPathBuilder.h>
+
 #include "../../GridManager.hpp"
 #include <Helpers/Logger.hpp>
 
 #include "../../MainProgram.hpp"
 
-#ifdef __EMSCRIPTEN__
-    #include <EmscriptenHelpers/emscripten_browser_file.h>
-#endif
 
 #include "../../GUIStuff/ElementHelpers/TextLabelHelpers.hpp"
 #include "../../GUIStuff/ElementHelpers/CheckBoxHelpers.hpp"
@@ -60,7 +39,7 @@ void ScreenshotTool::gui_toolbox(Toolbar& t) {
         text_label_centered(gui, "Screenshot");
         if(controls.selectionMode == ScreenshotControls::SelectionMode::NO_SELECTION)
             text_label(gui, "Select an area on the canvas...");
-        if(controls.selectionMode != ScreenshotControls::SelectionMode::NO_SELECTION && screenshotConfig.selectedType != SCREENSHOT_SVG) {
+        if(controls.selectionMode != ScreenshotControls::SelectionMode::NO_SELECTION && screenshotConfig.selectedType != WorldScreenshotInfo::ScreenshotType::SVG) {
             input_scalars_field(gui, "Image Size", "Image Size", &controls.imageSize, 2, 0, 999999999, {
                 .onEdit = [&] (size_t i) {
                     if(i == 0) {
@@ -82,11 +61,11 @@ void ScreenshotTool::gui_toolbox(Toolbar& t) {
                 text_label(gui, "Image Type");
                 gui.element<DropDown<size_t>>("image type select", (size_t*)(&screenshotConfig.selectedType), controls.typeSelections);
             });
-            if(screenshotConfig.selectedType != SCREENSHOT_SVG)
+            if(screenshotConfig.selectedType != WorldScreenshotInfo::ScreenshotType::SVG)
                 checkbox_boolean_field(gui, "Display Grid", "Display Grid", &controls.displayGrid);
             else
                 text_label(gui, "Note: Screenshot will ignore blend\nmodes and layer alpha");
-            if(screenshotConfig.selectedType != 0)
+            if(screenshotConfig.selectedType != WorldScreenshotInfo::ScreenshotType::JPG)
                 checkbox_boolean_field(gui, "Transparent Background", "Transparent Background", &controls.transparentBackground);
             text_button(gui, "Take Screenshot", "Take Screenshot", {
                 .wide = true,
@@ -98,16 +77,16 @@ void ScreenshotTool::gui_toolbox(Toolbar& t) {
                         // We can't actually use the extension from the callback, so we have to set the extension of choice beforehand
                         Toolbar::ExtensionFilter setExtensionFilter;
                         switch(screenshotConfig.selectedType) {
-                            case SCREENSHOT_JPG:
+                            case WorldScreenshotInfo::ScreenshotType::JPG:
                                 setExtensionFilter = {"JPEG", "jpg;jpeg"};
                                 break;
-                            case SCREENSHOT_PNG:
+                            case WorldScreenshotInfo::ScreenshotType::PNG:
                                 setExtensionFilter = {"PNG", "png"};
                                 break;
-                            case SCREENSHOT_WEBP:
+                            case WorldScreenshotInfo::ScreenshotType::WEBP:
                                 setExtensionFilter = {"WEBP", "webp"};
                                 break;
-                            case SCREENSHOT_SVG:
+                            case WorldScreenshotInfo::ScreenshotType::SVG:
                                 setExtensionFilter = {"SVG", "svg"};
                                 break;
                         }
@@ -298,170 +277,21 @@ bool ScreenshotTool::dragging_area_update(const Vector2f& camCursorPos) {
 void ScreenshotTool::erase_component(CanvasComponentContainer::ObjInfo* erasedComp) {
 }
 
-void ScreenshotTool::take_screenshot(const std::filesystem::path& filePath, ScreenshotType screenshotType) {
+void ScreenshotTool::take_screenshot(const std::filesystem::path& filePath, WorldScreenshotInfo::ScreenshotType screenshotType) {
     if(controls.imageSize.x() <= 0 || controls.imageSize.y() <= 0) {
         std::cout << "[ScreenshotTool::take_screenshot] Image size is 0 or negative" << std::endl;
         return;
     }
 
-    if(screenshotType != SCREENSHOT_SVG) {
-        size_t imageByteSize = (size_t)controls.imageSize.x() * (size_t)controls.imageSize.y() * 4;
-        size_t imageRowSize = 4 * controls.imageSize.x();
-    
-        SkImageInfo finalImgInfo = SkImageInfo::Make(controls.imageSize.x(), controls.imageSize.y(), kRGBA_8888_SkColorType, kUnpremul_SkAlphaType);
-        std::vector<uint8_t> finalImgRawData(imageByteSize);
-        SkPixmap finalImgData(finalImgInfo, finalImgRawData.data(), imageRowSize);
-        
-        sk_sp<SkSurface> surface = drawP.world.main.create_native_surface(drawP.world.main.window.size, true);
-        SkCanvas* screenshotCanvas = surface->getCanvas();
-        if(!screenshotCanvas) {
-            Logger::get().log("INFO", "Screenshot Tool could not make canvas");
-            return;
-        }
-    
-        for(int i = 0; i < controls.imageSize.x(); i += drawP.world.main.window.size.x())
-            for(int j = 0; j < controls.imageSize.y(); j += drawP.world.main.window.size.y())
-                take_screenshot_area_hw(surface, screenshotCanvas, finalImgRawData.data(), controls.imageSize, Vector2i{i, j}, Vector2i{std::min(drawP.world.main.window.size.x(), controls.imageSize.x() - i), std::min(drawP.world.main.window.size.y(), controls.imageSize.y() - j)}, drawP.world.main.window.size, screenshotType != SCREENSHOT_JPG && controls.transparentBackground);
-    
-        bool success = false;
-        SkDynamicMemoryWStream out;
-    
-        switch(screenshotType) {
-            case SCREENSHOT_JPG:
-                success = SkJpegEncoder::Encode(&out, finalImgData, {});
-                break;
-            case SCREENSHOT_PNG:
-                success = SkPngEncoder::Encode(&out, finalImgData, {});
-                break;
-            case SCREENSHOT_WEBP:
-                success = SkWebpEncoder::Encode(&out, finalImgData, {});
-                break;
-            default:
-                break;
-        }
-        if(!success) {
-            Logger::get().log("WORLDFATAL", "[ScreenshotTool::take_screenshot] Could not encode and write screenshot");
-            return;
-        }
-        out.flush();
-
-    #ifndef __EMSCRIPTEN__
-        try {
-            auto skData = out.detachAsData();
-            if(!SDL_SaveFile(filePath.string().c_str(), skData->bytes(), skData->size()))
-                throw std::runtime_error("SDL_SaveFile failed with error: " + std::string(SDL_GetError()));
-        }
-        catch(const std::exception& e) {
-            Logger::get().log("WORLDFATAL", std::string("[ScreenshotTool::take_screenshot] Save screenshot error: ") + e.what());
-        }
-    #else
-        if(success) {
-            std::string mimeTypeArray[] = {"image/jpeg", "image/png", "image/webp"};
-            auto skData = out.detachAsData();
-            emscripten_browser_file::download(
-                "screenshot" + controls.typeSelections[screenshotType],
-                mimeTypeArray[screenshotType],
-                std::string_view((const char*)skData->bytes(), skData->size())
-            );
-        }
-    #endif
-    }
-    else {
-        SkDynamicMemoryWStream out;
-        Vector2f canvasSize{controls.rectX2 - controls.rectX1, controls.rectY2 - controls.rectY1};
-        SkRect canvasBounds = SkRect::MakeLTRB(0.0f, 0.0f, canvasSize.x(), canvasSize.y());
-        std::unique_ptr<SkCanvas> canvas = SkSVGCanvas::Make(canvasBounds, &out, SkSVGCanvas::kConvertTextToPaths_Flag | SkSVGCanvas::kNoPrettyXML_Flag);
-        take_screenshot_svg(canvas.get(), controls.transparentBackground);
-        canvas = nullptr; // Ensure that SVG is completely written into the stream
-        out.flush();
-
-    #ifndef __EMSCRIPTEN__
-        try {
-            auto skData = out.detachAsData();
-            if(!SDL_SaveFile(filePath.string().c_str(), skData->bytes(), skData->size()))
-                throw std::runtime_error("SDL_SaveFile failed with error: " + std::string(SDL_GetError()));
-        }
-        catch(const std::exception& e) {
-            Logger::get().log("WORLDFATAL", std::string("[ScreenshotTool::take_screenshot] Save screenshot error: ") + e.what());
-        }
-    #else
-        auto skData = out.detachAsData();
-        emscripten_browser_file::download(
-            "screenshot.svg",
-            "image/svg+xml",
-            std::string_view((const char*)skData->bytes(), skData->size())
-        );
-    #endif
-    }
-}
-
-void ScreenshotTool::take_screenshot_svg(SkCanvas* canvas, bool transparentBackground) {
-    float secRectX1 = controls.rectX1;
-    float secRectX2 = controls.rectX2;
-    float secRectY1 = controls.rectY1;
-    float secRectY2 = controls.rectY2;
-
-    Vector2f canvasSize{controls.rectX2 - controls.rectX1, controls.rectY2 - controls.rectY1};
-
-    WorldVec topLeft = controls.coords.from_space({secRectX1, secRectY1});
-    WorldVec topRight = controls.coords.from_space({secRectX2, secRectY1});
-    WorldVec bottomLeft = controls.coords.from_space({secRectX1, secRectY2});
-    WorldVec bottomRight = controls.coords.from_space({secRectX2, secRectY2});
-    WorldVec camCenter = (topLeft + bottomRight) / WorldScalar(2);
-
-    WorldVec vectorZoom;
-    WorldScalar distX = (camCenter - (topLeft + bottomLeft) * WorldScalar(0.5)).norm();
-    WorldScalar distY = (camCenter - (topLeft + topRight) * WorldScalar(0.5)).norm();
-    vectorZoom.x() = distX / WorldScalar(canvasSize.x() * 0.5);
-    vectorZoom.y() = distY / WorldScalar(canvasSize.y() * 0.5);
-    WorldScalar newInverseScale = (vectorZoom.x() + vectorZoom.y()) * WorldScalar(0.5);
-
-    DrawData screenshotDrawData = drawP.world.drawData;
-    screenshotDrawData.cam.set_based_on_properties(drawP.world, topLeft, newInverseScale, controls.coords.rotation);
-    screenshotDrawData.cam.set_viewing_area(canvasSize);
-    screenshotDrawData.takingScreenshot = true;
-    screenshotDrawData.transparentBackground = transparentBackground;
-    screenshotDrawData.drawGrids = false;
-    screenshotDrawData.isSVGRender = true;
-    screenshotDrawData.refresh_draw_optimizing_values();
-    drawP.world.main.draw_world(canvas, drawP.world.main.world, screenshotDrawData);
-}
-
-void ScreenshotTool::take_screenshot_area_hw(const sk_sp<SkSurface>& surface, SkCanvas* canvas, void* fullImgRawData, const Vector2i& fullImageSize, const Vector2i& sectionImagePos, const Vector2i& sectionImageSize, const Vector2i& canvasSize, bool transparentBackground) {
-    //std::cout << "[ScreenshotTool::take_screenshot_area_hw] Screenshot Pos: " << "[" << sectionImagePos.x() << " " << sectionImagePos.y() << "]" << std::endl;
-
-    float secRectX1 = controls.rectX1 + (controls.rectX2 - controls.rectX1) * (sectionImagePos.x() / (double)fullImageSize.x());
-    float secRectX2 = controls.rectX1 + (controls.rectX2 - controls.rectX1) * ((sectionImagePos.x() + canvasSize.x()) / (double)fullImageSize.x());
-    float secRectY1 = controls.rectY1 + (controls.rectY2 - controls.rectY1) * (sectionImagePos.y() / (double)fullImageSize.y());
-    float secRectY2 = controls.rectY1 + (controls.rectY2 - controls.rectY1) * ((sectionImagePos.y() + canvasSize.y()) / (double)fullImageSize.y());
-
-    WorldVec topLeft = controls.coords.from_space({secRectX1, secRectY1});
-    WorldVec topRight = controls.coords.from_space({secRectX2, secRectY1});
-    WorldVec bottomLeft = controls.coords.from_space({secRectX1, secRectY2});
-    WorldVec bottomRight = controls.coords.from_space({secRectX2, secRectY2});
-    WorldVec camCenter = (topLeft + bottomRight) / WorldScalar(2);
-
-    WorldVec vectorZoom;
-    WorldScalar distX = (camCenter - (topLeft + bottomLeft) * WorldScalar(0.5)).norm();
-    WorldScalar distY = (camCenter - (topLeft + topRight) * WorldScalar(0.5)).norm();
-    vectorZoom.x() = distX / WorldScalar(canvasSize.x() * 0.5);
-    vectorZoom.y() = distY / WorldScalar(canvasSize.y() * 0.5);
-    WorldScalar newInverseScale = (vectorZoom.x() + vectorZoom.y()) * WorldScalar(0.5);
-
-    DrawData screenshotDrawData = drawP.world.drawData;
-    screenshotDrawData.cam.set_based_on_properties(drawP.world, topLeft, newInverseScale, controls.coords.rotation);
-    screenshotDrawData.cam.set_viewing_area(sectionImageSize.cast<float>());
-    screenshotDrawData.takingScreenshot = true;
-    screenshotDrawData.transparentBackground = transparentBackground;
-    screenshotDrawData.drawGrids = controls.displayGrid;
-    screenshotDrawData.refresh_draw_optimizing_values();
-    drawP.world.main.draw_world(canvas, drawP.world.main.world, screenshotDrawData);
-
-    SkImageInfo aaImgInfo = SkImageInfo::Make(sectionImageSize.x(), sectionImageSize.y(), kRGBA_8888_SkColorType, kPremul_SkAlphaType);
-    void* fullImgRawDataStartPt = (uint8_t*)fullImgRawData + 4 * (size_t)sectionImagePos.x() + 4 * (size_t)fullImageSize.x() * (size_t)sectionImagePos.y();
-    SkPixmap aaImgData(aaImgInfo, fullImgRawDataStartPt, fullImageSize.x() * 4);
-    if(!surface->readPixels(aaImgData, 0, 0))
-        throw std::runtime_error("[ScreenshotTool::take_screenshot_area_hw] Error copy pixmap");
+    world_take_screenshot(drawP.world.main.world, {
+        .filePath = filePath,
+        .type = screenshotType,
+        .imageSizePixels = controls.imageSize,
+        .cameraCoords = controls.coords,
+        .imageBounds = {{controls.rectX1, controls.rectY1}, {controls.rectX2, controls.rectY2}},
+        .transparentBackground = controls.transparentBackground,
+        .displayGrid = controls.displayGrid
+    });
 }
 
 void ScreenshotTool::switch_tool(DrawingProgramToolType newTool) {

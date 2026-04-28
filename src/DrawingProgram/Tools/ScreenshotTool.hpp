@@ -4,6 +4,7 @@
 #include <filesystem>
 #include "../../InputManager.hpp"
 #include "../../CoordSpaceHelper.hpp"
+#include "../../World.hpp"
 
 class DrawingProgram;
 
@@ -20,18 +21,9 @@ class ScreenshotTool : public DrawingProgramToolBase {
         virtual bool prevent_undo_or_redo() override;
         virtual void input_mouse_button_on_canvas_callback(const InputManager::MouseButtonCallbackArgs& button) override;
         virtual void input_mouse_motion_callback(const InputManager::MouseMotionCallbackArgs& motion) override;
-
-        enum ScreenshotType : size_t {
-            SCREENSHOT_JPG,
-            SCREENSHOT_PNG,
-            SCREENSHOT_WEBP,
-            SCREENSHOT_SVG
-        };
     private:
         void commit_rect();
-        void take_screenshot(const std::filesystem::path& filePath, ScreenshotType screenshotType);
-        void take_screenshot_area_hw(const sk_sp<SkSurface>& surface, SkCanvas* canvas, void* fullImgRawData, const Vector2i& fullImageSize, const Vector2i& sectionImagePos, const Vector2i& sectionImageSize, const Vector2i& canvasSize, bool transparentBackground);
-        void take_screenshot_svg(SkCanvas* canvas, bool transparentBackground);
+        void take_screenshot(const std::filesystem::path& filePath, WorldScreenshotInfo::ScreenshotType screenshotType);
 
         struct ScreenshotControls {
             CoordSpaceHelper translateBeginCoords;
@@ -59,16 +51,9 @@ class ScreenshotTool : public DrawingProgramToolBase {
 
             std::atomic<bool> setToTakeScreenshot = false;
             std::filesystem::path screenshotSavePath;
-            ScreenshotType screenshotSaveType;
+            WorldScreenshotInfo::ScreenshotType screenshotSaveType;
         } controls;
         bool dragging_border_update(const Vector2f& camCursorPos);
         bool selection_exists_update();
         bool dragging_area_update(const Vector2f& camCursorPos);
 };
-
-NLOHMANN_JSON_SERIALIZE_ENUM(ScreenshotTool::ScreenshotType, {
-    {ScreenshotTool::ScreenshotType::SCREENSHOT_JPG, "jpg"},
-    {ScreenshotTool::ScreenshotType::SCREENSHOT_PNG, "png"},
-    {ScreenshotTool::ScreenshotType::SCREENSHOT_WEBP, "webp"},
-    {ScreenshotTool::ScreenshotType::SCREENSHOT_SVG, "svg"}
-})

@@ -30,6 +30,7 @@
 #include "CanvasComponents/CanvasComponent.hpp"
 #include "CanvasComponents/CanvasComponentContainer.hpp"
 #include "CanvasComponents/CanvasComponentAllocator.hpp"
+#include "WorldScreenshot.hpp"
 
 #ifdef __EMSCRIPTEN__
     #include <EmscriptenHelpers/emscripten_browser_file.h>
@@ -45,6 +46,8 @@ World::World(MainProgram& initMain, const CustomEvents::OpenInfiniPaintFileEvent
     gridMan(*this),
     canvasTheme(*this)
 {
+    saveThumbnail = worldInfo.saveThumbnail;
+
     init_net_obj_type_list();
     netObjMan.set_netobj_destroy_callback([&undo = undo](const NetworkingObjects::NetObjID& idToDestroy) {
         undo.remove_by_netid(idToDestroy);
@@ -438,10 +441,10 @@ void World::autosave_to_directory(const std::filesystem::path& directoryToSaveAt
     catch(...) {
     }
     std::string nameToSaveUnder = ensure_string_unique(strList, name);
-    save_to_file(directoryToSaveAt / std::filesystem::path(nameToSaveUnder + "." + FILE_EXTENSION));
+    save_to_file(directoryToSaveAt / std::filesystem::path(nameToSaveUnder + "." + FILE_EXTENSION), true);
 }
 
-void World::save_to_file(const std::filesystem::path& filePathToSaveAt) {
+void World::save_to_file(const std::filesystem::path& filePathToSaveAt, bool disableThumbnailSaving) {
     try {
         filePath = filePathToSaveAt;
 
@@ -473,6 +476,21 @@ void World::save_to_file(const std::filesystem::path& filePathToSaveAt) {
         #else
             if(!SDL_SaveFile(filePath.string().c_str(), f.view().data(), f.view().size()))
                 throw std::runtime_error("SDL_SaveFile failed with error: " + std::string(SDL_GetError()));
+            else if(saveThumbnail && !disableThumbnailSaving) {
+                Vector2f imageCenter{main.window.size.x() * 0.5f, main.window.size.y() * 0.5f};
+                float imageDim = std::max(main.window.size.x(), main.window.size.y());
+                Vector2f imageDimVec{imageDim * 0.5f, imageDim * 0.5f};
+                SCollision::AABB<float> imageBounds{imageCenter - imageDimVec, imageCenter + imageDimVec};
+                world_take_screenshot(main.world, {
+                    .filePath = filePath.parent_path() / (filePath.stem().string() + ".jpg"),
+                    .type = WorldScreenshotInfo::ScreenshotType::JPG,
+                    .imageSizePixels = {512, 512},
+                    .cameraCoords = drawData.cam.c,
+                    .imageBounds = imageBounds,
+                    .transparentBackground = false,
+                    .displayGrid = false
+                });
+            }
         #endif
 
         Logger::get().log("USERINFO", "File saved");

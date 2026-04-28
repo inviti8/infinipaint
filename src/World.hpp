@@ -1,6 +1,7 @@
 #pragma once
 #include <Helpers/NetworkingObjects/DelayUpdateSerializedClassManager.hpp>
 #include <Helpers/NetworkingObjects/NetObjOrderedList.hpp>
+#include "CoordSpaceHelper.hpp"
 #include "CustomEvents.hpp"
 #include "Helpers/NetworkingObjects/NetObjUnorderedSet.hpp"
 #include "WorldUndoManager.hpp"
@@ -19,6 +20,8 @@
 class MainProgram;
 
 //#define ENABLE_ORDERED_LIST_TEST
+
+struct WorldScreenshotInfo;
 
 class World {
     public:
@@ -63,7 +66,7 @@ class World {
         bool clientStillConnecting = false;
 
         void autosave_to_directory(const std::filesystem::path& directoryToSaveAt);
-        void save_to_file(const std::filesystem::path& filePathToSaveAt);
+        void save_to_file(const std::filesystem::path& filePathToSaveAt, bool disableThumbnailSaving = false);
         void load_from_file(const std::filesystem::path& filePathToLoadFrom, std::string_view buffer);
 
         void undo_with_checks();
@@ -107,7 +110,7 @@ class World {
         void input_multi_finger_touch_callback(const InputManager::MultiFingerTouchCallbackArgs& touch);
         void input_multi_finger_motion_callback(const InputManager::MultiFingerMotionCallbackArgs& motion);
     private:
-
+        bool saveThumbnail = false;
         bool hasUnsavedLocalChanges = false;
 
         void load_empty_canvas(const std::optional<std::filesystem::path>& filePathEmptyAutoSaveDir = std::nullopt);

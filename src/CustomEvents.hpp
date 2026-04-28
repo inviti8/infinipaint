@@ -48,6 +48,7 @@ namespace CustomEvents {
     struct OpenInfiniPaintFileEvent {
         static uint32_t EVENT_NUM;
         bool isClient;
+        bool saveThumbnail = false;
         std::optional<std::filesystem::path> filePathEmptyAutoSaveDir;
         std::optional<std::filesystem::path> filePathSource;
         std::string netSource;

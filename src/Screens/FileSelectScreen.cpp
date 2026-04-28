@@ -203,11 +203,11 @@ void FileSelectScreen::create_file_button() {
             }) {
                 svg_icon_button(gui, "add button", "data/icons/plus.svg", {
                     .onClick = [&] {
-                        main.create_new_tab({
+                        CustomEvents::emit_event<CustomEvents::OpenInfiniPaintFileEvent>({
                             .isClient = false,
+                            .saveThumbnail = true,
                             .filePathEmptyAutoSaveDir = savePath
                         });
-                        main.set_screen([&] (std::unique_ptr<Screen>) { return std::make_unique<PhoneDrawingProgramScreen>(main); });
                     }
                 });
             }
@@ -577,6 +577,7 @@ void FileSelectScreen::file_view() {
                 else {
                     CustomEvents::emit_event<CustomEvents::OpenInfiniPaintFileEvent>({
                         .isClient = false,
+                        .saveThumbnail = true,
                         .filePathSource = filePath
                     });
                 }
