@@ -30,6 +30,9 @@ class GUIManager {
 
         UpdateInputData io;
 
+        void in_dynamic_area(const std::function<void()>& f);
+        bool is_dynamic_area();
+
         void new_id(const char* id, const std::function<void()>& f);
         void new_id(int64_t id, const std::function<void()>& f);
 
@@ -139,6 +142,7 @@ class GUIManager {
 
         int16_t zIndex = 0;
         Element* parentElement = nullptr;
+        bool dynamicArea = false;
         std::optional<SCollision::AABB<float>> clippingRegion;
 
         std::function<void()> postCallbackFunc;

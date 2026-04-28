@@ -36,7 +36,13 @@ void ScrollArea::layout(const Clay_ElementId& id, const Options& options) {
             },
             .clip = {.horizontal = opts.clipHorizontal, .vertical = opts.clipVertical, .childOffset = {.x = scrollOffset.x(), .y = scrollOffset.y()}}
         }) {
-            opts.innerContent({.contentDimensions = contentDimensions, .containerDimensions = containerDimensions, .scrollOffset = &scrollOffset});
+            if(scrollData.contentDimensions.height > scrollData.scrollContainerDimensions.height) {
+                gui.in_dynamic_area([&] {
+                    opts.innerContent({.contentDimensions = contentDimensions, .containerDimensions = containerDimensions, .scrollOffset = &scrollOffset});
+                });
+            }
+            else
+                opts.innerContent({.contentDimensions = contentDimensions, .containerDimensions = containerDimensions, .scrollOffset = &scrollOffset});
             clamp_scroll();
         }
 

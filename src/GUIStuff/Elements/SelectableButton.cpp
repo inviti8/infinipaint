@@ -14,6 +14,7 @@ void SelectableButton::layout(const Clay_ElementId& id, const Data& d) {
     SkColor4f backgroundColorHighlight;
     SkColor4f backgroundColor;
 
+    inDynamicArea = gui.is_dynamic_area();
     instantResponse = d.instantResponse;
     onClick = [&, this, d] {
         if(d.onClickButton)
@@ -112,7 +113,7 @@ void SelectableButton::input_finger_touch_callback(const InputManager::FingerTou
 }
 
 void SelectableButton::input_finger_motion_callback(const InputManager::FingerMotionCallbackArgs& motion) {
-    if(isHovering || isHeld) {
+    if((isHovering || isHeld) && (inDynamicArea || !mouseHovering)) {
         isHovering = false;
         isHeld = false;
         gui.set_to_layout();
