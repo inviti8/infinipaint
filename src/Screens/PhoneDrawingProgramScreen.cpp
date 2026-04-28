@@ -59,7 +59,7 @@ void PhoneDrawingProgramScreen::top_toolbar() {
                 .onClick = [&] {
                     main.world->save_to_file(main.world->filePath);
                     main.set_tab_to_close(main.world.get());
-                    main.set_screen(std::make_unique<FileSelectScreen>(main));
+                    main.set_screen([&] (std::unique_ptr<Screen>) { return std::make_unique<FileSelectScreen>(main); });
                 }
             });
             text_label(gui, main.world->name);
@@ -70,15 +70,10 @@ void PhoneDrawingProgramScreen::top_toolbar() {
 void PhoneDrawingProgramScreen::input_global_back_button_callback() {
     main.world->save_to_file(main.world->filePath);
     main.set_tab_to_close(main.world.get());
-    main.set_screen(std::make_unique<FileSelectScreen>(main));
     main.g.gui.set_to_layout();
+    main.set_screen([&] (std::unique_ptr<Screen>) { return std::make_unique<FileSelectScreen>(main); });
 }
 
-bool PhoneDrawingProgramScreen::app_close_requested() {
-    main.world->save_to_file(main.world->filePath);
-    return true;
-}
-
-void PhoneDrawingProgramScreen::input_app_terminate_callback() {
+void PhoneDrawingProgramScreen::input_app_about_to_go_to_background_callback() {
     main.world->save_to_file(main.world->filePath);
 }

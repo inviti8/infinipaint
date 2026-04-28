@@ -114,7 +114,9 @@ class MainProgram {
         float get_scale_and_density_factor_gui();
         bool app_close_requested();
         void toggle_full_screen();
-        void set_screen(std::unique_ptr<Screen> newScreen);
+        
+        void set_first_screen(std::unique_ptr<Screen> firstScreen);
+        void set_screen(std::function<std::unique_ptr<Screen>(std::unique_ptr<Screen>)> screenFunc);
 
         void refresh_draw_surfaces();
 
@@ -134,7 +136,7 @@ class MainProgram {
         void input_open_infinipaint_file_callback(const CustomEvents::OpenInfiniPaintFileEvent& openFile);
         void input_paste_callback(const CustomEvents::PasteEvent& paste);
 
-        void input_app_terminate_callback();
+        void input_app_about_to_go_to_background_callback();
         void input_global_back_button_callback();
         bool input_keybind_callback(const Vector2ui32& newKey);
         void input_drop_file_callback(const InputManager::DropCallbackArgs& drop);
@@ -165,8 +167,10 @@ class MainProgram {
         std::unordered_set<World*> tabsToClose;
         void close_set_to_close_tabs();
         void post_callback();
+        void run_new_screen_func();
 
         std::string gen_random_display_name();
+        std::function<std::unique_ptr<Screen>(std::unique_ptr<Screen>)> newScreenFunc;
         std::unique_ptr<Screen> screen;
 
         void gui();

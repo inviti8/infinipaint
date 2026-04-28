@@ -527,7 +527,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv) {
         mS.m->window.canCreateSurfaces = true;
         resize_window(mS);
 
-        mS.m->set_screen(std::make_unique<FileSelectScreen>(*mS.m));
+        mS.m->set_first_screen(std::make_unique<FileSelectScreen>(*mS.m));
 
         if(listOfFilesToOpenFromCommand.empty()) {
             //mS.m->create_new_tab({
@@ -638,10 +638,10 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
                 if(mS.m->app_close_requested())
                     return SDL_APP_SUCCESS;
                 break;
-            case SDL_EVENT_TERMINATING:
-                Logger::get().log("INFO", "[SDL_AppEvent] Terminate");
-                mS.m->input_app_terminate_callback();
-                return SDL_APP_SUCCESS;
+            case SDL_EVENT_WILL_ENTER_BACKGROUND:
+                Logger::get().log("INFO", "[SDL_AppEvent] Entering background");
+                mS.m->input_app_about_to_go_to_background_callback();
+                break;
             case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
                 if(event->window.windowID == SDL_GetWindowID(mS.window)) {
                     if(mS.m->app_close_requested())
@@ -798,7 +798,9 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
     return mS.m->setToQuit ? SDL_APP_SUCCESS : SDL_APP_CONTINUE;
 }
 
+// NOTE: On Android, SDL_AppQuit is triggered by onDestroy. onDestroy may or may not be called, and even if it is, it may only be partially called. You should not rely on it.
 void SDL_AppQuit(void *appstate, SDL_AppResult result) {
+#ifndef __ANDROID__
     DrawingProgramCache::delete_all_draw_cache();
 
     MainStruct& mS = *((MainStruct*)appstate);
@@ -816,4 +818,5 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result) {
     SDL_Quit();
     
     FileDownloader::cleanup();
+#endif
 }

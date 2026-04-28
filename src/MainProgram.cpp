@@ -263,13 +263,16 @@ void MainProgram::switch_to_tab(size_t wIndex) {
     worldIndex = wIndex;
 }
 
-void MainProgram::input_app_terminate_callback() {
-    screen->input_app_terminate_callback();
+void MainProgram::post_callback() {
+    g.gui.run_post_callback_func();
+    run_new_screen_func();
+    close_set_to_close_tabs();
+    g.gui.layout_if_necessary();
 }
 
-void MainProgram::post_callback() {
-    close_set_to_close_tabs();
-    g.post_callback();
+void MainProgram::input_app_about_to_go_to_background_callback() {
+    screen->input_app_about_to_go_to_background_callback();
+    post_callback();
 }
 
 void MainProgram::input_add_file_to_canvas_callback(const CustomEvents::AddFileToCanvasEvent& addFile) {
@@ -422,10 +425,22 @@ void MainProgram::toggle_full_screen() {
     SDL_SetWindowFullscreen(window.sdlWindow, window.fullscreen);
 }
 
-void MainProgram::set_screen(std::unique_ptr<Screen> newScreen) {
-    screen = std::move(newScreen);
-    g.gui.set_to_layout();
-    g.gui.io.redrawSurface = true;
+void MainProgram::set_first_screen(std::unique_ptr<Screen> firstScreen) {
+    set_screen([&](std::unique_ptr<Screen>){ return std::move(firstScreen); });
+    run_new_screen_func();
+}
+
+void MainProgram::run_new_screen_func() {
+    if(newScreenFunc) {
+        screen = newScreenFunc(std::move(screen));
+        g.gui.io.redrawSurface = true;
+        g.gui.set_to_layout();
+        newScreenFunc = nullptr;
+    }
+}
+
+void MainProgram::set_screen(std::function<std::unique_ptr<Screen>(std::unique_ptr<Screen>)> screenFunc) {
+    newScreenFunc = screenFunc;
 }
 
 void MainProgram::close_set_to_close_tabs() {

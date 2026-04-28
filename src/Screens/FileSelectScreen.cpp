@@ -207,7 +207,7 @@ void FileSelectScreen::create_file_button() {
                             .isClient = false,
                             .filePathEmptyAutoSaveDir = savePath
                         });
-                        main.set_screen(std::make_unique<PhoneDrawingProgramScreen>(main));
+                        main.set_screen([&] (std::unique_ptr<Screen>) { return std::make_unique<PhoneDrawingProgramScreen>(main); });
                     }
                 });
             }
@@ -257,6 +257,7 @@ void FileSelectScreen::move_selected_files(const std::filesystem::path& fromPath
     for(const FileInfo& f : fileList) {
         if(f.selected) {
             std::string newFileName = ensure_string_unique(toFolderListNames, f.fileName);
+            toFolderListNames.emplace_back(newFileName);
             std::filesystem::path filePath = fromPath / (f.fileName + World::DOT_FILE_EXTENSION);
             std::filesystem::path thumbnailPath = fromPath / (f.fileName + ".jpg");
             std::filesystem::path newFilePath = toPath / (newFileName + World::DOT_FILE_EXTENSION);
@@ -290,6 +291,7 @@ void FileSelectScreen::duplicate_selected_files(const std::filesystem::path& inP
     for(const FileInfo& f : fileList) {
         if(f.selected) {
             std::string newFileName = ensure_string_unique(toFolderListNames, f.fileName);
+            toFolderListNames.emplace_back(newFileName);
             std::filesystem::path filePath = inPath / (f.fileName + World::DOT_FILE_EXTENSION);
             std::filesystem::path thumbnailPath = inPath / (f.fileName + ".jpg");
             std::filesystem::path newFilePath = inPath / (newFileName + World::DOT_FILE_EXTENSION);
@@ -670,15 +672,15 @@ void FileSelectScreen::file_view() {
         Vector2f iconSize{0.0f, 0.0f};
         switch(fileViewType) {
             case FileViewType::LARGE_GRID:
-                entrySize = {170.0f, 190.0f};
+                entrySize = {170.0f, 210.0f};
                 iconSize = {130.0f, 130.0f};
                 break;
             case FileViewType::MEDIUM_GRID:
-                entrySize = {140.0f, 160.0f};
+                entrySize = {140.0f, 180.0f};
                 iconSize = {100.0f, 100.0f};
                 break;
             case FileViewType::SMALL_GRID:
-                entrySize = {110.0f, 130.0f};
+                entrySize = {110.0f, 150.0f};
                 iconSize = {70.0f, 70.0f};
                 break;
             default:
@@ -736,7 +738,7 @@ void FileSelectScreen::start_edit_mode() {
 
 void FileSelectScreen::input_open_infinipaint_file_callback(const CustomEvents::OpenInfiniPaintFileEvent& openFile) {
     main.create_new_tab(openFile);
-    main.set_screen(std::make_unique<PhoneDrawingProgramScreen>(main));
+    main.set_screen([&] (std::unique_ptr<Screen>) { return std::make_unique<PhoneDrawingProgramScreen>(main); });
 }
 
 void FileSelectScreen::input_global_back_button_callback() {
@@ -753,9 +755,19 @@ void FileSelectScreen::draw(SkCanvas* canvas) {
     canvas->clear(main.g.gui.io.theme->backColor0);
 }
 
-FileSelectScreen::~FileSelectScreen() {
+void FileSelectScreen::save_files() {
     nlohmann::json j;
     nlohmann::to_json(j, trashInfo);
     std::string saveJson = nlohmann::to_string(j);
     SDL_SaveFile(trashInfoPath.string().c_str(), saveJson.c_str(), saveJson.size());
+}
+
+void FileSelectScreen::input_app_about_to_go_to_background_callback() {
+    save_files();
+}
+
+FileSelectScreen::~FileSelectScreen() {
+#ifndef __ANDROID__
+    save_files();
+#endif
 }

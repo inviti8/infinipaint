@@ -1,7 +1,7 @@
 #pragma once
 #include "Screen.hpp"
 #include "nlohmann/json.hpp"
-#include "../GUIStuff/GUIManager.hpp"
+#include "../GUIStuff/GUIFloatAnimation.hpp"
 
 class FileSelectScreen : public Screen {
     public:
@@ -10,6 +10,7 @@ class FileSelectScreen : public Screen {
         virtual void draw(SkCanvas* canvas) override;
         virtual void input_open_infinipaint_file_callback(const CustomEvents::OpenInfiniPaintFileEvent& openFile) override;
         virtual void input_global_back_button_callback() override;
+        virtual void input_app_about_to_go_to_background_callback() override;
 
         struct TrashInfo {
             struct TrashFile {
@@ -25,6 +26,8 @@ class FileSelectScreen : public Screen {
         std::filesystem::path savePath;
         std::filesystem::path trashPath;
         std::filesystem::path trashInfoPath;
+
+        void save_files();
 
         struct FileInfo {
             std::string fileName;
