@@ -492,9 +492,11 @@ void FileSelectScreen::title_bar() {
                             }
                         }, LayoutElement::Callbacks{
                             .onClick = [&](LayoutElement* l, const InputManager::MouseButtonCallbackArgs& m) {
-                                if(!l->mouseHovering && m.down) {
-                                    moreOptionsMenu = MoreOptionsMenu::CLOSED;
-                                    main.g.gui.set_to_layout();
+                                if(!l->mouseHovering && !m.down) {
+                                    gui.set_post_callback_func_high_priority([&] { // Cancel actions on other buttons
+                                        moreOptionsMenu = MoreOptionsMenu::CLOSED;
+                                        main.g.gui.set_to_layout();
+                                    });
                                 }
                             }
                         });
