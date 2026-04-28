@@ -606,7 +606,7 @@ void Toolbar::top_toolbar() {
                             #endif
                         }
                     }, LayoutElement::Callbacks {
-                        .mouseButton = [&, mainMenuButton](LayoutElement* l, const InputManager::MouseButtonCallbackArgs& button) {
+                        .onClick = [&, mainMenuButton](LayoutElement* l, const InputManager::MouseButtonCallbackArgs& button) {
                             if(!l->mouseHovering && button.down && !mainMenuButton->mouseHovering) {
                                 menuPopUpOpen = false;
                                 gui.set_to_layout();
@@ -846,7 +846,7 @@ void Toolbar::grid_menu(Element* gridMenuButton) {
                                     }
                                 }
                             }, LayoutElement::Callbacks {
-                                .mouseButton = [&, i] (LayoutElement* l, const InputManager::MouseButtonCallbackArgs& button) {
+                                .onClick = [&, i] (LayoutElement* l, const InputManager::MouseButtonCallbackArgs& button) {
                                     if(l->mouseHovering && button.down && button.button == InputManager::MouseButton::LEFT) {
                                         gridMenu.selectedGrid = i;
                                         if(button.clicks == 2) {
@@ -870,7 +870,7 @@ void Toolbar::grid_menu(Element* gridMenuButton) {
                     });
                 }
             }, LayoutElement::Callbacks {
-                .mouseButton = [&, gridMenuButton] (LayoutElement* l, const InputManager::MouseButtonCallbackArgs& button) {
+                .onClick = [&, gridMenuButton] (LayoutElement* l, const InputManager::MouseButtonCallbackArgs& button) {
                     if(!l->mouseHovering && !l->childMouseHovering && !gridMenuButton->mouseHovering && button.down)
                         stop_displaying_grid_menu();
                 }
@@ -928,7 +928,7 @@ void Toolbar::bookmark_menu(Element* bookmarkMenuButton) {
                 main.world->bMan.setup_list_gui();
             }
         }, LayoutElement::Callbacks {
-            .mouseButton = [&, bookmarkMenuButton] (LayoutElement* l, const InputManager::MouseButtonCallbackArgs& button) {
+            .onClick = [&, bookmarkMenuButton] (LayoutElement* l, const InputManager::MouseButtonCallbackArgs& button) {
                 if(!l->mouseHovering && !l->childMouseHovering && !bookmarkMenuButton->mouseHovering && button.down)
                     stop_displaying_bookmark_menu();
             }
@@ -958,7 +958,7 @@ void Toolbar::layer_menu(Element* layerMenuButton) {
                 main.world->drawProg.layerMan.listGUI.setup_list_gui();
             }
         }, LayoutElement::Callbacks {
-            .mouseButton = [&, layerMenuButton] (LayoutElement* l, const InputManager::MouseButtonCallbackArgs& button) {
+            .onClick = [&, layerMenuButton] (LayoutElement* l, const InputManager::MouseButtonCallbackArgs& button) {
                 if(!l->mouseHovering && !l->childMouseHovering && !layerMenuButton->mouseHovering && button.down)
                     stop_displaying_layer_menu();
             }
@@ -1216,7 +1216,7 @@ void Toolbar::color_picker_window(const char* id, Vector4f** color, GUIStuff::El
                 });
             }
         }, LayoutElement::Callbacks{
-            .mouseButton = [&, b, color](LayoutElement* l, const InputManager::MouseButtonCallbackArgs& button) {
+            .onClick = [&, b, color](LayoutElement* l, const InputManager::MouseButtonCallbackArgs& button) {
                 if(!l->mouseHovering && !l->childMouseHovering && !b->mouseHovering && button.down) {
                     *color = nullptr;
                     main.g.gui.set_to_layout();
@@ -2111,7 +2111,7 @@ void Toolbar::file_picker_gui() {
                             text_label(gui, entry.filename().string());
                         }
                     }, LayoutElement::Callbacks {
-                        .mouseButton = [&, selectedEntry, entry](LayoutElement* l, const InputManager::MouseButtonCallbackArgs& button) {
+                        .onClick = [&, selectedEntry, entry](LayoutElement* l, const InputManager::MouseButtonCallbackArgs& button) {
                             if(l->mouseHovering && button.button == InputManager::MouseButton::LEFT && button.down) {
                                 gui.set_post_callback_func([&, button, selectedEntry, entry] {
                                     if(selectedEntry && button.clicks >= 2) {

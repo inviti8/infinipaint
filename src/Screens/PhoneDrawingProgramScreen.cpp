@@ -2,7 +2,6 @@
 #include "../MainProgram.hpp"
 #include "DrawingProgramScreen.hpp"
 #include "Helpers/ConvertVec.hpp"
-#include "../GUIStuff/Elements/LayoutElement.hpp"
 #include "../GUIStuff/ElementHelpers/ButtonHelpers.hpp"
 #include "../GUIStuff/ElementHelpers/LayoutHelpers.hpp"
 #include "../GUIStuff/ElementHelpers/TextLabelHelpers.hpp"

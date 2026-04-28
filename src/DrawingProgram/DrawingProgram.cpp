@@ -493,7 +493,7 @@ void DrawingProgram::right_click_action_menu(Vector2f popupPos, const std::funct
                 innerContent();
             }
         }, LayoutElement::Callbacks{
-            .mouseButton = [&](LayoutElement* l, const InputManager::MouseButtonCallbackArgs& button) {
+            .onClick = [&](LayoutElement* l, const InputManager::MouseButtonCallbackArgs& button) {
                 if(button.down && button.button != InputManager::MouseButton::RIGHT && !l->mouseHovering)
                     clear_right_click_popup();
             }

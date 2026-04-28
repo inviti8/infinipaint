@@ -491,7 +491,7 @@ void FileSelectScreen::title_bar() {
                                 }
                             }
                         }, LayoutElement::Callbacks{
-                            .mouseButton = [&](LayoutElement* l, const InputManager::MouseButtonCallbackArgs& m) {
+                            .onClick = [&](LayoutElement* l, const InputManager::MouseButtonCallbackArgs& m) {
                                 if(!l->mouseHovering && m.down) {
                                     moreOptionsMenu = MoreOptionsMenu::CLOSED;
                                     main.g.gui.set_to_layout();
@@ -720,7 +720,7 @@ void FileSelectScreen::menu_black_box() {
                 }) {
                 }
             }, LayoutElement::Callbacks{
-                .mouseButton = [&] (LayoutElement* l, const InputManager::MouseButtonCallbackArgs& m) {
+                .onClick = [&] (LayoutElement* l, const InputManager::MouseButtonCallbackArgs& m) {
                     if(m.down && m.button == InputManager::MouseButton::LEFT && l->mouseHovering) {
                         mainMenuOpenAnim->animation_trigger_reverse();
                         gui.set_to_layout();
