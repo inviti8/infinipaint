@@ -24,9 +24,21 @@ void GridScrollArea::layout(const Clay_ElementId& id, const Options& o) {
     size_t entriesPerRow = std::max<size_t>(rowWidth / options.entryWidth, 1);
     size_t rowCount = (options.entryCount + entriesPerRow - 1) / entriesPerRow;
     opts.entryCount = rowCount;
+    
     uint16_t xPadding = 0;
-    if(rowCount > 1 || (rowCount == 1 && ((options.entryCount + entriesPerRow) / entriesPerRow) > 1)) // More than 1 row or 1st row is full
-        xPadding = static_cast<float>(std::max<float>(rowWidth - (entriesPerRow * options.entryWidth), 0) / (entriesPerRow + 1));
+    uint16_t xChildGap = 0;
+    float entryWidth = options.entryWidth;
+    if(rowCount > 1 || (rowCount == 1 && ((options.entryCount + entriesPerRow) / entriesPerRow) > 1)) { // More than 1 row or 1st row is full
+        float padding = std::max<float>(rowWidth - (entriesPerRow * options.entryWidth), 0) / (entriesPerRow + 1);
+        xChildGap = xPadding = padding;
+        if(o.entryWidthIsMinimum) {
+            xPadding = padding / 2;
+            entryWidth = padding + options.entryWidth;
+            xChildGap = 0;
+        }
+        else
+            xPadding = xChildGap = padding;
+    }
 
     opts.elementContent = [&] (size_t rowIndex) {
         gui.new_id("grid row", [&] {
@@ -34,7 +46,7 @@ void GridScrollArea::layout(const Clay_ElementId& id, const Options& o) {
                 .layout = {
                     .sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_GROW(0)},
                     .padding = {.left = xPadding, .right = xPadding},
-                    .childGap = xPadding,
+                    .childGap = xChildGap,
                     .childAlignment = { .x = options.childAlignmentX}
                 }
             }) {
@@ -44,7 +56,7 @@ void GridScrollArea::layout(const Clay_ElementId& id, const Options& o) {
                     gui.new_id(static_cast<int64_t>(i - startIndex), [&] {
                         CLAY_AUTO_ID({
                             .layout = {
-                                .sizing = {.width = CLAY_SIZING_FIXED(options.entryWidth), .height = CLAY_SIZING_FIXED(options.entryHeight)},
+                                .sizing = {.width = CLAY_SIZING_FIXED(entryWidth), .height = CLAY_SIZING_FIXED(options.entryHeight)},
                             }
                         }) {
                             options.elementContent(i);

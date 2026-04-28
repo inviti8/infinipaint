@@ -14,6 +14,7 @@ class GridScrollArea : public Element {
             Clay_LayoutAlignmentX childAlignmentX = CLAY_ALIGN_X_LEFT;
             float entryHeight;
             size_t entryCount;
+            bool entryWidthIsMinimum = false;
             std::function<void(size_t elementIndex)> elementContent;
             std::function<void(const ScrollArea::InnerContentParameters&)> innerContentExtraCallback;
         };

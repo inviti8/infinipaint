@@ -692,6 +692,7 @@ void FileSelectScreen::file_view() {
             .childAlignmentX = CLAY_ALIGN_X_LEFT,
             .entryHeight = entrySize.y(),
             .entryCount = fileList.size(),
+            .entryWidthIsMinimum = true,
             .elementContent = [&](size_t i) {
                 fileButton(i, false, iconSize);
             }
