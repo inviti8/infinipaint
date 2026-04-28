@@ -21,7 +21,7 @@ void SelectableButton::layout(const Clay_ElementId& id, const Data& d) {
         else if(d.onClick) d.onClick();
     };
 
-    if(isHeld || ((d.isSelected || mouseHovering) && d.drawType == DrawType::TRANSPARENT_BORDER))
+    if(isHeld || ((d.isSelected || isHovering) && d.drawType == DrawType::TRANSPARENT_BORDER))
         borderColor = io.theme->fillColor1;
     else if(d.drawType == DrawType::TRANSPARENT_BORDER)
         borderColor = io.theme->backColor2;
@@ -30,7 +30,7 @@ void SelectableButton::layout(const Clay_ElementId& id, const Data& d) {
 
     if(d.isSelected)
         backgroundColorHighlight = color_mul_alpha(io.theme->fillColor1, 0.4f);
-    else if(mouseHovering || isHeld)
+    else if(isHovering || isHeld)
         backgroundColorHighlight = color_mul_alpha(io.theme->fillColor1, 0.2f);
     else
         backgroundColorHighlight = {0.0f, 0.0f, 0.0f, 0.0f};
@@ -63,7 +63,7 @@ void SelectableButton::layout(const Clay_ElementId& id, const Data& d) {
             .cornerRadius = CLAY_CORNER_RADIUS(4)
         }) {
             if(d.innerContent)
-                d.innerContent({.isSelected = d.isSelected, .isHovering = mouseHovering, .isHeld = isHeld});
+                d.innerContent({.isSelected = d.isSelected, .isHovering = isHovering, .isHeld = isHeld});
         }
     }
 }
@@ -81,15 +81,42 @@ void SelectableButton::input_mouse_button_callback(const InputManager::MouseButt
             gui.set_post_callback_func(onClick);
         gui.set_to_layout();
     }
-    else if(mouseHovering != oldIsHovering || isHeld != oldIsHeld)
+    else if(mouseHovering != isHovering || isHeld != oldIsHeld)
         gui.set_to_layout();
-    oldIsHovering = mouseHovering;
+    isHovering = mouseHovering;
 }
 
 void SelectableButton::input_mouse_motion_callback(const InputManager::MouseMotionCallbackArgs& motion) {
-    if(mouseHovering != oldIsHovering)
+    if(mouseHovering != isHovering)
         gui.set_to_layout();
-    oldIsHovering = mouseHovering;
+    isHovering = mouseHovering;
+}
+
+void SelectableButton::input_finger_touch_callback(const InputManager::FingerTouchCallbackArgs& touch) {
+    bool oldIsHeld = isHeld;
+    bool oldIsHovering = isHovering;
+    isHeld = mouseHovering && touch.down;
+    isHovering = mouseHovering && touch.down;
+    if(isHeld) {
+        if(instantResponse)
+            gui.set_post_callback_func(onClick);
+        gui.set_to_layout();
+    }
+    else if(mouseHovering && oldIsHeld && !touch.down) {
+        if(!instantResponse)
+            gui.set_post_callback_func(onClick);
+        gui.set_to_layout();
+    }
+    else if(oldIsHovering != isHovering || isHeld != oldIsHeld)
+        gui.set_to_layout();
+}
+
+void SelectableButton::input_finger_motion_callback(const InputManager::FingerMotionCallbackArgs& motion) {
+    if(isHovering || isHeld) {
+        isHovering = false;
+        isHeld = false;
+        gui.set_to_layout();
+    }
 }
 
 }

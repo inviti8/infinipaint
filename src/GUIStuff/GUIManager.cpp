@@ -690,18 +690,32 @@ void GUIManager::input_key_callback(const InputManager::KeyCallbackArgs& key) {
 }
 
 void GUIManager::input_mouse_button_callback(InputManager::MouseButtonCallbackArgs button) {
-    button.pos /= io.guiScaleMultiplier;
-    mouse_callback(button.pos, [&button] (ElementContainer* e) { e->elem->input_mouse_button_callback(button); });
+    if(button.deviceType != InputManager::MouseDeviceType::TOUCH) {
+        button.pos /= io.guiScaleMultiplier;
+        mouse_callback(button.pos, [&button] (ElementContainer* e) { e->elem->input_mouse_button_callback(button); });
+    }
 }
 
 void GUIManager::input_mouse_motion_callback(InputManager::MouseMotionCallbackArgs motion) {
-    motion.pos /= io.guiScaleMultiplier;
-    mouse_callback(motion.pos, [&motion] (ElementContainer* e) { e->elem->input_mouse_motion_callback(motion); });
+    if(motion.deviceType != InputManager::MouseDeviceType::TOUCH) {
+        motion.pos /= io.guiScaleMultiplier;
+        mouse_callback(motion.pos, [&motion] (ElementContainer* e) { e->elem->input_mouse_motion_callback(motion); });
+    }
 }
 
 void GUIManager::input_mouse_wheel_callback(InputManager::MouseWheelCallbackArgs wheel) {
     wheel.mousePos /= io.guiScaleMultiplier;
     mouse_callback(wheel.mousePos, [&wheel] (ElementContainer* e) { e->elem->input_mouse_wheel_callback(wheel); });
+}
+
+void GUIManager::input_finger_touch_callback(InputManager::FingerTouchCallbackArgs touch) {
+    touch.pos /= io.guiScaleMultiplier;
+    mouse_callback(touch.pos, [&touch] (ElementContainer* e) { e->elem->input_finger_touch_callback(touch); });
+}
+
+void GUIManager::input_finger_motion_callback(InputManager::FingerMotionCallbackArgs motion) {
+    motion.pos /= io.guiScaleMultiplier;
+    mouse_callback(motion.pos, [&motion] (ElementContainer* e) { e->elem->input_finger_motion_callback(motion); });
 }
 
 void GUIManager::mouse_callback(const Vector2f& mousePos, const std::function<void(ElementContainer*)>& f) {

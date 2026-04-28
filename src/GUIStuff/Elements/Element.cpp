@@ -14,6 +14,8 @@ namespace GUIStuff {
     void Element::input_mouse_button_callback(const InputManager::MouseButtonCallbackArgs& button) { }
     void Element::input_mouse_motion_callback(const InputManager::MouseMotionCallbackArgs& motion) { }
     void Element::input_mouse_wheel_callback(const InputManager::MouseWheelCallbackArgs& wheel) { }
+    void Element::input_finger_touch_callback(const InputManager::FingerTouchCallbackArgs& touch) { }
+    void Element::input_finger_motion_callback(const InputManager::FingerMotionCallbackArgs& motion) { }
     void Element::input_key_callback(const InputManager::KeyCallbackArgs& key) {}
 
     void Element::clay_draw(SkCanvas* canvas, UpdateInputData& io, Clay_RenderCommand* command, bool skiaAA) {}

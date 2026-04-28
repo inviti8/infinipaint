@@ -101,6 +101,8 @@ class GUIManager {
         void input_mouse_button_callback(InputManager::MouseButtonCallbackArgs button);
         void input_mouse_motion_callback(InputManager::MouseMotionCallbackArgs motion);
         void input_mouse_wheel_callback(InputManager::MouseWheelCallbackArgs wheel);
+        void input_finger_touch_callback(InputManager::FingerTouchCallbackArgs touch);
+        void input_finger_motion_callback(InputManager::FingerMotionCallbackArgs motion);
 
         bool cursor_obstructed() const;
     private:
