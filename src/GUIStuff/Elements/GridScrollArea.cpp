@@ -71,7 +71,7 @@ void GridScrollArea::layout(const Clay_ElementId& id, const Options& o) {
             .sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_GROW(0)}
         }
     }) {
-        scroll_area_many_entries(gui, "scroll many area", opts);
+        scrollArea = scroll_area_many_entries(gui, "scroll many area", opts);
     }
 }
 

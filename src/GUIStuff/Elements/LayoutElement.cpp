@@ -18,6 +18,7 @@ void LayoutElement::input_mouse_button_callback(const InputManager::MouseButtonC
 
 void LayoutElement::input_mouse_motion_callback(const InputManager::MouseMotionCallbackArgs& motion) {
     if(c.mouseMotion) c.mouseMotion(this, motion);
+    if(c.onMotion) c.onMotion(this, motion);
 }
 
 void LayoutElement::input_mouse_wheel_callback(const InputManager::MouseWheelCallbackArgs& wheel) {
@@ -39,6 +40,13 @@ void LayoutElement::input_finger_touch_callback(const InputManager::FingerTouchC
 
 void LayoutElement::input_finger_motion_callback(const InputManager::FingerMotionCallbackArgs& motion) {
     if(c.fingerMotion) c.fingerMotion(this, motion);
+    if(c.onMotion) {
+        c.onMotion(this, {
+            .deviceType = InputManager::MouseDeviceType::TOUCH,
+            .pos = motion.pos,
+            .move = motion.move
+        });
+    }
 }
 
 void LayoutElement::input_key_callback(const InputManager::KeyCallbackArgs& key) {

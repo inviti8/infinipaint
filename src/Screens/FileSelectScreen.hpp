@@ -2,6 +2,7 @@
 #include "Screen.hpp"
 #include "nlohmann/json.hpp"
 #include "../GUIStuff/GUIFloatAnimation.hpp"
+#include "../GUIStuff/Elements/ScrollArea.hpp"
 
 class FileSelectScreen : public Screen {
     public:
@@ -43,6 +44,8 @@ class FileSelectScreen : public Screen {
 
         GUIStuff::GUIFloatAnimation* mainMenuOpenAnim = nullptr;
         GUIStuff::GUIFloatAnimation* actionBarOpenAnim = nullptr;
+
+        GUIStuff::ScrollArea* fileViewScrollArea = nullptr;
 
         void main_display();
         void main_menu();

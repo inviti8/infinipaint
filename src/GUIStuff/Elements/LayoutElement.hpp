@@ -13,6 +13,7 @@ class LayoutElement : public Element {
             std::function<void(LayoutElement* l, const InputManager::FingerTouchCallbackArgs& touch)> fingerTouch;
             std::function<void(LayoutElement* l, const InputManager::FingerMotionCallbackArgs& motion)> fingerMotion;
             std::function<void(LayoutElement* l, const InputManager::MouseButtonCallbackArgs& button)> onClick;
+            std::function<void(LayoutElement* l, const InputManager::MouseMotionCallbackArgs& motion)> onMotion;
             std::function<void(LayoutElement* l, const InputManager::KeyCallbackArgs& key)> key;
         };
         void layout(const Clay_ElementId& id, const std::function<void(LayoutElement*, const Clay_ElementId&)>& layout, const Callbacks& c = {});

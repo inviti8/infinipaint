@@ -710,6 +710,7 @@ void GUIManager::input_mouse_button_callback(InputManager::MouseButtonCallbackAr
 void GUIManager::input_mouse_motion_callback(InputManager::MouseMotionCallbackArgs motion) {
     if(motion.deviceType != InputManager::MouseDeviceType::TOUCH) {
         motion.pos /= io.guiScaleMultiplier;
+        motion.move /= io.guiScaleMultiplier;
         mouse_callback(motion.pos, [&motion] (ElementContainer* e) { e->elem->input_mouse_motion_callback(motion); });
     }
 }
@@ -726,6 +727,7 @@ void GUIManager::input_finger_touch_callback(InputManager::FingerTouchCallbackAr
 
 void GUIManager::input_finger_motion_callback(InputManager::FingerMotionCallbackArgs motion) {
     motion.pos /= io.guiScaleMultiplier;
+    motion.move /= io.guiScaleMultiplier;
     mouse_callback(motion.pos, [&motion] (ElementContainer* e) { e->elem->input_finger_motion_callback(motion); });
 }
 

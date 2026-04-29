@@ -20,6 +20,8 @@ class GridScrollArea : public Element {
         };
 
         void layout(const Clay_ElementId& id, const Options& options);
+
+        ScrollArea* scrollArea = nullptr;
     private:
         Options options;
         float rowWidth = 0.0f;

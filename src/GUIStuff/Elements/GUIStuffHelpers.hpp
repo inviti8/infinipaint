@@ -99,6 +99,12 @@ struct UpdateInputData {
     InputManager* input = nullptr;
     std::function<void()> layoutRun;
 
+#ifdef __ANDROID__
+    bool isTouchDevice = true;
+#else
+    bool isTouchDevice = false;
+#endif
+
     SkFont get_font(float fSize) const;
 
     uint16_t fontSize = 16;

@@ -305,7 +305,7 @@ template <typename T> std::string vec_pretty(const T& a) {
     std::stringstream ss;
     ss << "[";
     for(size_t i = 0; i < static_cast<size_t>(a.size()); i++) {
-        if(i == a.size() - 1)
+        if(i == static_cast<size_t>(a.size() - 1))
             ss << a[i] << "]";
         else
             ss << a[i] << ", ";

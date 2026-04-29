@@ -30,17 +30,28 @@ class ScrollArea : public Element {
         void layout(const Clay_ElementId& id, const Options& options);
         void reset_scroll();
 
+
+        virtual void update() override;
         virtual void input_mouse_wheel_callback(const InputManager::MouseWheelCallbackArgs& wheel) override;
+        virtual void input_mouse_button_callback(const InputManager::MouseButtonCallbackArgs& button) override;
+        virtual void input_mouse_motion_callback(const InputManager::MouseMotionCallbackArgs& motion) override;
+        virtual void input_finger_touch_callback(const InputManager::FingerTouchCallbackArgs& touch) override;
+        virtual void input_finger_motion_callback(const InputManager::FingerMotionCallbackArgs& motion) override;
     private:
         Options opts;
+        bool scrollAreaHeld = false;
+        Vector2f scrollAreaMotion = {0.0f, 0.0f};
+        Vector2f scrollAreaMotionMax = {0.0f, 0.0f};
+
         bool isScrollbarHeldY = false;
         bool isScrollbarHoveredY = false;
         bool isHoveringOverScrollerY = false;
+        Element* scrollerY = nullptr;
         float scrollerStartPosY;
         float mouseStartPosY;
+        void y_scroll_bar();
 
         Vector2f contentDimensions = {0.0f, 0.0f};
-        Vector2f containerDimensions = {0.0f, 0.0f};
         Vector2f scrollOffset = {0.0f, 0.0f};
         void clamp_scroll();
 };

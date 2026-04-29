@@ -163,14 +163,13 @@ void FileSelectScreen::main_display() {
                         .layoutDirection = CLAY_TOP_TO_BOTTOM,
                     },
                 }) {
+                    file_view();
                     switch(selectedMenu) {
                         case SelectedMenu::FILES:
-                            file_view();
                             if(!editMode)
                                 create_file_button();
                             break;
                         case SelectedMenu::TRASH:
-                            file_view();
                             break;
                         case SelectedMenu::SETTINGS:
                             break;
@@ -548,15 +547,18 @@ void FileSelectScreen::main_menu() {
                             selectedMenu = SelectedMenu::FILES;
                             update_file_list(fileList, savePath, false);
                             mainMenuOpenAnim->animation_trigger_reverse();
+                            if(fileViewScrollArea) fileViewScrollArea->reset_scroll();
                         });
                         icon_text_transparent_option_selected_button("Trash", "data/icons/trash.svg", "Trash", selectedMenu == SelectedMenu::TRASH, [&] {
                             selectedMenu = SelectedMenu::TRASH;
                             update_file_list(fileList, trashPath, true);
                             mainMenuOpenAnim->animation_trigger_reverse();
+                            if(fileViewScrollArea) fileViewScrollArea->reset_scroll();
                         });
                         icon_text_transparent_option_selected_button("Settings", "data/icons/RemixIcon/settings-3-line.svg", "Settings", selectedMenu == SelectedMenu::SETTINGS, [&] {
                             selectedMenu = SelectedMenu::SETTINGS;
                             mainMenuOpenAnim->animation_trigger_reverse();
+                            if(fileViewScrollArea) fileViewScrollArea->reset_scroll();
                         });
                     }
                 }
@@ -566,6 +568,11 @@ void FileSelectScreen::main_menu() {
 }
 
 void FileSelectScreen::file_view() {
+    if(selectedMenu == SelectedMenu::SETTINGS) {
+        fileViewScrollArea = nullptr;
+        return;
+    }
+
     auto& gui = main.g.gui;
     std::filesystem::path folderPath = (selectedMenu == SelectedMenu::TRASH) ? trashPath : savePath;
 
@@ -660,7 +667,7 @@ void FileSelectScreen::file_view() {
     };
 
     if(fileViewType == FileViewType::LIST) {
-        scroll_area_many_entries(gui, "File selector list", ScrollBarManyEntriesOptions{
+        fileViewScrollArea = scroll_area_many_entries(gui, "File selector list", ScrollBarManyEntriesOptions{
             .entryHeight = 150.0f,
             .entryCount = fileList.size(),
             .clipHorizontal = true,
@@ -689,7 +696,7 @@ void FileSelectScreen::file_view() {
             default:
                 break;
         }
-        gui.element<GridScrollArea>("File selector grid", GridScrollArea::Options{
+        GridScrollArea* gridArea = gui.element<GridScrollArea>("File selector grid", GridScrollArea::Options{
             .entryWidth = entrySize.x(),
             .childAlignmentX = CLAY_ALIGN_X_LEFT,
             .entryHeight = entrySize.y(),
@@ -699,6 +706,7 @@ void FileSelectScreen::file_view() {
                 fileButton(i, false, iconSize);
             }
         });
+        fileViewScrollArea = gridArea->scrollArea;
     }
 }
 
