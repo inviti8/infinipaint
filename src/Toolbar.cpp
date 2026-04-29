@@ -1233,7 +1233,7 @@ void Toolbar::color_palette(const char* id, Vector4f* color, const std::function
     gui.new_id(id, [&] {
         auto& palette = main.conf.palettes[paletteData.selectedPalette].colors;
 
-        gui.element<ScrollArea>("color palette scroll area", ScrollArea::Options{
+        gui.clipping_element<ScrollArea>("color palette scroll area", ScrollArea::Options{
             .scrollVertical = true,
             .clipVertical = true,
             .scrollbarY = ScrollArea::ScrollbarType::NORMAL,

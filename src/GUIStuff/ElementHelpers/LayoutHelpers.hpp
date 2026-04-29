@@ -20,7 +20,7 @@ struct WindowFillSideBarConfig {
     Clay_BorderElementConfig border;
 };
 
-void window_fill_side_bar(GUIManager& gui, const char* id, const WindowFillSideBarConfig& config, const std::function<void()>& innerContent);
-void window_gap_side_bar(GUIManager& gui, const char* id, const WindowFillSideBarConfig::Direction& dir);
+void window_fill_side_bar(GUIManager& gui, const WindowFillSideBarConfig& config, const std::function<void()>& innerContent);
+void window_gap_side_bar(GUIManager& gui, const WindowFillSideBarConfig::Direction& dir);
 
 }}

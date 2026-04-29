@@ -42,30 +42,34 @@ void PhoneDrawingProgramScreen::top_toolbar() {
     auto& gui = main.g.gui;
     auto& io = gui.io;
 
-    window_fill_side_bar(gui, "top toolbar", {
-        .dir = WindowFillSideBarConfig::Direction::TOP,
-        .backgroundColor = io.theme->backColor0,
-        .border = {
-            .color = convert_vec4<Clay_Color>(io.theme->frontColor1),
-            .width = {.bottom = 1}
-        }
-    }, [&] {
-        CLAY_AUTO_ID({
-            .layout = {
-                .sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_FIT(0) },
-                .childAlignment = { .x = CLAY_ALIGN_X_LEFT, .y = CLAY_ALIGN_Y_CENTER},
-                .layoutDirection = CLAY_LEFT_TO_RIGHT
-            }
-        }) {
-            svg_icon_button(gui, "back exit button", "data/icons/RemixIcon/arrow-left-s-line.svg", {
-                .drawType = SelectableButton::DrawType::TRANSPARENT_ALL,
-                .onClick = [&] {
-                    main.world->save_to_file(main.world->filePath);
-                    main.set_tab_to_close(main.world.get());
-                    main.set_screen([&] (std::unique_ptr<Screen>) { return std::make_unique<FileSelectScreen>(main); });
+    gui.element<LayoutElement>("top toolbar", [&](LayoutElement*, const Clay_ElementId& lId) {
+        CLAY(lId, {}) {
+            window_fill_side_bar(gui, {
+                .dir = WindowFillSideBarConfig::Direction::TOP,
+                .backgroundColor = io.theme->backColor0,
+                .border = {
+                    .color = convert_vec4<Clay_Color>(io.theme->frontColor1),
+                    .width = {.bottom = 1}
+                }
+            }, [&] {
+                CLAY_AUTO_ID({
+                    .layout = {
+                        .sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_FIT(0) },
+                        .childAlignment = { .x = CLAY_ALIGN_X_LEFT, .y = CLAY_ALIGN_Y_CENTER},
+                        .layoutDirection = CLAY_LEFT_TO_RIGHT
+                    }
+                }) {
+                    svg_icon_button(gui, "back exit button", "data/icons/RemixIcon/arrow-left-s-line.svg", {
+                        .drawType = SelectableButton::DrawType::TRANSPARENT_ALL,
+                        .onClick = [&] {
+                            main.world->save_to_file(main.world->filePath);
+                            main.set_tab_to_close(main.world.get());
+                            main.set_screen([&] (std::unique_ptr<Screen>) { return std::make_unique<FileSelectScreen>(main); });
+                        }
+                    });
+                    text_label(gui, main.world->name);
                 }
             });
-            text_label(gui, main.world->name);
         }
     });
 }
@@ -74,9 +78,8 @@ void PhoneDrawingProgramScreen::bottom_toolbar() {
     auto& gui = main.g.gui;
     auto& io = gui.io;
     auto& drawProg = main.world->drawProg;
-    window_fill_side_bar(gui, "bottom toolbar", {
+    window_fill_side_bar(gui, {
         .dir = WindowFillSideBarConfig::Direction::BOTTOM,
-        .backgroundColor = io.theme->backColor1
     }, [&] {
         CLAY_AUTO_ID({
             .layout = {
@@ -85,23 +88,27 @@ void PhoneDrawingProgramScreen::bottom_toolbar() {
                 .layoutDirection = CLAY_LEFT_TO_RIGHT
             }
         }) {
-            CLAY_AUTO_ID({
-                .layout = {
-                    .sizing = {.width = CLAY_SIZING_FIT(0), .height = CLAY_SIZING_FIT(0) }
+            gui.element<LayoutElement>("bottom toolbar", [&](LayoutElement*, const Clay_ElementId& lId) {
+                CLAY(lId, {
+                    .layout = {
+                        .sizing = {.width = CLAY_SIZING_FIT(0), .height = CLAY_SIZING_FIT(0) },
+                    },
+                    .backgroundColor = convert_vec4<Clay_Color>(io.theme->backColor1),
+                    .cornerRadius = CLAY_CORNER_RADIUS(io.theme->windowCorners1)
+                }) {
+                    gui.clipping_element<ScrollArea>("tools scroll", ScrollArea::Options{
+                        .scrollHorizontal = true,
+                        .clipHorizontal = true,
+                        .scrollbarX = ScrollArea::ScrollbarType::NONE,
+                        .layoutDirection = CLAY_LEFT_TO_RIGHT,
+                        .xAlign = CLAY_ALIGN_X_LEFT,
+                        .yAlign = CLAY_ALIGN_Y_CENTER,
+                        .innerContent = [&](auto&) {
+                            drawProg.phone_bottom_toolbar_gui(*this);
+                        }
+                    });
                 }
-            }) {
-                gui.element<ScrollArea>("tools scroll", ScrollArea::Options{
-                    .scrollHorizontal = true,
-                    .clipHorizontal = true,
-                    .scrollbarX = ScrollArea::ScrollbarType::NONE,
-                    .layoutDirection = CLAY_LEFT_TO_RIGHT,
-                    .xAlign = CLAY_ALIGN_X_LEFT,
-                    .yAlign = CLAY_ALIGN_Y_CENTER,
-                    .innerContent = [&](auto&) {
-                        drawProg.phone_bottom_toolbar_gui(*this);
-                    }
-                });
-            }
+            });
         }
     });
 }
