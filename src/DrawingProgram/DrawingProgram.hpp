@@ -20,6 +20,7 @@
 #include "DrawingProgramSelection.hpp"
 
 class World;
+class PhoneDrawingProgramScreen;
 
 class DrawingProgram {
     public:
@@ -28,6 +29,7 @@ class DrawingProgram {
         void toolbar_gui(Toolbar& t);
         void tool_options_gui(Toolbar& t);
         void right_click_popup_gui(Toolbar& t);
+        void phone_bottom_toolbar_gui(PhoneDrawingProgramScreen& t);
         void update();
         void scale_up(const WorldScalar& scaleUpAmount);
         void draw(SkCanvas* canvas, const DrawData& drawData);

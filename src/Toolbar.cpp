@@ -291,7 +291,7 @@ void Toolbar::close_popup_gui() {
         gui.clipping_element<ScrollArea>("close file popup gui scroll area", ScrollArea::Options{
             .scrollVertical = true,
             .clipVertical = true,
-            .showScrollbarY = true,
+            .scrollbarY = ScrollArea::ScrollbarType::NORMAL,
             .innerContent = [&](const ScrollArea::InnerContentParameters&) {
                 CLAY_AUTO_ID({
                     .layout = {
@@ -1236,7 +1236,7 @@ void Toolbar::color_palette(const char* id, Vector4f* color, const std::function
         gui.element<ScrollArea>("color palette scroll area", ScrollArea::Options{
             .scrollVertical = true,
             .clipVertical = true,
-            .showScrollbarY = true,
+            .scrollbarY = ScrollArea::ScrollbarType::NORMAL,
             .innerContent = [&](const ScrollArea::InnerContentParameters&) {
                 CLAY_AUTO_ID({
                     .layout = {
@@ -1683,7 +1683,7 @@ void Toolbar::general_settings_inner_gui() {
                 gui.clipping_element<ScrollArea>("general settings scroll area", ScrollArea::Options{
                     .scrollVertical = true,
                     .clipVertical = true,
-                    .showScrollbarY = true,
+                    .scrollbarY = ScrollArea::ScrollbarType::NORMAL,
                     .innerContent = [&, innerContent](const ScrollArea::InnerContentParameters&) {
                         CLAY_AUTO_ID({
                             .layout = {
@@ -1911,7 +1911,7 @@ void Toolbar::about_menu_inner_gui() {
                 gui.clipping_element<ScrollArea>("About Menu Selector Scroll Area", ScrollArea::Options{
                     .scrollVertical = true,
                     .clipVertical = true,
-                    .showScrollbarY = true,
+                    .scrollbarY = ScrollArea::ScrollbarType::NORMAL,
                     .innerContent = [&](const ScrollArea::InnerContentParameters&) {
                         CLAY_AUTO_ID({
                             .layout = {
@@ -1953,7 +1953,7 @@ void Toolbar::about_menu_inner_gui() {
         gui.clipping_element<ScrollArea>("About Menu Text Scroll Area", ScrollArea::Options{
             .scrollVertical = true,
             .clipVertical = true,
-            .showScrollbarY = true,
+            .scrollbarY = ScrollArea::ScrollbarType::NORMAL,
             .innerContent = [&](const ScrollArea::InnerContentParameters&) {
                 text_label_size(gui, (selectedLicense == -1) ? main.conf.ownLicenseText : main.conf.thirdPartyLicenses[selectedLicense].second, 0.8f);
             }

@@ -12,5 +12,6 @@ class PhoneDrawingProgramScreen : public DrawingProgramScreen {
     private:
         void save_files();
         void top_toolbar();
+        void bottom_toolbar();
         void main_display();
 };

@@ -24,6 +24,7 @@ void GridScrollArea::layout(const Clay_ElementId& id, const Options& o) {
     size_t entriesPerRow = std::max<size_t>(rowWidth / options.entryWidth, 1);
     size_t rowCount = (options.entryCount + entriesPerRow - 1) / entriesPerRow;
     opts.entryCount = rowCount;
+    opts.scrollbar = options.scrollbar;
     
     uint16_t xPadding = 0;
     uint16_t xChildGap = 0;

@@ -9,7 +9,7 @@ ScrollArea* scroll_area_many_entries(GUIManager& gui, const char* id, const Scro
         .scrollVertical = true,
         .clipHorizontal = options.clipHorizontal,
         .clipVertical = true,
-        .showScrollbarY = true,
+        .scrollbarY = options.scrollbar,
         .xAlign = options.xAlign,
         .yAlign = CLAY_ALIGN_Y_TOP,
         .innerContent = [&](const ScrollArea::InnerContentParameters& params) {

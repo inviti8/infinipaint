@@ -14,13 +14,19 @@ class ScrollArea : public Element {
             Vector2f* scrollOffset;
         };
 
+        enum class ScrollbarType {
+            NONE,
+            NO_INTERACTION,
+            NORMAL
+        };
+
         struct Options {
             bool scrollVertical = false;
             bool scrollHorizontal = false;
             bool clipHorizontal = false;
             bool clipVertical = false;
-            bool showScrollbarX = false;
-            bool showScrollbarY = false;
+            ScrollbarType scrollbarX = ScrollbarType::NONE;
+            ScrollbarType scrollbarY = ScrollbarType::NONE;
             Clay_LayoutDirection layoutDirection = CLAY_TOP_TO_BOTTOM;
             Clay_LayoutAlignmentX xAlign = CLAY_ALIGN_X_LEFT;
             Clay_LayoutAlignmentY yAlign = CLAY_ALIGN_Y_TOP;
@@ -43,13 +49,21 @@ class ScrollArea : public Element {
         Vector2f scrollAreaMotion = {0.0f, 0.0f};
         Vector2f scrollAreaMotionMax = {0.0f, 0.0f};
 
-        bool isScrollbarHeldY = false;
-        bool isScrollbarHoveredY = false;
-        bool isHoveringOverScrollerY = false;
-        Element* scrollerY = nullptr;
-        float scrollerStartPosY;
-        float mouseStartPosY;
+        struct ScrollbarData {
+            bool isScrollbarHeld = false;
+            bool isScrollbarHovered = false;
+            bool isHoveringOverScroller = false;
+            Element* scroller = nullptr;
+            Element* scrollbar = nullptr;
+            float scrollerStartPos;
+            float mouseStartPos;
+        };
+
+        ScrollbarData xScrollbar;
+        ScrollbarData yScrollbar;
+
         void y_scroll_bar();
+        void x_scroll_bar();
 
         Vector2f contentDimensions = {0.0f, 0.0f};
         Vector2f scrollOffset = {0.0f, 0.0f};

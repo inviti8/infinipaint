@@ -15,6 +15,7 @@ class GridScrollArea : public Element {
             float entryHeight;
             size_t entryCount;
             bool entryWidthIsMinimum = false;
+            ScrollArea::ScrollbarType scrollbar = ScrollArea::ScrollbarType::NORMAL;
             std::function<void(size_t elementIndex)> elementContent;
             std::function<void(const ScrollArea::InnerContentParameters&)> innerContentExtraCallback;
         };

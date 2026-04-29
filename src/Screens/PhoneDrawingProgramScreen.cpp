@@ -31,6 +31,10 @@ void PhoneDrawingProgramScreen::main_display() {
         },
     }) {
         top_toolbar();
+        CLAY_AUTO_ID({
+            .layout = {.sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_GROW(0)}}
+        }) {}
+        bottom_toolbar();
     }
 }
 
@@ -62,6 +66,42 @@ void PhoneDrawingProgramScreen::top_toolbar() {
                 }
             });
             text_label(gui, main.world->name);
+        }
+    });
+}
+
+void PhoneDrawingProgramScreen::bottom_toolbar() {
+    auto& gui = main.g.gui;
+    auto& io = gui.io;
+    auto& drawProg = main.world->drawProg;
+    window_fill_side_bar(gui, "bottom toolbar", {
+        .dir = WindowFillSideBarConfig::Direction::BOTTOM,
+        .backgroundColor = io.theme->backColor1
+    }, [&] {
+        CLAY_AUTO_ID({
+            .layout = {
+                .sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_FIT(0) },
+                .childAlignment = { .x = CLAY_ALIGN_X_CENTER, .y = CLAY_ALIGN_Y_CENTER},
+                .layoutDirection = CLAY_LEFT_TO_RIGHT
+            }
+        }) {
+            CLAY_AUTO_ID({
+                .layout = {
+                    .sizing = {.width = CLAY_SIZING_FIT(0), .height = CLAY_SIZING_FIT(0) }
+                }
+            }) {
+                gui.element<ScrollArea>("tools scroll", ScrollArea::Options{
+                    .scrollHorizontal = true,
+                    .clipHorizontal = true,
+                    .scrollbarX = ScrollArea::ScrollbarType::NONE,
+                    .layoutDirection = CLAY_LEFT_TO_RIGHT,
+                    .xAlign = CLAY_ALIGN_X_LEFT,
+                    .yAlign = CLAY_ALIGN_Y_CENTER,
+                    .innerContent = [&](auto&) {
+                        drawProg.phone_bottom_toolbar_gui(*this);
+                    }
+                });
+            }
         }
     });
 }
