@@ -11,6 +11,7 @@
 #include "../GUIStuff/Elements/SVGIcon.hpp"
 #include "../GUIStuff/Elements/TextParagraph.hpp"
 #include "../GUIStuff/ElementHelpers/LayoutHelpers.hpp"
+#include "../GUIStuff/ElementHelpers/ScrollAreaHelpers.hpp"
 #include "../GUIStuff/Elements/PositionAdjustingPopupMenu.hpp"
 #include "../World.hpp"
 #include "Helpers/StringHelpers.hpp"
@@ -683,6 +684,7 @@ void FileSelectScreen::file_view() {
     };
 
     if(fileViewType == FileViewType::LIST) {
+        SCROLL_AREA_BUG_WORKAROUND();
         fileViewScrollArea = gui.element<ManyElementScrollArea>("File selector list", ManyElementScrollArea::Options{
             .entryHeight = 150.0f,
             .entryCount = fileList.size(),
