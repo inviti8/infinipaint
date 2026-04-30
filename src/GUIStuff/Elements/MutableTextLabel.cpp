@@ -5,7 +5,7 @@ namespace GUIStuff {
 
 MutableTextLabel::MutableTextLabel(GUIManager& gui): Element(gui) {}
 
-void MutableTextLabel::layout(const Clay_ElementId& id, const std::string& text, Clay_TextElementConfig* textConfig) {
+void MutableTextLabel::layout(const Clay_ElementId& id, const std::string& text, const Clay_TextElementConfig& textConfig) {
     if(text != oldText) {
         oldText = text;
         gui.invalidate_draw_element(this);

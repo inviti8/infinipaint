@@ -213,7 +213,7 @@ void PhoneDrawingProgramScreen::tool_settings_popup() {
             .backgroundColor = convert_vec4<Clay_Color>(io.theme->backColor1),
             .cornerRadius = CLAY_CORNER_RADIUS(io.theme->windowCorners1)
         }) {
-            gui.element<ScrollArea>("toolbox scroll area", ScrollArea::Options{
+            gui.clipping_element<ScrollArea>("toolbox scroll area", ScrollArea::Options{
                 .scrollVertical = true,
                 .clipVertical = true,
                 .scrollbarY = ScrollArea::ScrollbarType::NORMAL,
@@ -250,6 +250,7 @@ void PhoneDrawingProgramScreen::color_settings_popup(Vector4f* color) {
                 .childAlignmentX = CLAY_ALIGN_X_CENTER,
                 .entryHeight = BIG_BUTTON_SIZE,
                 .entryCount = palette.colors.size(),
+                .scrollbar = ScrollArea::ScrollbarType::NORMAL,
                 .elementContent = [&](size_t i) {
                     auto newC = std::make_shared<Vector3f>(palette.colors[i].x(), palette.colors[i].y(), palette.colors[i].z());
                     color_button(gui, "c", newC.get(), {

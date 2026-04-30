@@ -7,7 +7,7 @@ namespace GUIStuff {
 class MutableTextLabel : public Element {
     public:
         MutableTextLabel(GUIManager& gui);
-        void layout(const Clay_ElementId& id, const std::string& text, Clay_TextElementConfig* textConfig);
+        void layout(const Clay_ElementId& id, const std::string& text, const Clay_TextElementConfig& textConfig);
     private:
         std::string oldText;
 };

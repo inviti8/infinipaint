@@ -1,5 +1,6 @@
 #include "TextLabelHelpers.hpp"
 #include "../Elements/MutableTextLabel.hpp"
+#include "Helpers/ConvertVec.hpp"
 
 namespace GUIStuff { namespace ElementHelpers {
 
@@ -42,7 +43,8 @@ void text_label_light_centered(GUIManager& gui, std::string_view val) {
 }
 
 void mutable_text_label(GUIManager& gui, const char* id, const std::string& val) {
-    gui.element<MutableTextLabel>(id, val, CLAY_TEXT_CONFIG({.textColor = convert_vec4<Clay_Color>(gui.io.theme->frontColor1), .fontSize = gui.io.fontSize }));
+    Clay_TextElementConfig textConfig = CLAY_TEXT_CONFIG({.textColor = convert_vec4<Clay_Color>(gui.io.theme->frontColor1), .fontSize = gui.io.fontSize });
+    gui.element<MutableTextLabel>(id, val, textConfig);
 }
 
 }}

@@ -565,7 +565,7 @@ void GUIManager::layout_begin() {
 }
 
 void GUIManager::layout_end() {
-    renderCommands = Clay_EndLayout();
+    renderCommands = Clay_EndLayout(io.deltaTime);
     if(!idStack.empty())
         throw std::runtime_error("[GUIManager::end] ID Stack is not empty on end (push_id and pop_id calls not equal)");
     std::erase_if(elements, [](auto& p) {
