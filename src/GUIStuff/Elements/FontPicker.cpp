@@ -10,9 +10,9 @@
 #include "../GUIManager.hpp"
 
 #include "../ElementHelpers/ButtonHelpers.hpp"
-#include "../ElementHelpers/ScrollAreaHelpers.hpp"
 #include "../ElementHelpers/TextBoxHelpers.hpp"
 #include "TextParagraph.hpp"
+#include "ManyElementScrollArea.hpp"
 
 std::vector<std::string> sortedFontList;
 std::vector<std::string> sortedFontListLowercase;
@@ -120,11 +120,10 @@ void FontPicker::layout(const Clay_ElementId& id, std::string* newFontName, cons
                             .width = CLAY_BORDER_OUTSIDE(1)
                         }
                     }) {
-                        ElementHelpers::scroll_area_many_entries(gui, "dropdown scroll area", {
+                        gui.element<ManyElementScrollArea>("dropdown scroll area", ManyElementScrollArea::Options{
                             .entryHeight = ENTRY_HEIGHT,
                             .entryCount = sortedFontList.size(),
                             .clipHorizontal = true,
-                            .growing = true,
                             .elementContent = [&](size_t i) {
                                 bool selectedEntry = val == i;
                                 gui.element<LayoutElement>("elem", [&] (LayoutElement*, const Clay_ElementId& lId) {

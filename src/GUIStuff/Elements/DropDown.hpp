@@ -1,7 +1,7 @@
 #pragma once
 #include "Element.hpp"
+#include "ManyElementScrollArea.hpp"
 #include "SelectableButton.hpp"
-#include "../ElementHelpers/ScrollAreaHelpers.hpp"
 #include "../ElementHelpers/LayoutHelpers.hpp"
 #include "../ElementHelpers/TextLabelHelpers.hpp"
 #include "../ElementHelpers/ButtonHelpers.hpp"
@@ -81,11 +81,10 @@ template <typename T> class DropDown : public Element {
                                     .width = CLAY_BORDER_OUTSIDE(1)
                                 }
                             }) {
-                                ElementHelpers::scroll_area_many_entries(gui, "dropdown scroll area", {
+                                gui.element<ManyElementScrollArea>("dropdown scroll area", ManyElementScrollArea::Options{
                                     .entryHeight = 18.0f,
                                     .entryCount = selections.size(),
                                     .clipHorizontal = true,
-                                    .growing = true,
                                     .elementContent = [&](size_t i) {
                                         bool selectedEntry = static_cast<size_t>(*data) == i;
                                         gui.element<LayoutElement>("elem", [&] (LayoutElement*, const Clay_ElementId& lId) {

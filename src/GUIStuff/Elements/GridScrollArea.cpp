@@ -1,21 +1,19 @@
 #include "GridScrollArea.hpp"
-#include "../ElementHelpers/ScrollAreaHelpers.hpp"
 #include "Helpers/ConvertVec.hpp"
 #include "../GUIManager.hpp"
+#include "ManyElementScrollArea.hpp"
 
 namespace GUIStuff {
 
 GridScrollArea::GridScrollArea(GUIManager& gui): Element(gui) {}
 
 void GridScrollArea::layout(const Clay_ElementId& id, const Options& o) {
-    using namespace ElementHelpers;
-
     options = o;
 
     if(boundingBox.has_value())
         rowWidth = boundingBox.value().width(); // Use grid element bounding box instead of inner content width because row width will decide whether a scroll bar appears or not, which will change the inner content width (circular dependency)
 
-    ScrollBarManyEntriesOptions opts;
+    ManyElementScrollArea::Options opts;
     opts.clipHorizontal = true;
     opts.entryHeight = options.entryHeight;
     opts.innerContentExtraCallback = [&, extraCallback = options.innerContentExtraCallback] (const ScrollArea::InnerContentParameters& contParams) {
@@ -72,7 +70,7 @@ void GridScrollArea::layout(const Clay_ElementId& id, const Options& o) {
             .sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_GROW(0)}
         }
     }) {
-        scrollArea = scroll_area_many_entries(gui, "scroll many area", opts);
+        gui.element<ManyElementScrollArea>("scroll many area", opts);
     }
 }
 

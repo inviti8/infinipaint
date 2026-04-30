@@ -1,9 +1,8 @@
 #include "TreeListing.hpp"
 #include "Helpers/ConvertVec.hpp"
-#include "ScrollArea.hpp"
+#include "ManyElementScrollArea.hpp"
 #include "../GUIManager.hpp"
 
-#include "../ElementHelpers/ScrollAreaHelpers.hpp"
 #include "../ElementHelpers/ButtonHelpers.hpp"
 #include "LayoutElement.hpp"
 
@@ -54,10 +53,9 @@ void TreeListing::layout(const Clay_ElementId& id, const Data& newDisplayData) {
             CLAY(lIdParent, {
                 .layout = {.sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_GROW(0)}}
             }) {
-                scroll_area_many_entries(gui, "scroll", {
+                gui.element<ManyElementScrollArea>("scroll", ManyElementScrollArea::Options{
                     .entryHeight = ENTRY_HEIGHT,
                     .entryCount = flattenedIndexList.size(),
-                    .growing = d.scrollAreaGrowing,
                     .elementContent = [&](size_t i) {
                         const ObjInfo& objInfo = flattenedIndexList[i];
                         gui.element<LayoutElement>("elem", [&](LayoutElement*, const Clay_ElementId& lId) {

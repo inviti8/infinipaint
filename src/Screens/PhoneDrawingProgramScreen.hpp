@@ -17,10 +17,16 @@ class PhoneDrawingProgramScreen : public DrawingProgramScreen {
         void bottom_toolbar();
         void main_display();
         void tool_settings_popup();
+        void color_settings_popup(Vector4f* color);
         enum class SettingsMenuPopup {
             NONE,
             SETTINGS,
             FG_COLOR,
             BG_COLOR
         } settingsMenuPopup = SettingsMenuPopup::NONE;
+        struct PaletteData {
+            size_t selectedPalette = 0;
+            bool addingPalette = false;
+            std::string newPaletteStr;
+        } paletteData;
 };

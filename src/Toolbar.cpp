@@ -1,13 +1,12 @@
 #include "Toolbar.hpp"
 #include "CustomEvents.hpp"
 #include "DrawingProgram/Tools/DrawingProgramToolBase.hpp"
-#include "DrawingProgram/Tools/ScreenshotTool.hpp"
 #include "FileHelpers.hpp"
 #include "GUIStuff/ElementHelpers/CheckBoxHelpers.hpp"
 #include "GUIStuff/ElementHelpers/LayoutHelpers.hpp"
 #include "GUIStuff/ElementHelpers/PopupHelpers.hpp"
 #include "GUIStuff/ElementHelpers/RadioButtonHelpers.hpp"
-#include "GUIStuff/ElementHelpers/ScrollAreaHelpers.hpp"
+#include "GUIStuff/Elements/ManyElementScrollArea.hpp"
 #include "Helpers/ConvertVec.hpp"
 #include "Helpers/FileDownloader.hpp"
 #include "Helpers/MathExtras.hpp"
@@ -796,11 +795,10 @@ void Toolbar::grid_menu(Element* gridMenuButton) {
                     float ENTRY_HEIGHT = 25.0f;
                     if(main.world->gridMan.grids->empty())
                         text_label_centered(gui, "No grids yet...");
-                    scroll_area_many_entries(gui, "grid menu entries", {
+                    gui.element<ManyElementScrollArea>("grid menu entries", ManyElementScrollArea::Options{
                         .entryHeight = ENTRY_HEIGHT,
                         .entryCount = main.world->gridMan.grids->size(),
                         .clipHorizontal = true,
-                        .growing = true,
                         .elementContent = [&](size_t i) {
                             auto& grid = main.world->gridMan.grids->at(i)->obj;
                             bool selectedEntry = gridMenu.selectedGrid == i;
@@ -2081,7 +2079,7 @@ void Toolbar::file_picker_gui() {
             .backgroundColor = convert_vec4<Clay_Color>(io.theme->backColor2)
         }) {
             constexpr float entryHeight = 25.0f;
-            filePicker.entriesScrollArea = scroll_area_many_entries(gui, "file picker entries", {
+            filePicker.entriesScrollArea = gui.element<ManyElementScrollArea>("file picker entries", ManyElementScrollArea::Options{
                 .entryHeight = entryHeight,
                 .entryCount = filePicker.entries.size(),
                 .clipHorizontal = false,
@@ -2133,7 +2131,7 @@ void Toolbar::file_picker_gui() {
                         }
                     });
                 }
-            });
+            })->scrollArea;
         }
         left_to_right_line_layout(gui, [&]() {
             input_text(gui, "filepicker filename", &filePicker.fileName);

@@ -3,9 +3,9 @@
 #include "../GUIHolder.hpp"
 #include "../GUIStuff/ElementHelpers/TextLabelHelpers.hpp"
 #include "../GUIStuff/ElementHelpers/ButtonHelpers.hpp"
-#include "../GUIStuff/ElementHelpers/ScrollAreaHelpers.hpp"
 #include "Helpers/ConvertVec.hpp"
 #include "../GUIStuff/Elements/GridScrollArea.hpp"
+#include "../GUIStuff/Elements/ManyElementScrollArea.hpp"
 #include "../GUIStuff/Elements/ImageDisplay.hpp"
 #include "../GUIStuff/Elements/LayoutElement.hpp"
 #include "../GUIStuff/Elements/SVGIcon.hpp"
@@ -683,7 +683,7 @@ void FileSelectScreen::file_view() {
     };
 
     if(fileViewType == FileViewType::LIST) {
-        fileViewScrollArea = scroll_area_many_entries(gui, "File selector list", ScrollBarManyEntriesOptions{
+        fileViewScrollArea = gui.element<ManyElementScrollArea>("File selector list", ManyElementScrollArea::Options{
             .entryHeight = 150.0f,
             .entryCount = fileList.size(),
             .clipHorizontal = true,
@@ -691,7 +691,7 @@ void FileSelectScreen::file_view() {
             .elementContent = [&](size_t i) {
                 fileButton(i, true, Vector2f{100.0f, 100.0f});
             }
-        });
+        })->scrollArea;
     }
     else {
         Vector2f entrySize{0.0f, 0.0f};
@@ -712,7 +712,7 @@ void FileSelectScreen::file_view() {
             default:
                 break;
         }
-        GridScrollArea* gridArea = gui.element<GridScrollArea>("File selector grid", GridScrollArea::Options{
+        fileViewScrollArea = gui.element<GridScrollArea>("File selector grid", GridScrollArea::Options{
             .entryWidth = entrySize.x(),
             .childAlignmentX = CLAY_ALIGN_X_LEFT,
             .entryHeight = entrySize.y(),
@@ -721,8 +721,7 @@ void FileSelectScreen::file_view() {
             .elementContent = [&](size_t i) {
                 fileButton(i, false, iconSize);
             }
-        });
-        fileViewScrollArea = gridArea->scrollArea;
+        })->scrollArea;
     }
 }
 

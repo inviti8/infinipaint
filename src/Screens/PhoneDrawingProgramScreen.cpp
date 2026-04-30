@@ -2,6 +2,7 @@
 #include "../MainProgram.hpp"
 #include "DrawingProgramScreen.hpp"
 #include "Helpers/ConvertVec.hpp"
+#include "../GUIStuff/Elements/GridScrollArea.hpp"
 #include "../GUIStuff/ElementHelpers/ButtonHelpers.hpp"
 #include "../GUIStuff/ElementHelpers/LayoutHelpers.hpp"
 #include "../GUIStuff/ElementHelpers/TextLabelHelpers.hpp"
@@ -116,8 +117,10 @@ void PhoneDrawingProgramScreen::bottom_toolbar() {
                             tool_settings_popup();
                             break;
                         case SettingsMenuPopup::FG_COLOR:
+                            color_settings_popup(&main.toolConfig.globalConf.foregroundColor);
                             break;
                         case SettingsMenuPopup::BG_COLOR:
+                            color_settings_popup(&main.toolConfig.globalConf.backgroundColor);
                             break;
                     }
                 }
@@ -198,10 +201,10 @@ void PhoneDrawingProgramScreen::bottom_toolbar_gui() {
 }
 
 void PhoneDrawingProgramScreen::tool_settings_popup() {
-    GUIManager& gui = main.g.gui;
     auto& drawP = main.world->drawProg;
+    auto& gui = main.g.gui;
     auto& io = gui.io;
-
+ 
     gui.element<LayoutElement>("tool settings popup", [&] (LayoutElement*, const Clay_ElementId& lId) {
         CLAY(lId, {
             .layout = {
@@ -225,6 +228,40 @@ void PhoneDrawingProgramScreen::tool_settings_popup() {
                     }) {
                         drawP.drawTool->gui_phone_toolbox(*this);
                     }
+                }
+            });
+        }
+    });
+}
+
+void PhoneDrawingProgramScreen::color_settings_popup(Vector4f* color) {
+    auto& gui = main.g.gui;
+    auto& palette = main.conf.palettes[paletteData.selectedPalette];
+    gui.element<LayoutElement>("color settings popup", [&] (LayoutElement*, const Clay_ElementId& lId) {
+        CLAY(lId, {
+            .layout = {
+                .sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_FIT(0)},
+            },
+            .backgroundColor = convert_vec4<Clay_Color>(gui.io.theme->backColor1),
+            .cornerRadius = CLAY_CORNER_RADIUS(gui.io.theme->windowCorners1)
+        }) {
+            gui.element<GridScrollArea>("color selector grid", GridScrollArea::Options{
+                .entryWidth = BIG_BUTTON_SIZE,
+                .childAlignmentX = CLAY_ALIGN_X_CENTER,
+                .entryHeight = BIG_BUTTON_SIZE,
+                .entryCount = palette.colors.size(),
+                .elementContent = [&](size_t i) {
+                    auto newC = std::make_shared<Vector3f>(palette.colors[i].x(), palette.colors[i].y(), palette.colors[i].z());
+                    color_button(gui, "c", newC.get(), {
+                        .isSelected = newC->x() == color->x() && newC->y() == color->y() && newC->z() == color->z(),
+                        .hasAlpha = false,
+                        .onClick = [newC, color] {
+                            // We want to keep the old color's alpha
+                            color->x() = newC->x();
+                            color->y() = newC->y();
+                            color->z() = newC->z();
+                        }
+                    });
                 }
             });
         }
