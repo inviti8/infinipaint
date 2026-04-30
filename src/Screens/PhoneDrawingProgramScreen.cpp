@@ -27,6 +27,8 @@ void PhoneDrawingProgramScreen::main_display() {
     CLAY_AUTO_ID({
         .layout = {
             .sizing = { .width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_GROW(0) },
+            .childGap = main.g.gui.io.theme->childGap1,
+            .childAlignment = {.x = CLAY_ALIGN_X_CENTER},
             .layoutDirection = CLAY_TOP_TO_BOTTOM
         },
     }) {
@@ -77,38 +79,184 @@ void PhoneDrawingProgramScreen::top_toolbar() {
 void PhoneDrawingProgramScreen::bottom_toolbar() {
     auto& gui = main.g.gui;
     auto& io = gui.io;
-    auto& drawProg = main.world->drawProg;
     window_fill_side_bar(gui, {
         .dir = WindowFillSideBarConfig::Direction::BOTTOM,
     }, [&] {
         CLAY_AUTO_ID({
             .layout = {
                 .sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_FIT(0) },
-                .childAlignment = { .x = CLAY_ALIGN_X_CENTER, .y = CLAY_ALIGN_Y_CENTER},
-                .layoutDirection = CLAY_LEFT_TO_RIGHT
+                .childGap = io.theme->childGap1,
+                .childAlignment = { .x = CLAY_ALIGN_X_CENTER, .y = CLAY_ALIGN_Y_CENTER}
             }
         }) {
-            gui.element<LayoutElement>("bottom toolbar", [&](LayoutElement*, const Clay_ElementId& lId) {
-                CLAY(lId, {
+            CLAY_AUTO_ID({
+                .layout = {
+                    .sizing = {.width = CLAY_SIZING_FIT(0), .height = CLAY_SIZING_FIT(0) },
+                    .childGap = io.theme->childGap1,
+                    .childAlignment = { .x = CLAY_ALIGN_X_LEFT, .y = CLAY_ALIGN_Y_BOTTOM},
+                    .layoutDirection = CLAY_TOP_TO_BOTTOM
+                }
+            }) {
+                CLAY_AUTO_ID({
                     .layout = {
-                        .sizing = {.width = CLAY_SIZING_FIT(0), .height = CLAY_SIZING_FIT(0) },
-                    },
-                    .backgroundColor = convert_vec4<Clay_Color>(io.theme->backColor1),
-                    .cornerRadius = CLAY_CORNER_RADIUS(io.theme->windowCorners1)
+                        .sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_FIT(0) },
+                        .childAlignment = { .x = CLAY_ALIGN_X_LEFT, .y = CLAY_ALIGN_Y_BOTTOM},
+                        .layoutDirection = CLAY_LEFT_TO_RIGHT
+                    }
                 }) {
-                    gui.clipping_element<ScrollArea>("tools scroll", ScrollArea::Options{
-                        .scrollHorizontal = true,
-                        .clipHorizontal = true,
-                        .scrollbarX = ScrollArea::ScrollbarType::NONE,
-                        .layoutDirection = CLAY_LEFT_TO_RIGHT,
-                        .xAlign = CLAY_ALIGN_X_LEFT,
-                        .yAlign = CLAY_ALIGN_Y_CENTER,
-                        .innerContent = [&](auto&) {
-                            drawProg.phone_bottom_toolbar_gui(*this);
+                    CLAY_AUTO_ID({
+                        .layout = {
+                            .sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_FIT(0) },
+                        }
+                    }) {}
+                    switch(settingsMenuPopup) {
+                        case SettingsMenuPopup::NONE:
+                            break;
+                        case SettingsMenuPopup::SETTINGS:
+                            tool_settings_popup();
+                            break;
+                        case SettingsMenuPopup::FG_COLOR:
+                            break;
+                        case SettingsMenuPopup::BG_COLOR:
+                            break;
+                    }
+                }
+
+                CLAY_AUTO_ID({
+                    .layout = {
+                        .sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_FIT(0) },
+                        .childGap = io.theme->childGap1,
+                        .childAlignment = { .x = CLAY_ALIGN_X_CENTER, .y = CLAY_ALIGN_Y_CENTER},
+                        .layoutDirection = CLAY_LEFT_TO_RIGHT
+                    }
+                }) {
+                    gui.element<LayoutElement>("bottom toolbar", [&](LayoutElement*, const Clay_ElementId& lId) {
+                        CLAY(lId, {
+                            .layout = {
+                                .sizing = {.width = CLAY_SIZING_FIT(0), .height = CLAY_SIZING_FIT(0)}
+                            },
+                            .backgroundColor = convert_vec4<Clay_Color>(io.theme->backColor1),
+                            .cornerRadius = CLAY_CORNER_RADIUS(io.theme->windowCorners1)
+                        }) {
+                            gui.clipping_element<ScrollArea>("tools scroll", ScrollArea::Options{
+                                .scrollHorizontal = true,
+                                .clipHorizontal = true,
+                                .scrollbarX = ScrollArea::ScrollbarType::NONE,
+                                .layoutDirection = CLAY_LEFT_TO_RIGHT,
+                                .xAlign = CLAY_ALIGN_X_LEFT,
+                                .yAlign = CLAY_ALIGN_Y_CENTER,
+                                .innerContent = [&](auto&) {
+                                    bottom_toolbar_gui();
+                                }
+                            });
+                        }
+                    });
+                    gui.element<LayoutElement>("bottom extra toolbar", [&](LayoutElement*, const Clay_ElementId& lId) {
+                        CLAY(lId, {
+                            .layout = {
+                                .sizing = {.width = CLAY_SIZING_FIT(0), .height = CLAY_SIZING_FIT(0)},
+                                .layoutDirection = CLAY_LEFT_TO_RIGHT
+                            },
+                            .backgroundColor = convert_vec4<Clay_Color>(io.theme->backColor1),
+                            .cornerRadius = CLAY_CORNER_RADIUS(io.theme->windowCorners1)
+                        }) {
+                            bottom_extra_toolbar_gui();
                         }
                     });
                 }
+            }
+        }
+    });
+}
+
+void PhoneDrawingProgramScreen::bottom_toolbar_gui() {
+    GUIManager& gui = main.g.gui;
+    auto& drawP = main.world->drawProg;
+
+    auto tool_button = [&](const char* id, const std::string& svgPath, DrawingProgramToolType toolType) {
+        svg_icon_button(gui, id, svgPath, {
+            .drawType = SelectableButton::DrawType::TRANSPARENT_ALL,
+            .isSelected = drawP.drawTool->get_type() == toolType,
+            .onClick = [&, toolType] {
+                drawP.switch_to_tool(toolType);
+            }
+        });
+    };
+
+    tool_button("Brush Toolbar Button", "data/icons/brush.svg", DrawingProgramToolType::BRUSH);
+    tool_button("Eraser Toolbar Button", "data/icons/eraser.svg", DrawingProgramToolType::ERASER);
+    tool_button("Line Toolbar Button", "data/icons/line.svg", DrawingProgramToolType::LINE);
+    tool_button("Text Toolbar Button", "data/icons/text.svg", DrawingProgramToolType::TEXTBOX);
+    tool_button("Ellipse Toolbar Button", "data/icons/circle.svg", DrawingProgramToolType::ELLIPSE);
+    tool_button("Rect Toolbar Button", "data/icons/rectangle.svg", DrawingProgramToolType::RECTANGLE);
+    tool_button("RectSelect Toolbar Button", "data/icons/rectselect.svg", DrawingProgramToolType::RECTSELECT);
+    tool_button("LassoSelect Toolbar Button", "data/icons/lassoselect.svg", DrawingProgramToolType::LASSOSELECT);
+    tool_button("Edit Toolbar Button", "data/icons/cursor.svg", DrawingProgramToolType::EDIT);
+    tool_button("Eyedropper Toolbar Button", "data/icons/eyedropper.svg", DrawingProgramToolType::EYEDROPPER);
+    tool_button("Zoom Canvas Toolbar Button", "data/icons/zoom.svg", DrawingProgramToolType::ZOOM);
+    tool_button("Pan Canvas Toolbar Button", "data/icons/hand.svg", DrawingProgramToolType::PAN);
+}
+
+void PhoneDrawingProgramScreen::tool_settings_popup() {
+    GUIManager& gui = main.g.gui;
+    auto& drawP = main.world->drawProg;
+    auto& io = gui.io;
+
+    gui.element<LayoutElement>("tool settings popup", [&] (LayoutElement*, const Clay_ElementId& lId) {
+        CLAY(lId, {
+            .layout = {
+                .sizing = {.width = CLAY_SIZING_FIT(0), .height = CLAY_SIZING_FIT(0)},
+            },
+            .backgroundColor = convert_vec4<Clay_Color>(io.theme->backColor1),
+            .cornerRadius = CLAY_CORNER_RADIUS(io.theme->windowCorners1)
+        }) {
+            gui.element<ScrollArea>("toolbox scroll area", ScrollArea::Options{
+                .scrollVertical = true,
+                .clipVertical = true,
+                .scrollbarY = ScrollArea::ScrollbarType::NORMAL,
+                .innerContent = [&](auto&) {
+                    CLAY_AUTO_ID({
+                        .layout = {
+                            .sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_GROW(0)},
+                            .padding = CLAY_PADDING_ALL(io.theme->padding1),
+                            .childGap = io.theme->childGap1,
+                            .layoutDirection = CLAY_TOP_TO_BOTTOM
+                        },
+                    }) {
+                        drawP.drawTool->gui_phone_toolbox(*this);
+                    }
+                }
             });
+        }
+    });
+}
+
+void PhoneDrawingProgramScreen::bottom_extra_toolbar_gui() {
+    GUIManager& gui = main.g.gui;
+
+    svg_icon_button(gui, "tool settings", "data/icons/RemixIcon/settings-3-line.svg", {
+        .drawType = SelectableButton::DrawType::TRANSPARENT_ALL,
+        .isSelected = settingsMenuPopup == SettingsMenuPopup::SETTINGS,
+        .onClick = [&] {
+            settingsMenuPopup = (settingsMenuPopup == SettingsMenuPopup::SETTINGS) ? SettingsMenuPopup::NONE : SettingsMenuPopup::SETTINGS;
+        }
+    });
+
+    color_button(gui, "foreground color", &main.toolConfig.globalConf.foregroundColor, {
+        .drawType = SelectableButton::DrawType::TRANSPARENT_ALL,
+        .isSelected = settingsMenuPopup == SettingsMenuPopup::FG_COLOR,
+        .hasAlpha = true,
+        .onClick = [&] {
+            settingsMenuPopup = (settingsMenuPopup == SettingsMenuPopup::FG_COLOR) ? SettingsMenuPopup::NONE : SettingsMenuPopup::FG_COLOR;
+        }
+    });
+
+    color_button(gui, "background color", &main.toolConfig.globalConf.backgroundColor, {
+        .drawType = SelectableButton::DrawType::TRANSPARENT_ALL,
+        .isSelected = settingsMenuPopup == SettingsMenuPopup::BG_COLOR,
+        .hasAlpha = true,
+        .onClick = [&] {
+            settingsMenuPopup = (settingsMenuPopup == SettingsMenuPopup::BG_COLOR) ? SettingsMenuPopup::NONE : SettingsMenuPopup::BG_COLOR;
         }
     });
 }

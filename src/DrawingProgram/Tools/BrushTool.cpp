@@ -183,6 +183,18 @@ void BrushTool::gui_toolbox(Toolbar& t) {
     });
 }
 
+void BrushTool::gui_phone_toolbox(PhoneDrawingProgramScreen& t) {
+    using namespace GUIStuff;
+    using namespace ElementHelpers;
+
+    auto& gui = drawP.world.main.g.gui;
+
+    gui.new_id("brush tool", [&] {
+        checkbox_boolean_field(gui, "hasroundcaps", "Round Caps", &drawP.world.main.toolConfig.brush.hasRoundCaps);
+        drawP.world.main.toolConfig.relative_width_gui(drawP, "Size");
+    });
+}
+
 void BrushTool::right_click_popup_gui(Toolbar& t, Vector2f popupPos) {
     t.paint_popup(popupPos);
 }

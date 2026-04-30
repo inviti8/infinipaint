@@ -26,6 +26,13 @@ void RectSelectTool::gui_toolbox(Toolbar& t) {
     });
 }
 
+void RectSelectTool::gui_phone_toolbox(PhoneDrawingProgramScreen& t) {
+    auto& gui = drawP.world.main.g.gui;
+    gui.new_id("rect select tool", [&] {
+        drawP.selection.phone_selection_gui(t);
+    });
+}
+
 void RectSelectTool::input_key_callback(const InputManager::KeyCallbackArgs& key) {
     drawP.selection.input_key_callback_modify_selection(key);
 }

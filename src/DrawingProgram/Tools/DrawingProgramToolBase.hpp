@@ -5,6 +5,7 @@
 #include "../../InputManager.hpp"
 
 class DrawingProgram;
+class PhoneDrawingProgramScreen;
 
 #define MINIMUM_DISTANCE_BETWEEN_BOUNDS 10.0f
 
@@ -30,6 +31,7 @@ class DrawingProgramToolBase {
         DrawingProgramToolBase(DrawingProgram& initDrawP);
         virtual DrawingProgramToolType get_type() = 0;
         virtual void gui_toolbox(Toolbar& t) = 0;
+        virtual void gui_phone_toolbox(PhoneDrawingProgramScreen& t) = 0;
         virtual void erase_component(CanvasComponentContainer::ObjInfo* erasedComp) = 0;
         virtual void right_click_popup_gui(Toolbar& t, Vector2f popupPos) = 0;
         virtual void tool_update() = 0;

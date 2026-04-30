@@ -8,6 +8,7 @@ class PanCanvasTool : public DrawingProgramToolBase {
         PanCanvasTool(DrawingProgram& initDrawP);
         virtual DrawingProgramToolType get_type() override;
         virtual void gui_toolbox(Toolbar& t) override;
+        virtual void gui_phone_toolbox(PhoneDrawingProgramScreen& t) override;
         virtual void right_click_popup_gui(Toolbar& t, Vector2f popupPos) override;
         virtual void erase_component(CanvasComponentContainer::ObjInfo* erasedComp) override;
         virtual void tool_update() override;

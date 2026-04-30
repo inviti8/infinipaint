@@ -39,6 +39,17 @@ void EditTool::gui_toolbox(Toolbar& t) {
     }
 }
 
+void EditTool::gui_phone_toolbox(PhoneDrawingProgramScreen& t) {
+    using namespace GUIStuff;
+    using namespace ElementHelpers;
+
+    auto& gui = drawP.world.main.g.gui;
+
+    gui.new_id("edit tool", [&] {
+        text_label_centered(gui, "Edit");
+    });
+}
+
 void EditTool::erase_component(CanvasComponentContainer::ObjInfo* erasedComp) {
     if(erasedComp == objInfoBeingEdited)
         switch_tool(get_type());

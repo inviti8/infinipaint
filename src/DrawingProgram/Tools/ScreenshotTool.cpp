@@ -106,6 +106,16 @@ void ScreenshotTool::gui_toolbox(Toolbar& t) {
     });
 }
 
+void ScreenshotTool::gui_phone_toolbox(PhoneDrawingProgramScreen& t) {
+    using namespace GUIStuff;
+    using namespace ElementHelpers;
+
+    auto& gui = drawP.world.main.g.gui;
+    gui.new_id("screenshot tool", [&] {
+        text_label_centered(gui, "Screenshot");
+    });
+}
+
 void ScreenshotTool::right_click_popup_gui(Toolbar& t, Vector2f popupPos) {
     t.paint_popup(popupPos);
 }

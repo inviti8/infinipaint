@@ -26,6 +26,13 @@ void TextBoxTool::gui_toolbox(Toolbar& t) {
     });
 }
 
+void TextBoxTool::gui_phone_toolbox(PhoneDrawingProgramScreen& t) {
+    auto& gui = drawP.world.main.g.gui;
+    gui.new_id("textbox tool", [&] {
+        GUIStuff::ElementHelpers::text_label_centered(gui, "Place textbox");
+    });
+}
+
 void TextBoxTool::input_mouse_button_on_canvas_callback(const InputManager::MouseButtonCallbackArgs& button) {
     if(button.button == InputManager::MouseButton::LEFT) {
         if(button.down && drawP.layerMan.is_a_layer_being_edited() && !objInfoBeingEdited && !drawP.world.main.g.gui.cursor_obstructed()) {

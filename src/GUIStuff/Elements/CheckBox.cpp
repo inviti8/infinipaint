@@ -22,7 +22,7 @@ void CheckBox::layout(const Clay_ElementId& id, const std::function<bool()>& isT
 }
 
 void CheckBox::update() {
-    if(smooth_two_way_animation_time_check_for_change(hoverAnimation, gui.io.deltaTime, mouseHovering, CHECKBOX_ANIMATION_TIME))
+    if(smooth_two_way_animation_time_check_for_change(hoverAnimation, gui.io.deltaTime, is_hovering_animation(), CHECKBOX_ANIMATION_TIME))
         gui.invalidate_draw_element(this);
     if(oldIsTicked != isTicked()) {
         gui.invalidate_draw_element(this);
@@ -30,9 +30,26 @@ void CheckBox::update() {
     }
 }
 
+bool CheckBox::is_hovering_animation() {
+    return mouseHovering && (!gui.last_interaction_is_touch() || isHeld);
+}
+
 void CheckBox::input_mouse_button_callback(const InputManager::MouseButtonCallbackArgs& button) {
-    if(mouseHovering && button.button == InputManager::MouseButton::LEFT && button.down)
+    if(mouseHovering && button.button == InputManager::MouseButton::LEFT && button.down) {
         gui.set_post_callback_func([&](){if(onClick) onClick();});
+        isHeld = true;
+    }
+    else
+        isHeld = false;
+}
+
+void CheckBox::input_finger_touch_callback(const InputManager::FingerTouchCallbackArgs& touch) {
+    if(mouseHovering && touch.down) {
+        gui.set_post_callback_func([&](){if(onClick) onClick();});
+        isHeld = true;
+    }
+    else
+        isHeld = false;
 }
 
 void CheckBox::clay_draw(SkCanvas* canvas, UpdateInputData& io, Clay_RenderCommand* command, bool skiaAA) {
@@ -53,7 +70,7 @@ void CheckBox::clay_draw(SkCanvas* canvas, UpdateInputData& io, Clay_RenderComma
     }
     else {
         SkRect checkBox = SkRect::MakeLTRB(-0.45f, -0.45f, 0.45f, 0.45f);
-        p.setColor4f(convert_vec4<SkColor4f>(mouseHovering ? io.theme->fillColor1 : io.theme->fillColor2));
+        p.setColor4f(convert_vec4<SkColor4f>(is_hovering_animation() ? io.theme->fillColor1 : io.theme->fillColor2));
         p.setStyle(SkPaint::kStroke_Style);
         p.setStrokeWidth(0.15f);
         canvas->drawRoundRect(checkBox, 0.25f, 0.25f, p);

@@ -27,6 +27,7 @@ GUIManager::GUIManager()
     Clay_SetMeasureTextFunction(clay_skia_measure_text, this);
     setToLayout = true;
     postCallbackFuncIsHighPriority = false;
+    lastInteractionIsTouch = false;
 }
 
 Clay_Dimensions GUIManager::clay_skia_measure_text(Clay_StringSlice str, Clay_TextElementConfig* config, void* userData) {
@@ -671,6 +672,10 @@ void GUIManager::invalidate_draw_in_area(const SCollision::AABB<float>& bb) {
         invalidDrawBB = bb;
 }
 
+bool GUIManager::last_interaction_is_touch() {
+    return lastInteractionIsTouch;
+}
+
 bool GUIManager::cursor_obstructed() const {
     return cursorObstructed;
 }
@@ -702,6 +707,7 @@ void GUIManager::input_key_callback(const InputManager::KeyCallbackArgs& key) {
 
 void GUIManager::input_mouse_button_callback(InputManager::MouseButtonCallbackArgs button) {
     if(button.deviceType != InputManager::MouseDeviceType::TOUCH) {
+        lastInteractionIsTouch = false;
         button.pos /= io.guiScaleMultiplier;
         mouse_callback(button.pos, [&button] (ElementContainer* e) { e->elem->input_mouse_button_callback(button); });
     }
@@ -709,6 +715,7 @@ void GUIManager::input_mouse_button_callback(InputManager::MouseButtonCallbackAr
 
 void GUIManager::input_mouse_motion_callback(InputManager::MouseMotionCallbackArgs motion) {
     if(motion.deviceType != InputManager::MouseDeviceType::TOUCH) {
+        lastInteractionIsTouch = false;
         motion.pos /= io.guiScaleMultiplier;
         motion.move /= io.guiScaleMultiplier;
         mouse_callback(motion.pos, [&motion] (ElementContainer* e) { e->elem->input_mouse_motion_callback(motion); });
@@ -721,11 +728,13 @@ void GUIManager::input_mouse_wheel_callback(InputManager::MouseWheelCallbackArgs
 }
 
 void GUIManager::input_finger_touch_callback(InputManager::FingerTouchCallbackArgs touch) {
+    lastInteractionIsTouch = true;
     touch.pos /= io.guiScaleMultiplier;
     mouse_callback(touch.pos, [&touch] (ElementContainer* e) { e->elem->input_finger_touch_callback(touch); });
 }
 
 void GUIManager::input_finger_motion_callback(InputManager::FingerMotionCallbackArgs motion) {
+    lastInteractionIsTouch = true;
     motion.pos /= io.guiScaleMultiplier;
     motion.move /= io.guiScaleMultiplier;
     mouse_callback(motion.pos, [&motion] (ElementContainer* e) { e->elem->input_finger_motion_callback(motion); });

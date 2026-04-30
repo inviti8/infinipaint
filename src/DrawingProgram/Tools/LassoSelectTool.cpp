@@ -47,6 +47,13 @@ void LassoSelectTool::gui_toolbox(Toolbar& t) {
     });
 }
 
+void LassoSelectTool::gui_phone_toolbox(PhoneDrawingProgramScreen& t) {
+    auto& gui = drawP.world.main.g.gui;
+    gui.new_id("lasso select tool", [&] {
+        drawP.selection.phone_selection_gui(t);
+    });
+}
+
 void LassoSelectTool::right_click_popup_gui(Toolbar& t, Vector2f popupPos) {
     drawP.selection_action_menu(popupPos);
 }

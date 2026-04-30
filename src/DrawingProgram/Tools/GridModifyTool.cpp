@@ -161,6 +161,51 @@ void GridModifyTool::gui_toolbox(Toolbar& t) {
     });
 }
 
+void GridModifyTool::gui_phone_toolbox(PhoneDrawingProgramScreen& t) {
+    using namespace GUIStuff;
+    using namespace ElementHelpers;
+
+    auto& gui = drawP.world.main.g.gui;
+
+    gui.new_id("Grid modify tool", [&] {
+        NetworkingObjects::NetObjTemporaryPtr<WorldGrid> gLock = grid.lock();
+        if(gLock) {
+            WorldGrid& g = *gLock;
+            input_text_field(gui, "grid name", "Name", &g.name);
+            checkbox_boolean_field(gui, "Visible", "Visible", &g.visible);
+            checkbox_boolean_field(gui, "Display in Front", "Display in front of canvas", &g.displayInFront);
+            std::vector<std::string> listOfGridTypes = {
+                "Circle Points",
+                "Square Points",
+                "Square Lines",
+                "Horizontal Lines"
+            };
+            left_to_right_line_layout(gui, [&]() {
+                text_label(gui, "Type");
+                gui.element<DropDown<WorldGrid::GridType>>("filepicker select type", &g.gridType, listOfGridTypes);
+            });
+            input_scalar_field<uint32_t>(gui, "Subdivisions", "Subdivisions", &g.subdivisions, 1, 10, {
+                .onEdit = [&] { g.set_subdivisions(g.subdivisions); }
+            });
+            checkbox_boolean_field(gui, "Subdivide outwards", "Subdivide when zooming out", &g.removeDivisionsOutwards, [&] {
+                g.set_remove_divisions_outwards(g.removeDivisionsOutwards);
+            });
+            auto bounded = std::make_shared<bool>(g.bounds.has_value());
+            checkbox_boolean_field(gui, "Bounded", "Bounded", bounded.get(), [&, bounded] {
+                if(*bounded) {
+                    SCollision::AABB<WorldScalar> newBounds;
+                    newBounds.min = g.offset - drawP.world.drawData.cam.c.dir_from_space(drawP.world.main.window.size.cast<float>() * 0.3f);
+                    newBounds.max = g.offset + drawP.world.drawData.cam.c.dir_from_space(drawP.world.main.window.size.cast<float>() * 0.3f);
+                    g.bounds = newBounds;
+                }
+                else
+                    g.bounds = std::nullopt;
+            });
+            checkbox_boolean_field(gui, "Show Coordinates", "Show Coordinates (visible\nwhen canvas isn't rotated)", &g.showCoordinates);
+        }
+    });
+}
+
 void GridModifyTool::right_click_popup_gui(Toolbar& t, Vector2f popupPos) {
     t.paint_popup(popupPos);
 }

@@ -30,6 +30,17 @@ void LineDrawTool::gui_toolbox(Toolbar& t) {
     });
 }
 
+void LineDrawTool::gui_phone_toolbox(PhoneDrawingProgramScreen& t) {
+    using namespace GUIStuff;
+    using namespace ElementHelpers;
+    auto& gui = drawP.world.main.g.gui;
+    auto& toolConfig = drawP.world.main.toolConfig;
+    gui.new_id("rect draw tool", [&] {
+        toolConfig.relative_width_gui(drawP, "Size");
+        checkbox_boolean_field(gui, "hasroundcaps", "Round Caps", &toolConfig.lineDraw.hasRoundCaps);
+    });
+}
+
 void LineDrawTool::input_mouse_button_on_canvas_callback(const InputManager::MouseButtonCallbackArgs& button) {
     if(button.button == InputManager::MouseButton::LEFT) {
         auto& toolConfig = drawP.world.main.toolConfig;

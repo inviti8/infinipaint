@@ -1,6 +1,7 @@
 #pragma once
 #include "Element.hpp"
 #include "../GUIManager.hpp"
+#include "../../TimePoint.hpp"
 
 namespace GUIStuff {
 
@@ -35,7 +36,7 @@ template <typename T> class NumberSlider : public Element {
 
         virtual void update() override {
             smooth_two_way_animation_time(dd.holdAnimation, gui.io.deltaTime, dd.isHeld, HOLD_ANIMATION_TIME);
-            smooth_two_way_animation_time(dd.hoverAnimation, gui.io.deltaTime, mouseHovering, gui.io.theme->hoverExpandTime);
+            smooth_two_way_animation_time(dd.hoverAnimation, gui.io.deltaTime, mouseHovering && !gui.last_interaction_is_touch(), gui.io.theme->hoverExpandTime);
             if(oldDD != dd) {
                 gui.invalidate_draw_element(this, {
                     .top = 10.0f,
@@ -109,6 +110,23 @@ template <typename T> class NumberSlider : public Element {
         }
 
         virtual void input_mouse_motion_callback(const InputManager::MouseMotionCallbackArgs& motion) override {
+            if(dd.isHeld && boundingBox.has_value())
+                update_slider_pos(motion.pos, false);
+        }
+
+        virtual void input_finger_touch_callback(const InputManager::FingerTouchCallbackArgs& touch) override {
+            bool oldIsHeld = dd.isHeld;
+            dd.isHeld = mouseHovering && touch.down;
+            if(oldIsHeld && !dd.isHeld) {
+                gui.set_post_callback_func([&] {
+                    if(config.onRelease) config.onRelease();
+                });
+            }
+            else if(dd.isHeld && boundingBox.has_value())
+                update_slider_pos(touch.pos, true);
+        }
+
+        virtual void input_finger_motion_callback(const InputManager::FingerMotionCallbackArgs& motion) override {
             if(dd.isHeld && boundingBox.has_value())
                 update_slider_pos(motion.pos, false);
         }

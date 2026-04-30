@@ -60,6 +60,21 @@ void DrawingProgramSelection::selection_gui(Toolbar& t) {
     });
 }
 
+void DrawingProgramSelection::phone_selection_gui(PhoneDrawingProgramScreen& t) {
+    using namespace GUIStuff;
+    using namespace ElementHelpers;
+
+    auto& gui = drawP.world.main.g.gui;
+
+    gui.new_id("general selection gui", [&] {
+        text_label(gui, "Select from:");
+        radio_button_selector(gui, "layer selector", &drawP.controls.layerSelector, {
+            {"Layer being edited", DrawingProgramLayerManager::LayerSelector::LAYER_BEING_EDITED},
+            {"All visible layers", DrawingProgramLayerManager::LayerSelector::ALL_VISIBLE_LAYERS}
+        });
+    });
+}
+
 void DrawingProgramSelection::update_selection_stroke_color() {
     if(strokeColorChangeData.oldColor != strokeColorChangeData.newColor) {
         for(auto& c : selectedSet) {

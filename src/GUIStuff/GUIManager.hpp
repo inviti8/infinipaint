@@ -47,6 +47,8 @@ class GUIManager {
         void invalidate_draw_element(Element* element, const BorderData& extraPadding = {});
         void invalidate_draw_in_area(const SCollision::AABB<float>& bb);
 
+        bool last_interaction_is_touch();
+
         template <typename ElementType, typename... Args> ElementType* element(const char* id, const Args&... a) {
             push_id(id);
 
@@ -161,6 +163,7 @@ class GUIManager {
         void calculate_new_clip_rect(std::vector<SCollision::AABB<float>>& clipRectStack, std::optional<SCollision::AABB<float>>& clipRect, bool& clipNoDraw);
         void clip_rect_transform(SkCanvas* canvas, std::vector<SCollision::AABB<float>>& clipRectStack, std::optional<SCollision::AABB<float>>& clipRect, bool& clipNoDraw);
 
+        bool lastInteractionIsTouch;
         bool setToLayout;
         bool setToUpdateInvalidateDrawAreaFromLayout;
         bool cursorObstructed;

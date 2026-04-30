@@ -32,6 +32,22 @@ void EraserTool::gui_toolbox(Toolbar& t) {
     });
 }
 
+void EraserTool::gui_phone_toolbox(PhoneDrawingProgramScreen& t) {
+    using namespace GUIStuff;
+    using namespace ElementHelpers;
+
+    auto& gui = drawP.world.main.g.gui;
+
+    gui.new_id("eraser tool", [&] {
+        drawP.world.main.toolConfig.relative_width_gui(drawP, "Size");
+        text_label(gui, "Erase from:");
+        radio_button_selector(gui, "layer selector", &drawP.controls.layerSelector, {
+            {"Layer being edited", DrawingProgramLayerManager::LayerSelector::LAYER_BEING_EDITED},
+            {"All visible layers", DrawingProgramLayerManager::LayerSelector::ALL_VISIBLE_LAYERS}
+        });
+    });
+}
+
 void EraserTool::right_click_popup_gui(Toolbar& t, Vector2f popupPos) {
     t.paint_popup(popupPos);
 }

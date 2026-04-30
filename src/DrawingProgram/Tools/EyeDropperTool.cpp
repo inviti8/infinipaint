@@ -42,6 +42,20 @@ void EyeDropperTool::gui_toolbox(Toolbar& t) {
     });
 }
 
+void EyeDropperTool::gui_phone_toolbox(PhoneDrawingProgramScreen& t) {
+    using namespace GUIStuff;
+    using namespace ElementHelpers;
+
+    auto& gui = drawP.world.main.g.gui;
+    auto& selectingStrokeColor = drawP.world.main.toolConfig.eyeDropper.selectingStrokeColor;
+    gui.new_id("Color select tool", [&] {
+        radio_button_selector<bool>(gui, "Stroke type", &selectingStrokeColor, {
+            {"Stroke Color", true},
+            {"Fill Color", false}
+        });
+    });
+}
+
 void EyeDropperTool::right_click_popup_gui(Toolbar& t, Vector2f popupPos) {
     t.paint_popup(popupPos);
 }

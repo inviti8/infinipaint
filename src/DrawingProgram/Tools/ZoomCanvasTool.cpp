@@ -23,6 +23,13 @@ void ZoomCanvasTool::gui_toolbox(Toolbar& t) {
     });
 }
 
+void ZoomCanvasTool::gui_phone_toolbox(PhoneDrawingProgramScreen& t) {
+    auto& gui = drawP.world.main.g.gui;
+    gui.new_id("Zoom canvas tool", [&] {
+        GUIStuff::ElementHelpers::text_label_centered(gui, "Zoom tool");
+    });
+}
+
 void ZoomCanvasTool::right_click_popup_gui(Toolbar& t, Vector2f popupPos) {
     drawP.selection_action_menu(popupPos);
 }

@@ -398,36 +398,6 @@ void DrawingProgram::toolbar_gui(Toolbar& t) {
     });
 }
 
-void DrawingProgram::phone_bottom_toolbar_gui(PhoneDrawingProgramScreen& t) {
-    using namespace GUIStuff;
-    using namespace ElementHelpers;
-
-    GUIManager& gui = world.main.g.gui;
-
-    auto tool_button = [&](const char* id, const std::string& svgPath, DrawingProgramToolType toolType) {
-        svg_icon_button(gui, id, svgPath, {
-            .drawType = SelectableButton::DrawType::TRANSPARENT_ALL,
-            .isSelected = drawTool->get_type() == toolType,
-            .onClick = [&, toolType] {
-                switch_to_tool(toolType);
-            }
-        });
-    };
-
-    tool_button("Brush Toolbar Button", "data/icons/brush.svg", DrawingProgramToolType::BRUSH);
-    tool_button("Eraser Toolbar Button", "data/icons/eraser.svg", DrawingProgramToolType::ERASER);
-    tool_button("Line Toolbar Button", "data/icons/line.svg", DrawingProgramToolType::LINE);
-    tool_button("Text Toolbar Button", "data/icons/text.svg", DrawingProgramToolType::TEXTBOX);
-    tool_button("Ellipse Toolbar Button", "data/icons/circle.svg", DrawingProgramToolType::ELLIPSE);
-    tool_button("Rect Toolbar Button", "data/icons/rectangle.svg", DrawingProgramToolType::RECTANGLE);
-    tool_button("RectSelect Toolbar Button", "data/icons/rectselect.svg", DrawingProgramToolType::RECTSELECT);
-    tool_button("LassoSelect Toolbar Button", "data/icons/lassoselect.svg", DrawingProgramToolType::LASSOSELECT);
-    tool_button("Edit Toolbar Button", "data/icons/cursor.svg", DrawingProgramToolType::EDIT);
-    tool_button("Eyedropper Toolbar Button", "data/icons/eyedropper.svg", DrawingProgramToolType::EYEDROPPER);
-    tool_button("Zoom Canvas Toolbar Button", "data/icons/zoom.svg", DrawingProgramToolType::ZOOM);
-    tool_button("Pan Canvas Toolbar Button", "data/icons/hand.svg", DrawingProgramToolType::PAN);
-}
-
 void DrawingProgram::right_click_popup_gui(Toolbar& t) {
     if(rightClickPopupLocation.has_value())
         drawTool->right_click_popup_gui(t, rightClickPopupLocation.value());

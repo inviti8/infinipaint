@@ -39,6 +39,26 @@ void RectDrawTool::gui_toolbox(Toolbar& t) {
     });
 }
 
+void RectDrawTool::gui_phone_toolbox(PhoneDrawingProgramScreen& t) {
+    using namespace GUIStuff;
+    using namespace ElementHelpers;
+
+    auto& gui = drawP.world.main.g.gui;
+    auto& toolConfig = drawP.world.main.toolConfig;
+    auto& fillStrokeMode = toolConfig.rectDraw.fillStrokeMode;
+    auto& relativeRadiusWidth = toolConfig.rectDraw.relativeRadiusWidth;
+    gui.new_id("rect draw tool", [&] {
+        slider_scalar_field(gui, "relradiuswidth", "Corner Radius", &relativeRadiusWidth, 0.0f, 40.0f);
+        radio_button_selector(gui, "fill type", &fillStrokeMode, {
+            {"Fill only", 0},
+            {"Outline only", 1},
+            {"Fill and Outline", 2}
+        });
+        if(fillStrokeMode == 1 || fillStrokeMode == 2)
+            toolConfig.relative_width_gui(drawP, "Outline Size");
+    });
+}
+
 void RectDrawTool::input_mouse_button_on_canvas_callback(const InputManager::MouseButtonCallbackArgs& button) {
     if(button.button == InputManager::MouseButton::LEFT) {
         if(button.down && drawP.layerMan.is_a_layer_being_edited() && !objInfoBeingEdited && !drawP.world.main.g.gui.cursor_obstructed()) {

@@ -29,7 +29,6 @@ class DrawingProgram {
         void toolbar_gui(Toolbar& t);
         void tool_options_gui(Toolbar& t);
         void right_click_popup_gui(Toolbar& t);
-        void phone_bottom_toolbar_gui(PhoneDrawingProgramScreen& t);
         void update();
         void scale_up(const WorldScalar& scaleUpAmount);
         void draw(SkCanvas* canvas, const DrawData& drawData);
@@ -78,6 +77,8 @@ class DrawingProgram {
 
         void set_right_click_popup_location(const Vector2f& newLoc);
         void clear_right_click_popup();
+
+        std::unique_ptr<DrawingProgramToolBase> drawTool;
     private:
         void process_transform_message(const std::vector<std::pair<NetworkingObjects::NetObjID, CoordSpaceHelper>>& transforms);
 
@@ -129,7 +130,6 @@ class DrawingProgram {
         };
         std::vector<DroppedDownloadingFile> droppedDownloadingFiles;
 
-        std::unique_ptr<DrawingProgramToolBase> drawTool;
 
         std::optional<Vector2f> rightClickPopupLocation;
 

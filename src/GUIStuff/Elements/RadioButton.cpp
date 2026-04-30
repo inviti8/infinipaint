@@ -20,7 +20,7 @@ void RadioButton::layout(const Clay_ElementId& id, const std::function<bool()>& 
 }
 
 void RadioButton::update() {
-    if(smooth_two_way_animation_time_check_for_change(hoverAnimation, gui.io.deltaTime, mouseHovering, RADIOBUTTON_ANIMATION_TIME))
+    if(smooth_two_way_animation_time_check_for_change(hoverAnimation, gui.io.deltaTime, is_hovering_animation(), RADIOBUTTON_ANIMATION_TIME))
         gui.invalidate_draw_element(this);
     if(oldIsTicked != isTicked()) {
         gui.invalidate_draw_element(this);
@@ -28,9 +28,26 @@ void RadioButton::update() {
     }
 }
 
+bool RadioButton::is_hovering_animation() {
+    return mouseHovering && (!gui.last_interaction_is_touch() || isHeld);
+}
+
 void RadioButton::input_mouse_button_callback(const InputManager::MouseButtonCallbackArgs& button) {
-    if(mouseHovering && button.button == InputManager::MouseButton::LEFT && button.down)
+    if(mouseHovering && button.button == InputManager::MouseButton::LEFT && button.down) {
         gui.set_post_callback_func([&] { if(onClick) onClick(); });
+        isHeld = true;
+    }
+    else
+        isHeld = false;
+}
+
+void RadioButton::input_finger_touch_callback(const InputManager::FingerTouchCallbackArgs& touch) {
+    if(mouseHovering && touch.down) {
+        gui.set_post_callback_func([&] { if(onClick) onClick(); });
+        isHeld = true;
+    }
+    else
+        isHeld = false;
 }
 
 void RadioButton::clay_draw(SkCanvas* canvas, UpdateInputData& io, Clay_RenderCommand* command, bool skiaAA) {
@@ -62,7 +79,7 @@ void RadioButton::clay_draw(SkCanvas* canvas, UpdateInputData& io, Clay_RenderCo
     else {
         SkPaint p;
         p.setAntiAlias(skiaAA);
-        p.setColor4f(convert_vec4<SkColor4f>(mouseHovering ? io.theme->fillColor1 : io.theme->backColor2));
+        p.setColor4f(convert_vec4<SkColor4f>(is_hovering_animation() ? io.theme->fillColor1 : io.theme->backColor2));
         p.setStyle(SkPaint::kStroke_Style);
         p.setStrokeWidth(0.15f);
         canvas->drawCircle(0.0f, 0.0f, 0.5f, p);
