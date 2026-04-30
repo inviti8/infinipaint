@@ -6,6 +6,7 @@
 #include "../GUIStuff/ElementHelpers/ButtonHelpers.hpp"
 #include "../GUIStuff/ElementHelpers/LayoutHelpers.hpp"
 #include "../GUIStuff/ElementHelpers/TextLabelHelpers.hpp"
+#include "../GUIStuff/ElementHelpers/ScrollAreaHelpers.hpp"
 #include "FileSelectScreen.hpp"
 #include <Helpers/Logger.hpp>
 
@@ -117,9 +118,11 @@ void PhoneDrawingProgramScreen::bottom_toolbar() {
                             tool_settings_popup();
                             break;
                         case SettingsMenuPopup::FG_COLOR:
+                            SCROLL_AREA_BUG_WORKAROUND();
                             color_settings_popup(&main.toolConfig.globalConf.foregroundColor);
                             break;
                         case SettingsMenuPopup::BG_COLOR:
+                            SCROLL_AREA_BUG_WORKAROUND();
                             color_settings_popup(&main.toolConfig.globalConf.backgroundColor);
                             break;
                     }
