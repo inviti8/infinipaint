@@ -16,6 +16,16 @@
 #include <modules/skparagraph/include/TextStyle.h>
 #include <modules/skunicode/include/SkUnicode_icu.h>
 
+//#define CLAY_DEBUG_MENU_ENABLED
+
+SkColor4f convert_clay_color_to_skcolor4f(const Clay_Color& color) {
+#ifdef CLAY_DEBUG_MENU_ENABLED
+    if(color.a > 1.0f)
+        return {color.r / 255.0f, color.g / 255.0f, color.b / 255.0f, color.a / 255.0f};
+#endif
+    return convert_vec4<SkColor4f>(color);
+}
+
 namespace GUIStuff {
 
 GUIManager::GUIManager()
@@ -25,6 +35,9 @@ GUIManager::GUIManager()
     clayArena = Clay_CreateArenaWithCapacityAndMemory(Clay_MinMemorySize(), malloc(Clay_MinMemorySize()));
     clayInstance = Clay_Initialize(clayArena, Clay_Dimensions(1.0f, 1.0f), (Clay_ErrorHandler)clay_error_handler);
     Clay_SetMeasureTextFunction(clay_skia_measure_text, this);
+#ifdef CLAY_DEBUG_MENU_ENABLED
+    Clay_SetDebugModeEnabled(true);
+#endif
     setToLayout = true;
     postCallbackFuncIsHighPriority = false;
     lastInteractionIsTouch = false;
@@ -128,7 +141,7 @@ void GUIManager::draw(SkCanvas* c, bool skiaAA) {
                     SkPaint paint;
                     paint.setAntiAlias(skiaAA);
                     paint.setStyle(SkPaint::kFill_Style);
-                    paint.setColor4f(convert_vec4<SkColor4f>(config->backgroundColor));
+                    paint.setColor4f(convert_clay_color_to_skcolor4f(config->backgroundColor));
                     canvas->drawRRect(rrect, paint);
 
                     break;
@@ -141,7 +154,7 @@ void GUIManager::draw(SkCanvas* c, bool skiaAA) {
                     skia::textlayout::TextStyle tStyle;
                     tStyle.setFontSize(config->fontSize);
                     tStyle.setFontFamilies(io.fonts->get_default_font_families());
-                    tStyle.setColor(convert_vec4<SkColor4f>(config->textColor).toSkColor());
+                    tStyle.setColor(convert_clay_color_to_skcolor4f(config->textColor).toSkColor());
                     pStyle.setTextStyle(tStyle);
 
                     skia::textlayout::ParagraphBuilderImpl a(pStyle, io.fonts->collection, SkUnicodes::ICU::Make());
@@ -156,7 +169,7 @@ void GUIManager::draw(SkCanvas* c, bool skiaAA) {
                     Clay_BorderRenderData* config = &command->renderData.border;
 
                     SkPaint p;
-                    p.setColor4f(convert_vec4<SkColor4f>(config->color));
+                    p.setColor4f(convert_clay_color_to_skcolor4f(config->color));
                     p.setStyle(SkPaint::kStroke_Style);
                     p.setAntiAlias(skiaAA);
 
@@ -309,7 +322,7 @@ void GUIManager::draw_force(SkCanvas* canvas, bool skiaAA) {
                 SkPaint paint;
                 paint.setAntiAlias(skiaAA);
                 paint.setStyle(SkPaint::kFill_Style);
-                paint.setColor4f(convert_vec4<SkColor4f>(config->backgroundColor));
+                paint.setColor4f(convert_clay_color_to_skcolor4f(config->backgroundColor));
                 canvas->drawRRect(rrect, paint);
 
                 break;
@@ -322,7 +335,7 @@ void GUIManager::draw_force(SkCanvas* canvas, bool skiaAA) {
                 skia::textlayout::TextStyle tStyle;
                 tStyle.setFontSize(config->fontSize);
                 tStyle.setFontFamilies(io.fonts->get_default_font_families());
-                tStyle.setColor(convert_vec4<SkColor4f>(config->textColor).toSkColor());
+                tStyle.setColor(convert_clay_color_to_skcolor4f(config->textColor).toSkColor());
                 pStyle.setTextStyle(tStyle);
 
                 skia::textlayout::ParagraphBuilderImpl a(pStyle, io.fonts->collection, SkUnicodes::ICU::Make());
@@ -337,7 +350,7 @@ void GUIManager::draw_force(SkCanvas* canvas, bool skiaAA) {
                 Clay_BorderRenderData* config = &command->renderData.border;
 
                 SkPaint p;
-                p.setColor4f(convert_vec4<SkColor4f>(config->color));
+                p.setColor4f(convert_clay_color_to_skcolor4f(config->color));
                 p.setStyle(SkPaint::kStroke_Style);
                 p.setAntiAlias(skiaAA);
 
@@ -543,6 +556,9 @@ void GUIManager::layout_if_necessary() {
 }
 
 void GUIManager::layout() {
+#ifdef CLAY_DEBUG_MENU_ENABLED
+    Clay_SetPointerState({io.input->mouse.pos.x(), io.input->mouse.pos.y()}, io.input->mouse.leftDown);
+#endif
     constexpr int LAYOUT_RUN_COUNT = 6;
     for(int i = 0; i < LAYOUT_RUN_COUNT; i++)
         single_layout_run();
