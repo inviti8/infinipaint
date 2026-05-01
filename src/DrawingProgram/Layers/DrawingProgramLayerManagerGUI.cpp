@@ -13,7 +13,6 @@
 #include "../../GUIStuff/ElementHelpers/LayoutHelpers.hpp"
 #include "../../GUIStuff/ElementHelpers/TextBoxHelpers.hpp"
 #include "../../GUIStuff/ElementHelpers/NumberSliderHelpers.hpp"
-#include "../../GUIStuff/ElementHelpers/ScrollAreaHelpers.hpp"
 #include "../../GUIStuff/Elements/SVGIcon.hpp"
 #include "../../GUIStuff/Elements/DropDown.hpp"
 
@@ -61,7 +60,6 @@ void DrawingProgramLayerManagerGUI::setup_list_gui() {
             nameToEdit.clear();
         }
         else {
-            SCROLL_AREA_BUG_WORKAROUND();
             gui.element<TreeListing>("list", TreeListing::Data {
                 .selectedIndices = &selectedLayerIndices,
                 .dirInfo = [&](const TreeListingObjIndexList& objIndex) -> std::optional<TreeListing::DirectoryInfo> {

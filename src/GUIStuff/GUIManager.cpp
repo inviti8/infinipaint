@@ -559,6 +559,7 @@ void GUIManager::layout() {
 #ifdef CLAY_DEBUG_MENU_ENABLED
     Clay_SetPointerState({io.input->mouse.pos.x(), io.input->mouse.pos.y()}, io.input->mouse.leftDown);
 #endif
+    Clay_UpdateScrollContainers(false, {0, 0}, 0.1f); // Important regardless if scroll position is updated with Clay or not
     constexpr int LAYOUT_RUN_COUNT = 6;
     for(int i = 0; i < LAYOUT_RUN_COUNT; i++)
         single_layout_run();
