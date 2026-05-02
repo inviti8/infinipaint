@@ -395,6 +395,9 @@ struct InputManager {
         size_t fingerDownCount;
     };
 
+    static MouseButtonCallbackArgs convert_finger_touch_to_mouse_button(const FingerTouchCallbackArgs& touch);
+    static MouseMotionCallbackArgs convert_finger_motion_to_mouse_motion(const FingerMotionCallbackArgs& motion);
+
     struct WindowResizeCallbackArgs {
         Vector2i size;
         SCollision::AABB<float> safeArea;

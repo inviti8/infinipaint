@@ -16,7 +16,6 @@ struct DropdownOptions {
 
 template <typename T> class DropDown : public Element {
     public:
-        static constexpr float ENTRY_HEIGHT = 27.0f;
         static constexpr float DROPDOWN_OFFSET = 4.0f;
 
         DropDown(GUIManager& gui): Element(gui) {}
@@ -61,6 +60,7 @@ template <typename T> class DropDown : public Element {
 
                 if(isOpen && boundingBox.has_value()) {
                     auto& buttonBB = boundingBox.value();
+                    float ENTRY_HEIGHT = buttonBB.height();
                     gui.set_z_index(gui.get_z_index() + 1, [&] {
                         gui.element<LayoutElement>("DROPDOWN", [&](LayoutElement* l, const Clay_ElementId& lId) {
                             float dropdownHeight = ENTRY_HEIGHT * selections.size() + DROPDOWN_OFFSET;

@@ -1,192 +1,116 @@
 #pragma once
 #include "ColorPicker.decl.hpp"
 #include "../GUIManager.hpp"
+#include "Helpers/ConvertVec.hpp"
+#include "SaturationValueSquare.hpp"
+#include "HueVerticalSlider.hpp"
+#include "AlphaSlider.hpp"
 
 namespace GUIStuff {
 
 template <typename T> ColorPicker<T>::ColorPicker(GUIManager& gui): Element(gui) {}
 
-template <typename T> void ColorPicker<T>::layout(const Clay_ElementId& id, T* data, bool selectAlpha, const ColorPickerData& config) {
+template <typename T> void ColorPicker<T>::layout(const Clay_ElementId& id, T* data, bool selectAlpha, const ColorPickerData& conf) {
     this->data = data;
     if(!oldData.has_value() || oldData.value() != *data) {
-        dd.savedHsv = rgb_to_hsv<Vector3f, T>(*data);
+        savedHsv = rgb_to_hsv<Vector3f, T>(*data);
         oldData = *data;
     }
-    if(selectAlpha)
-        dd.savedAlpha = (*data)[3];
 
-    this->selectAlpha = selectAlpha;
-    this->config = config;
+    config = conf;
 
-    CLAY(id, {
-        .layout = {
-            .sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_GROW(0) }
-        },
-        .aspectRatio = {1.0f},
-        .custom = { .customData = this }
-    }) {}
-}
-
-template <typename T> void ColorPicker<T>::update() {
-    if(dd != oldDD) {
-        gui.invalidate_draw_element(this);
-        oldDD = dd;
-    }
-}
-
-template <typename T> void ColorPicker<T>::clay_draw(SkCanvas* canvas, UpdateInputData& io, Clay_RenderCommand* command, bool skiaAA) {
-    auto& bb = boundingBox.value();
-
-    canvas->save();
-    canvas->translate(bb.min.x(), bb.min.y());
-    float svSelectionAreaSize = get_sv_selection_area_size();
-    canvas->scale(svSelectionAreaSize, svSelectionAreaSize);
-    canvas->clipRect(SkRect::MakeXYWH(0.0f, 0.0f, 1.0f, 1.0f), skiaAA);
-
-    SkPaint svSelectionAreaPaint;
-    svSelectionAreaPaint.setShader(ColorPickerShaders::get_sv_selection_shader(dd.savedHsv.x() / 360.0f));
-    canvas->drawPaint(svSelectionAreaPaint);
-
-    SkPaint selectionLinePaint({1.0f, 1.0f, 1.0f, 1.0f});
-    selectionLinePaint.setAntiAlias(skiaAA);
-    selectionLinePaint.setStrokeWidth(2.0f / svSelectionAreaSize);
-    canvas->drawLine(0.0f, 1.0f - dd.savedHsv.z(), 1.0f, 1.0f - dd.savedHsv.z(), selectionLinePaint);
-    canvas->drawLine(dd.savedHsv.y(), 0.0f, dd.savedHsv.y(), 1.0f, selectionLinePaint);
-
-    canvas->restore();
-
-    float normalizedHue = dd.savedHsv.x() / 360.0f;
-
-    Vector2f hueBarPos = get_hue_bar_pos();
-    Vector2f hueBarDim = get_hue_bar_dim();
-    canvas->save();
-    canvas->translate(hueBarPos.x(), hueBarPos.y());
-    canvas->scale(hueBarDim.x(), hueBarDim.y());
-    canvas->clipRect(SkRect::MakeXYWH(0.0f, 0.0f, 1.0f, 1.0f), skiaAA);
-
-    SkPaint hueBarPaint;
-    hueBarPaint.setShader(ColorPickerShaders::get_hue_shader());
-    canvas->drawPaint(hueBarPaint);
-    canvas->drawLine(0.0f, 1.0f - normalizedHue, 1.0f, 1.0f - normalizedHue, selectionLinePaint);
-
-    canvas->restore();
-
-    Vector2f alphaBarPos = get_alpha_bar_pos();
-    Vector2f alphaBarDim = get_alpha_bar_dim();
-    canvas->save();
-    canvas->translate(alphaBarPos.x(), alphaBarPos.y());
-    canvas->clipRect(SkRect::MakeXYWH(0.0f, 0.0f, alphaBarDim.x(), alphaBarDim.y()), skiaAA);
-
-    SkPaint alphaBarPaint;
-    if(selectAlpha)
-        alphaBarPaint.setShader(ColorPickerShaders::get_alpha_bar_shader({(*data)[0], (*data)[1], (*data)[2]}, alphaBarDim.x()));
-    else
-        alphaBarPaint.setColor4f(SkColor4f{(*data)[0], (*data)[1], (*data)[2], 1.0f});
-    canvas->drawPaint(alphaBarPaint);
+    auto onChange = [&] {
+        set_rgb_from_hsv(savedHsv);
+        if(config.onChange) config.onChange();
+    };
 
     if(selectAlpha) {
-        canvas->scale(alphaBarDim.x(), alphaBarDim.y());
-        canvas->drawLine((*data)[3], 0.0f, (*data)[3], 1.0f, selectionLinePaint);
-    }
-
-    canvas->restore();
-}
-
-template <typename T> void ColorPicker<T>::input_mouse_button_callback(const InputManager::MouseButtonCallbackArgs& button) {
-    HeldBar oldHeld = held;
-    held = HeldBar::NONE;
-    if(mouseHovering && button.button == InputManager::MouseButton::LEFT && button.down && boundingBox.has_value()) {
-        auto& bb = boundingBox.value();
-        float svSelectionAreaSize = get_sv_selection_area_size();
-        if(SCollision::collide(SCollision::AABB<float>(bb.min, bb.min + Vector2f{svSelectionAreaSize, svSelectionAreaSize}), button.pos))
-            held = HeldBar::SV_HELD;
-        else {
-            Vector2f hueBarPos = get_hue_bar_pos();
-            Vector2f hueBarDim = get_hue_bar_dim();
-            if(SCollision::collide(SCollision::AABB<float>(hueBarPos, hueBarPos + hueBarDim), button.pos))
-                held = HeldBar::HUE_HELD;
-            else if(selectAlpha) {
-                Vector2f alphaBarPos = get_alpha_bar_pos();
-                Vector2f alphaBarDim = get_alpha_bar_dim();
-                if(SCollision::collide(SCollision::AABB<float>(alphaBarPos, alphaBarPos + alphaBarDim), button.pos))
-                    held = HeldBar::ALPHA_HELD;
+        CLAY(id, {
+            .layout = {
+                .sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_GROW(0) },
+                .childGap = BAR_GAP,
+                .layoutDirection = CLAY_TOP_TO_BOTTOM
+            }
+        }) {
+            CLAY_AUTO_ID({
+                .layout = {
+                    .sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_GROW(0)},
+                    .childGap = BAR_GAP,
+                    .layoutDirection = CLAY_LEFT_TO_RIGHT
+                },
+            }) {
+                gui.element<SaturationValueSquare>("sv square", SaturationValueSquareData{
+                    .saturation = &savedHsv.y(),
+                    .value = &savedHsv.z(),
+                    .hue = &savedHsv.x(),
+                    .onChange = onChange,
+                    .onHold = config.onHold,
+                    .onRelease = config.onRelease
+                });
+                CLAY_AUTO_ID({
+                    .layout = {
+                        .sizing = {.width = CLAY_SIZING_FIT(BAR_WIDTH), .height = CLAY_SIZING_GROW(0)}
+                    },
+                }) {
+                    gui.element<HueVerticalSlider>("hue slider", HueVerticalSliderData{
+                        .hue = &savedHsv.x(),
+                        .onChange = onChange,
+                        .onHold = config.onHold,
+                        .onRelease = config.onRelease
+                    });
+                }
+            }
+            CLAY_AUTO_ID({
+                .layout = {
+                    .sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_FIT(BAR_WIDTH)}
+                },
+            }) {
+                gui.element<AlphaSlider>("alpha slider", AlphaSliderData{
+                    .alpha = &(*data)[3],
+                    .r = &(*data)[0],
+                    .g = &(*data)[1],
+                    .b = &(*data)[2],
+                    .onChange = onChange,
+                    .onHold = config.onHold,
+                    .onRelease = config.onRelease
+                });
             }
         }
     }
-    if(oldHeld != HeldBar::NONE && held == HeldBar::NONE) {
-        gui.set_post_callback_func([&] {
-            if(config.onRelease) config.onRelease();
-        });
-    }
-    update_color_picker_pos(button.pos, true);
-}
-
-template <typename T> void ColorPicker<T>::input_mouse_motion_callback(const InputManager::MouseMotionCallbackArgs& motion) {
-    update_color_picker_pos(motion.pos, false);
-}
-
-template <typename T> void ColorPicker<T>::update_color_picker_pos(const Vector2f& p, bool justHeld) {
-    if(held != HeldBar::NONE && boundingBox.has_value()) {
-        gui.set_post_callback_func([&, p, justHeld]() {
-            auto& bb = boundingBox.value();
-            switch(held) {
-                case HeldBar::NONE:
-                    break;
-                case HeldBar::SV_HELD: {
-                    float svSelectionAreaSize = bb.width() - (BAR_GAP + BAR_WIDTH);
-                    Vector2f newSv = cwise_vec_clamp<Vector2f>((p - bb.min) / svSelectionAreaSize, Vector2f{0.0f, 0.0f}, Vector2f{1.0f, 1.0f});
-                    dd.savedHsv.y() = newSv.x();
-                    dd.savedHsv.z() = 1.0f - newSv.y();
-                    set_hsv(dd.savedHsv);
-                    if(justHeld && config.onHold) config.onHold();
-                    if(config.onChange) config.onChange();
-                    break;
-                }
-                case HeldBar::HUE_HELD: {
-                    Vector2f huePos = get_hue_bar_pos();
-                    Vector2f hueDim = get_hue_bar_dim();
-                    dd.savedHsv.x() = (1.0f - std::clamp((p.y() - huePos.y()) / hueDim.y(), 0.0f, 1.0f)) * 360.0f;
-                    set_hsv(dd.savedHsv);
-                    if(justHeld && config.onHold) config.onHold();
-                    if(config.onChange) config.onChange();
-                    break;
-                }
-                case HeldBar::ALPHA_HELD: {
-                    Vector2f alphaPos = get_alpha_bar_pos();
-                    Vector2f alphaDim = get_alpha_bar_dim();
-                    (*data)[3] = std::clamp((p.x() - alphaPos.x()) / alphaDim.x(), 0.0f, 1.0f);
-                    dd.savedAlpha = (*data)[3];
-                    oldData = *data;
-                    if(justHeld && config.onHold) config.onHold();
-                    if(config.onChange) config.onChange();
-                    break;
-                }
+    else {
+        CLAY(id, {
+            .layout = {
+                .sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_GROW(0)},
+                .childGap = BAR_GAP,
+                .layoutDirection = CLAY_LEFT_TO_RIGHT
+            },
+        }) {
+            gui.element<SaturationValueSquare>("sv square", SaturationValueSquareData{
+                .saturation = &savedHsv.y(),
+                .value = &savedHsv.z(),
+                .hue = &savedHsv.x(),
+                .onChange = onChange,
+                .onHold = config.onHold,
+                .onRelease = config.onRelease
+            });
+            CLAY_AUTO_ID({
+                .layout = {
+                    .sizing = {.width = CLAY_SIZING_FIT(BAR_WIDTH), .height = CLAY_SIZING_GROW(0)},
+                    .layoutDirection = CLAY_LEFT_TO_RIGHT
+                },
+            }) {
+                gui.element<HueVerticalSlider>("hue slider", HueVerticalSliderData{
+                    .hue = &savedHsv.x(),
+                    .onChange = onChange,
+                    .onHold = config.onHold,
+                    .onRelease = config.onRelease
+                });
             }
-        });
+        }
     }
 }
 
-template <typename T> float ColorPicker<T>::get_sv_selection_area_size() {
-    return boundingBox.value().width() - (BAR_GAP + BAR_WIDTH);
-}
-
-template <typename T> Vector2f ColorPicker<T>::get_hue_bar_pos() {
-    return {boundingBox.value().min.x() + get_sv_selection_area_size() + BAR_GAP, boundingBox.value().min.y()};
-}
-
-template <typename T> Vector2f ColorPicker<T>::get_hue_bar_dim() {
-    return {BAR_WIDTH, get_sv_selection_area_size()};
-}
-
-template <typename T> Vector2f ColorPicker<T>::get_alpha_bar_pos() {
-    return {boundingBox.value().min.x(), boundingBox.value().min.y() + get_sv_selection_area_size() + BAR_GAP};
-}
-
-template <typename T> Vector2f ColorPicker<T>::get_alpha_bar_dim() {
-    return {boundingBox.value().width(), BAR_WIDTH};
-}
-
-template <typename T> void ColorPicker<T>::set_hsv(const Vector3f& hsv) {
+template <typename T> void ColorPicker<T>::set_rgb_from_hsv(const Vector3f& hsv) {
     Vector3f a = hsv_to_rgb<Vector3f>(hsv);
     (*data)[0] = a.x();
     (*data)[1] = a.y();

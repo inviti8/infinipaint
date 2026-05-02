@@ -3,7 +3,6 @@
 #include <include/core/SkColor.h>
 #include <include/core/SkPath.h>
 #include <include/effects/SkRuntimeEffect.h>
-#include <iostream>
 #include <Helpers/SCollision.hpp>
 #include <Helpers/HsvRgb.hpp>
 
@@ -67,44 +66,17 @@ struct ColorPickerData {
 template <typename T> class ColorPicker : public Element {
     public:
         ColorPicker(GUIManager& gui);
-        void layout(const Clay_ElementId& id, T* data, bool selectAlpha, const ColorPickerData& config);
-        virtual void update() override;
-        virtual void clay_draw(SkCanvas* canvas, UpdateInputData& io, Clay_RenderCommand* command, bool skiaAA) override;
-        void input_mouse_button_callback(const InputManager::MouseButtonCallbackArgs& button) override;
-        void input_mouse_motion_callback(const InputManager::MouseMotionCallbackArgs& motion) override;
+        void layout(const Clay_ElementId& id, T* data, bool selectAlpha, const ColorPickerData& conf = {});
     private:
-        void update_color_picker_pos(const Vector2f& p, bool justHeld);
-        float get_sv_selection_area_size();
-        Vector2f get_hue_bar_pos();
-        Vector2f get_hue_bar_dim();
-        Vector2f get_alpha_bar_pos();
-        Vector2f get_alpha_bar_dim();
-        void set_hsv(const Vector3f& hsv);
+        void set_rgb_from_hsv(const Vector3f& hsv);
 
         static constexpr float BAR_WIDTH = 30.0;
-        static constexpr float BAR_GAP = 5.0;
+        static constexpr uint16_t BAR_GAP = 5;
 
-        struct DisplayData {
-            Vector3f savedHsv = {0.0f, 0.0f, 0.0f};
-            float savedAlpha = 0.0f;
-            bool operator!=(const DisplayData&) const = default;
-            bool operator==(const DisplayData&) const = default;
-        };
-
-        DisplayData dd;
-        DisplayData oldDD;
-
+        Vector3f savedHsv = {0.0f, 0.0f, 0.0f};
         T* data;
         std::optional<T> oldData;
         ColorPickerData config;
-        bool selectAlpha = false;
-        enum class HeldBar {
-            NONE,
-            SV_HELD,
-            HUE_HELD,
-            ALPHA_HELD
-        };
-        HeldBar held = HeldBar::NONE;
 };
 
 }

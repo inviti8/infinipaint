@@ -24,9 +24,11 @@ class PhoneDrawingProgramScreen : public DrawingProgramScreen {
             FG_COLOR,
             BG_COLOR
         } settingsMenuPopup = SettingsMenuPopup::NONE;
-        struct PaletteData {
+        struct ColorPickerPopupData {
+            bool extraSettingsOpen = false;
             size_t selectedPalette = 0;
             bool addingPalette = false;
             std::string newPaletteStr;
-        } paletteData;
+        } colorPickerPopupData;
+        void reset_color_picker_popup_data();
 };

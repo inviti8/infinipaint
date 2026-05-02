@@ -624,6 +624,24 @@ void InputManager::backend_pen_axis_update(const SDL_PenAxisEvent& e) {
     }
 }
 
+InputManager::MouseButtonCallbackArgs InputManager::convert_finger_touch_to_mouse_button(const FingerTouchCallbackArgs& touch) {
+    return {
+        .deviceType = InputManager::MouseDeviceType::TOUCH,
+        .button = InputManager::MouseButton::LEFT,
+        .down = touch.down,
+        .clicks = static_cast<uint8_t>(touch.fingerTapCount),
+        .pos = touch.pos
+    };
+}
+
+InputManager::MouseMotionCallbackArgs InputManager::convert_finger_motion_to_mouse_motion(const FingerMotionCallbackArgs& motion) {
+    return {
+        .deviceType = InputManager::MouseDeviceType::TOUCH,
+        .pos = motion.pos,
+        .move = motion.move
+    };
+}
+
 std::vector<Vector2f> InputManager::get_multiple_finger_positions() {
     std::vector<Vector2f> pos;
     for(const SDL_TouchFingerEvent& fingerEvent : touch.fingers)

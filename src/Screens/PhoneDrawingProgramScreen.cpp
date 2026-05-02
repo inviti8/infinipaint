@@ -3,9 +3,12 @@
 #include "DrawingProgramScreen.hpp"
 #include "Helpers/ConvertVec.hpp"
 #include "../GUIStuff/Elements/GridScrollArea.hpp"
+#include "../GUIStuff/Elements/DropDown.hpp"
+#include "../GUIStuff/Elements/ColorPicker.hpp"
 #include "../GUIStuff/ElementHelpers/ButtonHelpers.hpp"
 #include "../GUIStuff/ElementHelpers/LayoutHelpers.hpp"
 #include "../GUIStuff/ElementHelpers/TextLabelHelpers.hpp"
+#include "../GUIStuff/ElementHelpers/TextBoxHelpers.hpp"
 #include "FileSelectScreen.hpp"
 #include <Helpers/Logger.hpp>
 
@@ -112,8 +115,10 @@ void PhoneDrawingProgramScreen::bottom_toolbar() {
                     }) {}
                     switch(settingsMenuPopup) {
                         case SettingsMenuPopup::NONE:
+                            reset_color_picker_popup_data();
                             break;
                         case SettingsMenuPopup::SETTINGS:
+                            reset_color_picker_popup_data();
                             tool_settings_popup();
                             break;
                         case SettingsMenuPopup::FG_COLOR:
@@ -234,24 +239,25 @@ void PhoneDrawingProgramScreen::tool_settings_popup() {
     });
 }
 
+void PhoneDrawingProgramScreen::reset_color_picker_popup_data() {
+    colorPickerPopupData.extraSettingsOpen = false;
+    colorPickerPopupData.addingPalette = false;
+    colorPickerPopupData.newPaletteStr.clear();
+}
+
 void PhoneDrawingProgramScreen::color_settings_popup(Vector4f* color) {
     auto& gui = main.g.gui;
-    auto& palette = main.conf.palettes[paletteData.selectedPalette];
-    gui.element<LayoutElement>("color settings popup", [&] (LayoutElement*, const Clay_ElementId& lId) {
-        CLAY(lId, {
-            .layout = {
-                .sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_FIT(0)},
-            },
-            .backgroundColor = convert_vec4<Clay_Color>(gui.io.theme->backColor1),
-            .cornerRadius = CLAY_CORNER_RADIUS(gui.io.theme->windowCorners1)
-        }) {
-            gui.element<GridScrollArea>("color selector grid", GridScrollArea::Options{
-                .entryWidth = BIG_BUTTON_SIZE,
-                .childAlignmentX = CLAY_ALIGN_X_CENTER,
-                .entryHeight = BIG_BUTTON_SIZE,
-                .entryCount = palette.colors.size(),
-                .scrollbar = ScrollArea::ScrollbarType::NORMAL,
-                .elementContent = [&](size_t i) {
+    auto& palette = main.conf.palettes[colorPickerPopupData.selectedPalette];
+
+    auto paletteColorPickerGrid = [&] {
+        gui.element<GridScrollArea>("color selector grid", GridScrollArea::Options{
+            .entryWidth = BIG_BUTTON_SIZE,
+            .childAlignmentX = CLAY_ALIGN_X_CENTER,
+            .entryHeight = BIG_BUTTON_SIZE,
+            .entryCount = palette.colors.size() + 1,
+            .scrollbar = ScrollArea::ScrollbarType::NORMAL,
+            .elementContent = [&](size_t i) {
+                if(i < palette.colors.size()) {
                     auto newC = std::make_shared<Vector3f>(palette.colors[i].x(), palette.colors[i].y(), palette.colors[i].z());
                     color_button(gui, "c", newC.get(), {
                         .isSelected = newC->x() == color->x() && newC->y() == color->y() && newC->z() == color->z(),
@@ -264,7 +270,124 @@ void PhoneDrawingProgramScreen::color_settings_popup(Vector4f* color) {
                         }
                     });
                 }
+                else {
+                    svg_icon_button(gui, "extra color settings", "data/icons/RemixIcon/more-fill.svg", {
+                        .drawType = SelectableButton::DrawType::TRANSPARENT_ALL,
+                        .isSelected = colorPickerPopupData.extraSettingsOpen,
+                        .onClick = [&] {
+                            colorPickerPopupData.extraSettingsOpen = !colorPickerPopupData.extraSettingsOpen;
+                        }
+                    });
+                }
+            }
+        });
+    };
+
+    auto paletteColorPickerExtras = [&] {
+        CLAY_AUTO_ID({
+            .layout = {
+                .sizing = {.width = CLAY_SIZING_FIT(200), .height = CLAY_SIZING_FIT(200)},
+                .childAlignment = { .x = CLAY_ALIGN_X_CENTER, .y = CLAY_ALIGN_Y_CENTER},
+                .layoutDirection = CLAY_LEFT_TO_RIGHT
+            }
+        }) {
+            gui.element<ColorPicker<Vector4f>>("color picker element", color, true);
+        }
+        CLAY_AUTO_ID({
+            .layout = {
+                .sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_FIT(0)},
+                .childGap = gui.io.theme->childGap1,
+                .childAlignment = { .x = CLAY_ALIGN_X_CENTER, .y = CLAY_ALIGN_Y_CENTER},
+                .layoutDirection = CLAY_LEFT_TO_RIGHT
+            }
+        }) {
+            std::vector<std::string> paletteNames;
+            for(auto& p : main.conf.palettes)
+                paletteNames.emplace_back(p.name);
+            gui.element<DropDown<size_t>>("paletteselector", &colorPickerPopupData.selectedPalette, paletteNames);
+            svg_icon_button(gui, "paletteadd", "data/icons/plus.svg", {
+                .onClick = [&] {
+                    colorPickerPopupData.addingPalette = !colorPickerPopupData.addingPalette;
+                }
             });
+            svg_icon_button(gui, "paletteremove", "data/icons/close.svg", {
+                .onClick = [&] {
+                    main.conf.palettes.erase(main.conf.palettes.begin() + colorPickerPopupData.selectedPalette);
+                    colorPickerPopupData.selectedPalette = 0;
+                }
+            });
+        }
+        if(colorPickerPopupData.addingPalette) {
+            input_text_field(gui, "paletteinputname", "Name", &colorPickerPopupData.newPaletteStr);
+            text_button(gui, "addpalettebutton", "Create", {
+                .wide = true,
+                .onClick = [&] {
+                    if(!colorPickerPopupData.newPaletteStr.empty()) {
+                        main.conf.palettes.emplace_back();
+                        main.conf.palettes.back().name = colorPickerPopupData.newPaletteStr;
+                        colorPickerPopupData.selectedPalette = main.conf.palettes.size() - 1;
+                        colorPickerPopupData.addingPalette = false;
+                    }
+                }
+            });
+        }
+        if(colorPickerPopupData.selectedPalette != 0) {
+            CLAY_AUTO_ID({
+                .layout = {
+                    .sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_FIT(0)},
+                    .childGap = gui.io.theme->childGap1,
+                    .childAlignment = { .x = CLAY_ALIGN_X_CENTER, .y = CLAY_ALIGN_Y_CENTER},
+                    .layoutDirection = CLAY_LEFT_TO_RIGHT
+                }
+            }) {
+                svg_icon_button(gui, "addcolor", "data/icons/plus.svg", {
+                    .onClick = [&, color] {
+                        std::erase(palette.colors, Vector3f{color->x(), color->y(), color->z()});
+                        palette.colors.emplace_back(color->x(), color->y(), color->z());
+                    }
+                });
+                svg_icon_button(gui, "deletecolor", "data/icons/close.svg", {
+                    .onClick = [&, color] {
+                        std::erase(palette.colors, Vector3f{color->x(), color->y(), color->z()});
+                    }
+                });
+            }
+        }
+    };
+
+    gui.element<LayoutElement>("color settings popup", [&] (LayoutElement* l, const Clay_ElementId& lId) {
+        CLAY(lId, {
+            .layout = {
+                .sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_FIT(0)},
+                .childGap = gui.io.theme->childGap1,
+                .childAlignment = { .x = CLAY_ALIGN_X_LEFT, .y = CLAY_ALIGN_Y_CENTER},
+                .layoutDirection = CLAY_LEFT_TO_RIGHT
+            },
+            .backgroundColor = convert_vec4<Clay_Color>(gui.io.theme->backColor1),
+            .cornerRadius = CLAY_CORNER_RADIUS(gui.io.theme->windowCorners1)
+        }) {
+            if(colorPickerPopupData.extraSettingsOpen) {
+                CLAY_AUTO_ID({
+                    .layout = {
+                        .sizing = {.width = CLAY_SIZING_FIT(0), .height = CLAY_SIZING_FIT(0)},
+                        .childGap = gui.io.theme->childGap1,
+                        .layoutDirection = CLAY_TOP_TO_BOTTOM
+                    },
+                }) {
+                    paletteColorPickerGrid();
+                }
+                CLAY_AUTO_ID({
+                    .layout = {
+                        .sizing = {.width = CLAY_SIZING_FIT(0), .height = CLAY_SIZING_FIT(0)},
+                        .childGap = gui.io.theme->childGap1,
+                        .layoutDirection = CLAY_TOP_TO_BOTTOM
+                    },
+                }) {
+                    paletteColorPickerExtras();
+                }
+            }
+            else
+                paletteColorPickerGrid();
         }
     });
 }
