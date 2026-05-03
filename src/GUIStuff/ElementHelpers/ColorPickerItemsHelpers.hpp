@@ -18,7 +18,14 @@ template <typename T> void color_picker_items(GUIManager& gui, const char* id, T
             if(oE) oE();
             gui.set_to_layout();
         };
-        gui.element<ColorPicker<T>>("c", val, options.hasAlpha, ColorPickerData{ .onChange = fullOnEdit, .onHold = options.onSelect, .onRelease = options.onDeselect });
+        CLAY_AUTO_ID({
+            .layout = {
+                .sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_GROW(0)}
+            },
+            .aspectRatio = {1.0f}
+        }) {
+            gui.element<ColorPicker<T>>("c", val, options.hasAlpha, ColorPickerData{ .onChange = fullOnEdit, .onHold = options.onSelect, .onRelease = options.onDeselect });
+        }
         left_to_right_line_layout(gui, [&]() {
             text_label(gui, "R");
             input_color_component_255(gui, "r", &(*val)[0], { .onEdit = fullOnEdit, .onSelect = options.onSelect, .onDeselect = options.onDeselect });

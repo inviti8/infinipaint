@@ -1196,7 +1196,7 @@ void Toolbar::color_picker_window(const char* id, Vector4f** color, GUIStuff::El
                     .sizing = {.width = CLAY_SIZING_FIT(300), .height = CLAY_SIZING_FIT(0)},
                     .padding = CLAY_PADDING_ALL(gui.io.theme->padding1),
                     .childGap = gui.io.theme->childGap1,
-                    .childAlignment = { .x = CLAY_ALIGN_X_CENTER, .y = CLAY_ALIGN_Y_TOP},
+                    .childAlignment = { .x = CLAY_ALIGN_X_LEFT, .y = CLAY_ALIGN_Y_TOP},
                     .layoutDirection = CLAY_TOP_TO_BOTTOM
                 },
                 .backgroundColor = convert_vec4<Clay_Color>(gui.io.theme->backColor1),

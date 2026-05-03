@@ -108,24 +108,29 @@ void PhoneDrawingProgramScreen::bottom_toolbar() {
                         .layoutDirection = CLAY_LEFT_TO_RIGHT
                     }
                 }) {
-                    CLAY_AUTO_ID({
-                        .layout = {
-                            .sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_FIT(0) },
-                        }
-                    }) {}
                     switch(settingsMenuPopup) {
                         case SettingsMenuPopup::NONE:
                             reset_color_picker_popup_data();
                             break;
                         case SettingsMenuPopup::SETTINGS:
+                            CLAY_AUTO_ID({
+                                .layout = {
+                                    .sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_FIT(0) },
+                                }
+                            }) {}
                             reset_color_picker_popup_data();
                             tool_settings_popup();
                             break;
                         case SettingsMenuPopup::FG_COLOR:
-                            color_settings_popup(&main.toolConfig.globalConf.foregroundColor);
-                            break;
                         case SettingsMenuPopup::BG_COLOR:
-                            color_settings_popup(&main.toolConfig.globalConf.backgroundColor);
+                            if(!colorPickerPopupData.extraSettingsOpen) {
+                                CLAY_AUTO_ID({
+                                    .layout = {
+                                        .sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_FIT(0) },
+                                    }
+                                }) {}
+                            }
+                            color_settings_popup(settingsMenuPopup == SettingsMenuPopup::FG_COLOR ? &main.toolConfig.globalConf.foregroundColor : &main.toolConfig.globalConf.backgroundColor);
                             break;
                     }
                 }
@@ -249,12 +254,13 @@ void PhoneDrawingProgramScreen::color_settings_popup(Vector4f* color) {
     auto& gui = main.g.gui;
     auto& palette = main.conf.palettes[colorPickerPopupData.selectedPalette];
 
+    bool extraColorButtons = colorPickerPopupData.extraSettingsOpen && colorPickerPopupData.selectedPalette != 0;
     auto paletteColorPickerGrid = [&] {
         gui.element<GridScrollArea>("color selector grid", GridScrollArea::Options{
             .entryWidth = BIG_BUTTON_SIZE,
             .childAlignmentX = CLAY_ALIGN_X_CENTER,
             .entryHeight = BIG_BUTTON_SIZE,
-            .entryCount = palette.colors.size() + 1,
+            .entryCount = palette.colors.size() + (extraColorButtons ? 3 : 1),
             .scrollbar = ScrollArea::ScrollbarType::NORMAL,
             .elementContent = [&](size_t i) {
                 if(i < palette.colors.size()) {
@@ -271,13 +277,43 @@ void PhoneDrawingProgramScreen::color_settings_popup(Vector4f* color) {
                     });
                 }
                 else {
-                    svg_icon_button(gui, "extra color settings", "data/icons/RemixIcon/more-fill.svg", {
-                        .drawType = SelectableButton::DrawType::TRANSPARENT_ALL,
-                        .isSelected = colorPickerPopupData.extraSettingsOpen,
-                        .onClick = [&] {
-                            colorPickerPopupData.extraSettingsOpen = !colorPickerPopupData.extraSettingsOpen;
+                    if(extraColorButtons) {
+                        switch(i - palette.colors.size()) {
+                            case 0:
+                                svg_icon_button(gui, "addcolor", "data/icons/plus.svg", {
+                                    .onClick = [&, color] {
+                                        std::erase(palette.colors, Vector3f{color->x(), color->y(), color->z()});
+                                        palette.colors.emplace_back(color->x(), color->y(), color->z());
+                                    }
+                                });
+                                break;
+                            case 1:
+                                svg_icon_button(gui, "deletecolor", "data/icons/close.svg", {
+                                    .onClick = [&, color] {
+                                        std::erase(palette.colors, Vector3f{color->x(), color->y(), color->z()});
+                                    }
+                                });
+                                break;
+                            case 2:
+                                svg_icon_button(gui, "extra color settings", "data/icons/RemixIcon/more-fill.svg", {
+                                    .drawType = SelectableButton::DrawType::TRANSPARENT_ALL,
+                                    .isSelected = colorPickerPopupData.extraSettingsOpen,
+                                    .onClick = [&] {
+                                        colorPickerPopupData.extraSettingsOpen = !colorPickerPopupData.extraSettingsOpen;
+                                    }
+                                });
+                                break;
                         }
-                    });
+                    }
+                    else {
+                        svg_icon_button(gui, "extra color settings", "data/icons/RemixIcon/more-fill.svg", {
+                            .drawType = SelectableButton::DrawType::TRANSPARENT_ALL,
+                            .isSelected = colorPickerPopupData.extraSettingsOpen,
+                            .onClick = [&] {
+                                colorPickerPopupData.extraSettingsOpen = !colorPickerPopupData.extraSettingsOpen;
+                            }
+                        });
+                    }
                 }
             }
         });
@@ -286,10 +322,11 @@ void PhoneDrawingProgramScreen::color_settings_popup(Vector4f* color) {
     auto paletteColorPickerExtras = [&] {
         CLAY_AUTO_ID({
             .layout = {
-                .sizing = {.width = CLAY_SIZING_FIT(200), .height = CLAY_SIZING_FIT(200)},
+                .sizing = {.width = CLAY_SIZING_FIT(200), .height = CLAY_SIZING_GROW(0)},
                 .childAlignment = { .x = CLAY_ALIGN_X_CENTER, .y = CLAY_ALIGN_Y_CENTER},
                 .layoutDirection = CLAY_LEFT_TO_RIGHT
-            }
+            },
+            .aspectRatio = {1.0f}
         }) {
             gui.element<ColorPicker<Vector4f>>("color picker element", color, true);
         }
@@ -331,28 +368,6 @@ void PhoneDrawingProgramScreen::color_settings_popup(Vector4f* color) {
                 }
             });
         }
-        if(colorPickerPopupData.selectedPalette != 0) {
-            CLAY_AUTO_ID({
-                .layout = {
-                    .sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_FIT(0)},
-                    .childGap = gui.io.theme->childGap1,
-                    .childAlignment = { .x = CLAY_ALIGN_X_CENTER, .y = CLAY_ALIGN_Y_CENTER},
-                    .layoutDirection = CLAY_LEFT_TO_RIGHT
-                }
-            }) {
-                svg_icon_button(gui, "addcolor", "data/icons/plus.svg", {
-                    .onClick = [&, color] {
-                        std::erase(palette.colors, Vector3f{color->x(), color->y(), color->z()});
-                        palette.colors.emplace_back(color->x(), color->y(), color->z());
-                    }
-                });
-                svg_icon_button(gui, "deletecolor", "data/icons/close.svg", {
-                    .onClick = [&, color] {
-                        std::erase(palette.colors, Vector3f{color->x(), color->y(), color->z()});
-                    }
-                });
-            }
-        }
     };
 
     gui.element<LayoutElement>("color settings popup", [&] (LayoutElement* l, const Clay_ElementId& lId) {
@@ -369,7 +384,7 @@ void PhoneDrawingProgramScreen::color_settings_popup(Vector4f* color) {
             if(colorPickerPopupData.extraSettingsOpen) {
                 CLAY_AUTO_ID({
                     .layout = {
-                        .sizing = {.width = CLAY_SIZING_FIT(0), .height = CLAY_SIZING_FIT(0)},
+                        .sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_GROW(0)},
                         .childGap = gui.io.theme->childGap1,
                         .layoutDirection = CLAY_TOP_TO_BOTTOM
                     },

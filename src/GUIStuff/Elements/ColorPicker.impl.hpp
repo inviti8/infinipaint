@@ -49,7 +49,7 @@ template <typename T> void ColorPicker<T>::layout(const Clay_ElementId& id, T* d
                 });
                 CLAY_AUTO_ID({
                     .layout = {
-                        .sizing = {.width = CLAY_SIZING_FIT(BAR_WIDTH), .height = CLAY_SIZING_GROW(0)}
+                        .sizing = {.width = CLAY_SIZING_GROW(0, BAR_WIDTH), .height = CLAY_SIZING_GROW(0)}
                     },
                 }) {
                     gui.element<HueVerticalSlider>("hue slider", HueVerticalSliderData{
@@ -62,7 +62,7 @@ template <typename T> void ColorPicker<T>::layout(const Clay_ElementId& id, T* d
             }
             CLAY_AUTO_ID({
                 .layout = {
-                    .sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_FIT(BAR_WIDTH)}
+                    .sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_GROW(0, BAR_WIDTH)}
                 },
             }) {
                 gui.element<AlphaSlider>("alpha slider", AlphaSliderData{
