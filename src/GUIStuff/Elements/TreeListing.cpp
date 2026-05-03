@@ -122,7 +122,8 @@ void TreeListing::layout(const Clay_ElementId& id, const Data& newDisplayData) {
                             }
                         }, LayoutElement::Callbacks {
                             .onClick = [&, i] (LayoutElement* l, const InputManager::MouseButtonCallbackArgs& button) {
-                                if(l->mouseHovering && button.button == InputManager::MouseButton::LEFT && button.down) {
+                                bool hovering = l->mouseHovering || (l->childMouseHovering && button.deviceType == InputManager::MouseDeviceType::TOUCH);
+                                if(hovering && button.button == InputManager::MouseButton::LEFT && button.down) {
                                     gui.set_post_callback_func([&, i, button, l]{
                                         auto& objIndex = flattenedIndexList[i].objIndex;
                                         if(d.selectedIndices) {
@@ -149,7 +150,7 @@ void TreeListing::layout(const Clay_ElementId& id, const Data& newDisplayData) {
                                                     d.selectedIndices->emplace(objIndex);
                                                     if(d.onSelectChange) d.onSelectChange();
                                                 }
-                                                isDragging = true;
+                                                isDragging = button.deviceType != InputManager::MouseDeviceType::TOUCH || l->childMouseHovering;
                                                 dragIndexStart = dragIndexEnd = i;
                                                 dragFromTop = button.pos.y() - l->get_bb().value().min.y() < ENTRY_HEIGHT * 0.5f;
                                             }
@@ -161,7 +162,7 @@ void TreeListing::layout(const Clay_ElementId& id, const Data& newDisplayData) {
                                 }
                             },
                             .onMotion = [&, i] (LayoutElement* l, const InputManager::MouseMotionCallbackArgs& motion) {
-                                if(isDragging && l->mouseHovering) {
+                                if(isDragging && (l->mouseHovering || l->childMouseHovering)) {
                                     size_t newDragIndexEnd = i;
                                     bool newDragFromTop = motion.pos.y() - l->get_bb().value().min.y() < ENTRY_HEIGHT * 0.5f;
                                     if(dragIndexEnd != newDragIndexEnd || dragFromTop != newDragFromTop) {

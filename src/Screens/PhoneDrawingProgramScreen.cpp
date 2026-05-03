@@ -257,6 +257,21 @@ void PhoneDrawingProgramScreen::color_settings_popup(Vector4f* color) {
 
     bool extraSettingsOpen = colorPickerPopupData.screenType == ColorPickerPopupData::ScreenType::EXTRA;
     bool extraColorButtons = extraSettingsOpen && colorPickerPopupData.selectedPalette != 0;
+
+    auto paletteColorPickerGridColorButton = [&](size_t i){
+        auto newC = std::make_shared<Vector3f>(palette.colors[i].x(), palette.colors[i].y(), palette.colors[i].z());
+        color_button(gui, "c", newC.get(), {
+            .isSelected = newC->x() == color->x() && newC->y() == color->y() && newC->z() == color->z(),
+            .hasAlpha = false,
+            .onClick = [newC, color] {
+                // We want to keep the old color's alpha
+                color->x() = newC->x();
+                color->y() = newC->y();
+                color->z() = newC->z();
+            }
+        });
+    };
+
     auto paletteColorPickerGrid = [&] {
         gui.element<GridScrollArea>("color selector grid", GridScrollArea::Options{
             .entryWidth = BIG_BUTTON_SIZE,
@@ -265,24 +280,34 @@ void PhoneDrawingProgramScreen::color_settings_popup(Vector4f* color) {
             .entryCount = palette.colors.size() + (extraColorButtons ? 3 : 1),
             .scrollbar = ScrollArea::ScrollbarType::NORMAL,
             .elementContent = [&](size_t i) {
-                if(i < palette.colors.size()) {
-                    auto newC = std::make_shared<Vector3f>(palette.colors[i].x(), palette.colors[i].y(), palette.colors[i].z());
-                    color_button(gui, "c", newC.get(), {
-                        .isSelected = newC->x() == color->x() && newC->y() == color->y() && newC->z() == color->z(),
-                        .hasAlpha = false,
-                        .onClick = [newC, color] {
-                            // We want to keep the old color's alpha
-                            color->x() = newC->x();
-                            color->y() = newC->y();
-                            color->z() = newC->z();
-                        }
-                    });
+                if(colorPickerPopupData.screenType == ColorPickerPopupData::ScreenType::NORMAL) {
+                    if(i < palette.colors.size())
+                        paletteColorPickerGridColorButton(i);
+                    else {
+                        svg_icon_button(gui, "extra color settings", "data/icons/RemixIcon/more-fill.svg", {
+                            .drawType = SelectableButton::DrawType::TRANSPARENT_ALL,
+                            .onClick = [&] {
+                                colorPickerPopupData.screenType = ColorPickerPopupData::ScreenType::EXTRA;
+                            }
+                        });
+                    }
                 }
                 else {
-                    if(extraColorButtons) {
-                        switch(i - palette.colors.size()) {
+                    if(i == 0) {
+                        svg_icon_button(gui, "extra color settings", "data/icons/RemixIcon/arrow-left-s-line.svg", {
+                            .drawType = SelectableButton::DrawType::TRANSPARENT_ALL,
+                            .onClick = [&] {
+                                colorPickerPopupData.screenType = ColorPickerPopupData::ScreenType::NORMAL;
+                            }
+                        });
+                    }
+                    else if((i - 1) < palette.colors.size())
+                        paletteColorPickerGridColorButton(i - 1);
+                    else if(extraColorButtons) {
+                        switch(i - palette.colors.size() - 1) {
                             case 0:
                                 svg_icon_button(gui, "addcolor", "data/icons/plus.svg", {
+                                    .drawType = SelectableButton::DrawType::TRANSPARENT_ALL,
                                     .onClick = [&, color] {
                                         std::erase(palette.colors, Vector3f{color->x(), color->y(), color->z()});
                                         palette.colors.emplace_back(color->x(), color->y(), color->z());
@@ -291,36 +316,13 @@ void PhoneDrawingProgramScreen::color_settings_popup(Vector4f* color) {
                                 break;
                             case 1:
                                 svg_icon_button(gui, "deletecolor", "data/icons/close.svg", {
+                                    .drawType = SelectableButton::DrawType::TRANSPARENT_ALL,
                                     .onClick = [&, color] {
                                         std::erase(palette.colors, Vector3f{color->x(), color->y(), color->z()});
                                     }
                                 });
                                 break;
-                            case 2:
-                                svg_icon_button(gui, "extra color settings", "data/icons/RemixIcon/more-fill.svg", {
-                                    .drawType = SelectableButton::DrawType::TRANSPARENT_ALL,
-                                    .isSelected = extraSettingsOpen,
-                                    .onClick = [&] {
-                                        if(colorPickerPopupData.screenType == ColorPickerPopupData::ScreenType::NORMAL)
-                                            colorPickerPopupData.screenType = ColorPickerPopupData::ScreenType::EXTRA;
-                                        else
-                                            colorPickerPopupData.screenType = ColorPickerPopupData::ScreenType::NORMAL;
-                                    }
-                                });
-                                break;
                         }
-                    }
-                    else {
-                        svg_icon_button(gui, "extra color settings", "data/icons/RemixIcon/more-fill.svg", {
-                            .drawType = SelectableButton::DrawType::TRANSPARENT_ALL,
-                            .isSelected = extraSettingsOpen,
-                            .onClick = [&] {
-                                if(colorPickerPopupData.screenType == ColorPickerPopupData::ScreenType::NORMAL)
-                                    colorPickerPopupData.screenType = ColorPickerPopupData::ScreenType::EXTRA;
-                                else
-                                    colorPickerPopupData.screenType = ColorPickerPopupData::ScreenType::NORMAL;
-                            }
-                        });
                     }
                 }
             }
@@ -336,7 +338,11 @@ void PhoneDrawingProgramScreen::color_settings_popup(Vector4f* color) {
             },
             .aspectRatio = {1.0f}
         }) {
-            gui.element<ColorPicker<Vector4f>>("color picker element", color, true);
+            gui.element<ColorPicker<Vector4f>>("color picker element", color, true, ColorPickerData{
+                .onChange = [&] {
+                    gui.set_to_layout();
+                }
+            });
         }
         CLAY_AUTO_ID({
             .layout = {
@@ -350,7 +356,7 @@ void PhoneDrawingProgramScreen::color_settings_popup(Vector4f* color) {
             for(auto& p : main.conf.palettes)
                 paletteNames.emplace_back(p.name);
             gui.element<DropDown<size_t>>("paletteselector", &colorPickerPopupData.selectedPalette, paletteNames);
-            svg_icon_button(gui, "paletteadd", "data/icons/RemixIcon/more-fill.svg", {
+            svg_icon_button(gui, "paletteadd", "data/icons/pencil.svg", {
                 .onClick = [&] {
                     reset_color_picker_popup_data();
                     colorPickerPopupData.screenType = ColorPickerPopupData::ScreenType::PALETTES;
@@ -405,6 +411,15 @@ void PhoneDrawingProgramScreen::color_settings_popup(Vector4f* color) {
                         }
                     }) {
                         text_label(gui, main.conf.palettes[objIndex.back()].name);
+                    }
+                    if(gui.io.isTouchDevice) {
+                        gui.set_z_index_keep_clipping_region(gui.get_z_index() + 1, [&] {
+                            CLAY_AUTO_ID({
+                                .layout = {.sizing = {.width = CLAY_SIZING_FIXED(TreeListing::ENTRY_HEIGHT), .height = CLAY_SIZING_FIXED(TreeListing::ENTRY_HEIGHT)}}
+                            }) {
+                                gui.element<SVGIcon>("touch screen holder", "data/icons/menu.svg");
+                            }
+                        });
                     }
                     gui.set_z_index_keep_clipping_region(gui.get_z_index() + 1, [&] {
                         svg_icon_button(gui, "edit button", "data/icons/pencil.svg", {

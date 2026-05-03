@@ -65,14 +65,14 @@ template <typename T> class DropDown : public Element {
                         gui.element<LayoutElement>("DROPDOWN", [&](LayoutElement* l, const Clay_ElementId& lId) {
                             float dropdownHeight = ENTRY_HEIGHT * selections.size() + DROPDOWN_OFFSET;
                             Clay_FloatingElementConfig floatConfig;
-                            float maxHeight = gui.io.windowSize.y();
-                            if(buttonBB.max.y() + dropdownHeight > gui.io.windowSize.y()) {
-                                float rightSideWidth = gui.io.windowSize.x() - buttonBB.max.x();
-                                float leftSideWidth = buttonBB.min.x();
+                            float maxHeight = gui.io.safeWindowRect.height();
+                            if(buttonBB.max.y() + dropdownHeight > gui.io.safeWindowRect.max.y()) {
+                                float rightSideWidth = gui.io.safeWindowRect.max.x() - buttonBB.max.x();
+                                float leftSideWidth = buttonBB.min.x() - gui.io.safeWindowRect.min.x();
                                 if(rightSideWidth > buttonBB.width() || leftSideWidth > buttonBB.width())
                                     vertical_offset_setup(dropdownHeight, floatConfig, maxHeight, rightSideWidth >= leftSideWidth);
                                 else {
-                                    if(gui.io.windowSize.y() - buttonBB.max.y() >= buttonBB.min.y())
+                                    if(gui.io.safeWindowRect.max.y() - buttonBB.max.y() >= buttonBB.min.y() - gui.io.safeWindowRect.min.y())
                                         bottom_offset_setup(dropdownHeight, floatConfig, maxHeight);
                                     else
                                         top_offset_setup(dropdownHeight, floatConfig, maxHeight);
@@ -132,7 +132,7 @@ template <typename T> class DropDown : public Element {
                 .attachTo = CLAY_ATTACH_TO_PARENT
             };
             // This function might be used even when boundingBox isnt determined yet
-            maxHeight = boundingBox.has_value() ? std::max(gui.io.windowSize.y() - boundingBox.value().max.y() - DROPDOWN_OFFSET, 0.0f) : 0.0f;
+            maxHeight = boundingBox.has_value() ? std::max(gui.io.safeWindowRect.max.y() - boundingBox.value().max.y() - DROPDOWN_OFFSET, 0.0f) : 0.0f;
         }
 
         void top_offset_setup(float dropdownHeight, Clay_FloatingElementConfig& floatConfig, float& maxHeight) {
@@ -147,16 +147,16 @@ template <typename T> class DropDown : public Element {
                 },
                 .attachTo = CLAY_ATTACH_TO_PARENT
             };
-            maxHeight = std::max(boundingBox.value().min.y() - DROPDOWN_OFFSET, 0.0f);
+            maxHeight = std::max(boundingBox.value().min.y() - gui.io.safeWindowRect.min.y() - DROPDOWN_OFFSET, 0.0f);
         }
 
         void vertical_offset_setup(float dropdownHeight, Clay_FloatingElementConfig& floatConfig, float& maxHeight, bool isRightSide) {
             auto& bb = boundingBox.value();
             float offsetY = bb.center().y() - dropdownHeight * 0.5f;
-            if(dropdownHeight >= gui.io.windowSize.y() || offsetY < 0.0f)
-                offsetY = 0.0f;
-            else if(offsetY + dropdownHeight > gui.io.windowSize.y())
-                offsetY -= (offsetY + dropdownHeight) - gui.io.windowSize.y();
+            if(dropdownHeight >= gui.io.safeWindowRect.height() || offsetY < gui.io.safeWindowRect.min.y())
+                offsetY = gui.io.safeWindowRect.min.y();
+            else if(offsetY + dropdownHeight > gui.io.safeWindowRect.max.y())
+                offsetY -= (offsetY + dropdownHeight) - gui.io.safeWindowRect.max.y();
             floatConfig = {
                 .offset = {
                     .x = isRightSide ? bb.max.x() + DROPDOWN_OFFSET : bb.min.x() - bb.width() - DROPDOWN_OFFSET,
@@ -169,7 +169,7 @@ template <typename T> class DropDown : public Element {
                 },
                 .attachTo = CLAY_ATTACH_TO_ROOT
             };
-            maxHeight = gui.io.windowSize.y();
+            maxHeight = gui.io.safeWindowRect.height();
         }
 
         void text_transparent_option_button(const char* id, const char* text, const std::function<void()>& onClick) {
