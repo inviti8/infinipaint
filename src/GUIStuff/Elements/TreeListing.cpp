@@ -2,7 +2,7 @@
 #include "Helpers/ConvertVec.hpp"
 #include "ManyElementScrollArea.hpp"
 #include "../GUIManager.hpp"
-
+#include "SVGIcon.hpp"
 #include "../ElementHelpers/ButtonHelpers.hpp"
 #include "LayoutElement.hpp"
 
@@ -58,6 +58,7 @@ void TreeListing::layout(const Clay_ElementId& id, const Data& newDisplayData) {
                     .entryCount = flattenedIndexList.size(),
                     .elementContent = [&](size_t i) {
                         const ObjInfo& objInfo = flattenedIndexList[i];
+                        std::shared_ptr<Element*> touchMoveHolder = std::make_shared<Element*>(nullptr);
                         gui.element<LayoutElement>("elem", [&](LayoutElement*, const Clay_ElementId& lId) {
                             SkColor4f backgroundColor;
                             if(d.selectedIndices && d.selectedIndices->contains(flattenedIndexList[i].objIndex))
@@ -72,6 +73,21 @@ void TreeListing::layout(const Clay_ElementId& id, const Data& newDisplayData) {
                                 },
                                 .backgroundColor = convert_vec4<Clay_Color>(backgroundColor)
                             }) {
+                                if(gui.io.isTouchDevice) {
+                                    gui.set_z_index_keep_clipping_region(gui.get_z_index() + 1, [&] {
+                                        *touchMoveHolder = gui.element<LayoutElement>("touch move holder layout", [&] (LayoutElement*, const Clay_ElementId& lIdTouch) {
+                                            CLAY(lIdTouch, {
+                                                .layout = {
+                                                    .sizing = {.width = CLAY_SIZING_FIXED(TreeListing::ENTRY_HEIGHT), .height = CLAY_SIZING_FIXED(TreeListing::ENTRY_HEIGHT)},
+                                                    .padding = CLAY_PADDING_ALL(2)
+                                                }
+                                            }) {
+                                                gui.element<SVGIcon>("touch move holder", "data/icons/menu.svg");
+                                            }
+                                        });
+                                    });
+                                }
+
                                 if(objInfo.objIndex.size() > 1) {
                                     CLAY_AUTO_ID({
                                         .layout = {.sizing = {.width = CLAY_SIZING_FIXED((objInfo.objIndex.size() - 1) * ICON_SIZE), .height = CLAY_SIZING_GROW(0)}}
@@ -121,8 +137,8 @@ void TreeListing::layout(const Clay_ElementId& id, const Data& newDisplayData) {
                                 }
                             }
                         }, LayoutElement::Callbacks {
-                            .onClick = [&, i] (LayoutElement* l, const InputManager::MouseButtonCallbackArgs& button) {
-                                bool hovering = l->mouseHovering || (l->childMouseHovering && button.deviceType == InputManager::MouseDeviceType::TOUCH);
+                            .onClick = [&, i, touchMoveHolder] (LayoutElement* l, const InputManager::MouseButtonCallbackArgs& button) {
+                                bool hovering = l->mouseHovering || (*touchMoveHolder && (*touchMoveHolder)->mouseHovering);
                                 if(hovering && button.button == InputManager::MouseButton::LEFT && button.down) {
                                     gui.set_post_callback_func([&, i, button, l]{
                                         auto& objIndex = flattenedIndexList[i].objIndex;
@@ -150,7 +166,7 @@ void TreeListing::layout(const Clay_ElementId& id, const Data& newDisplayData) {
                                                     d.selectedIndices->emplace(objIndex);
                                                     if(d.onSelectChange) d.onSelectChange();
                                                 }
-                                                isDragging = button.deviceType != InputManager::MouseDeviceType::TOUCH || l->childMouseHovering;
+                                                isDragging = *touchMoveHolder ? (*touchMoveHolder)->mouseHovering : true;
                                                 dragIndexStart = dragIndexEnd = i;
                                                 dragFromTop = button.pos.y() - l->get_bb().value().min.y() < ENTRY_HEIGHT * 0.5f;
                                             }

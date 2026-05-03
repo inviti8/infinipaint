@@ -412,15 +412,6 @@ void PhoneDrawingProgramScreen::color_settings_popup(Vector4f* color) {
                     }) {
                         text_label(gui, main.conf.palettes[objIndex.back()].name);
                     }
-                    if(gui.io.isTouchDevice) {
-                        gui.set_z_index_keep_clipping_region(gui.get_z_index() + 1, [&] {
-                            CLAY_AUTO_ID({
-                                .layout = {.sizing = {.width = CLAY_SIZING_FIXED(TreeListing::ENTRY_HEIGHT), .height = CLAY_SIZING_FIXED(TreeListing::ENTRY_HEIGHT)}}
-                            }) {
-                                gui.element<SVGIcon>("touch screen holder", "data/icons/menu.svg");
-                            }
-                        });
-                    }
                     gui.set_z_index_keep_clipping_region(gui.get_z_index() + 1, [&] {
                         svg_icon_button(gui, "edit button", "data/icons/pencil.svg", {
                             .drawType = SelectableButton::DrawType::TRANSPARENT_ALL,
