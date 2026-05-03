@@ -5,6 +5,7 @@
 #include "../GUIStuff/Elements/GridScrollArea.hpp"
 #include "../GUIStuff/Elements/DropDown.hpp"
 #include "../GUIStuff/Elements/ColorPicker.hpp"
+#include "../GUIStuff/Elements/TreeListing.hpp"
 #include "../GUIStuff/ElementHelpers/ButtonHelpers.hpp"
 #include "../GUIStuff/ElementHelpers/LayoutHelpers.hpp"
 #include "../GUIStuff/ElementHelpers/TextLabelHelpers.hpp"
@@ -123,7 +124,7 @@ void PhoneDrawingProgramScreen::bottom_toolbar() {
                             break;
                         case SettingsMenuPopup::FG_COLOR:
                         case SettingsMenuPopup::BG_COLOR:
-                            if(!colorPickerPopupData.extraSettingsOpen) {
+                            if(colorPickerPopupData.screenType == ColorPickerPopupData::ScreenType::NORMAL) {
                                 CLAY_AUTO_ID({
                                     .layout = {
                                         .sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_FIT(0) },
@@ -245,16 +246,17 @@ void PhoneDrawingProgramScreen::tool_settings_popup() {
 }
 
 void PhoneDrawingProgramScreen::reset_color_picker_popup_data() {
-    colorPickerPopupData.extraSettingsOpen = false;
-    colorPickerPopupData.addingPalette = false;
+    colorPickerPopupData.screenType = ColorPickerPopupData::ScreenType::NORMAL;
     colorPickerPopupData.newPaletteStr.clear();
+    colorPickerPopupData.paletteListSelection.clear();
 }
 
 void PhoneDrawingProgramScreen::color_settings_popup(Vector4f* color) {
     auto& gui = main.g.gui;
     auto& palette = main.conf.palettes[colorPickerPopupData.selectedPalette];
 
-    bool extraColorButtons = colorPickerPopupData.extraSettingsOpen && colorPickerPopupData.selectedPalette != 0;
+    bool extraSettingsOpen = colorPickerPopupData.screenType == ColorPickerPopupData::ScreenType::EXTRA;
+    bool extraColorButtons = extraSettingsOpen && colorPickerPopupData.selectedPalette != 0;
     auto paletteColorPickerGrid = [&] {
         gui.element<GridScrollArea>("color selector grid", GridScrollArea::Options{
             .entryWidth = BIG_BUTTON_SIZE,
@@ -297,9 +299,12 @@ void PhoneDrawingProgramScreen::color_settings_popup(Vector4f* color) {
                             case 2:
                                 svg_icon_button(gui, "extra color settings", "data/icons/RemixIcon/more-fill.svg", {
                                     .drawType = SelectableButton::DrawType::TRANSPARENT_ALL,
-                                    .isSelected = colorPickerPopupData.extraSettingsOpen,
+                                    .isSelected = extraSettingsOpen,
                                     .onClick = [&] {
-                                        colorPickerPopupData.extraSettingsOpen = !colorPickerPopupData.extraSettingsOpen;
+                                        if(colorPickerPopupData.screenType == ColorPickerPopupData::ScreenType::NORMAL)
+                                            colorPickerPopupData.screenType = ColorPickerPopupData::ScreenType::EXTRA;
+                                        else
+                                            colorPickerPopupData.screenType = ColorPickerPopupData::ScreenType::NORMAL;
                                     }
                                 });
                                 break;
@@ -308,9 +313,12 @@ void PhoneDrawingProgramScreen::color_settings_popup(Vector4f* color) {
                     else {
                         svg_icon_button(gui, "extra color settings", "data/icons/RemixIcon/more-fill.svg", {
                             .drawType = SelectableButton::DrawType::TRANSPARENT_ALL,
-                            .isSelected = colorPickerPopupData.extraSettingsOpen,
+                            .isSelected = extraSettingsOpen,
                             .onClick = [&] {
-                                colorPickerPopupData.extraSettingsOpen = !colorPickerPopupData.extraSettingsOpen;
+                                if(colorPickerPopupData.screenType == ColorPickerPopupData::ScreenType::NORMAL)
+                                    colorPickerPopupData.screenType = ColorPickerPopupData::ScreenType::EXTRA;
+                                else
+                                    colorPickerPopupData.screenType = ColorPickerPopupData::ScreenType::NORMAL;
                             }
                         });
                     }
@@ -342,31 +350,129 @@ void PhoneDrawingProgramScreen::color_settings_popup(Vector4f* color) {
             for(auto& p : main.conf.palettes)
                 paletteNames.emplace_back(p.name);
             gui.element<DropDown<size_t>>("paletteselector", &colorPickerPopupData.selectedPalette, paletteNames);
-            svg_icon_button(gui, "paletteadd", "data/icons/plus.svg", {
+            svg_icon_button(gui, "paletteadd", "data/icons/RemixIcon/more-fill.svg", {
                 .onClick = [&] {
-                    colorPickerPopupData.addingPalette = !colorPickerPopupData.addingPalette;
-                }
-            });
-            svg_icon_button(gui, "paletteremove", "data/icons/close.svg", {
-                .onClick = [&] {
-                    main.conf.palettes.erase(main.conf.palettes.begin() + colorPickerPopupData.selectedPalette);
-                    colorPickerPopupData.selectedPalette = 0;
+                    reset_color_picker_popup_data();
+                    colorPickerPopupData.screenType = ColorPickerPopupData::ScreenType::PALETTES;
                 }
             });
         }
-        if(colorPickerPopupData.addingPalette) {
-            input_text_field(gui, "paletteinputname", "Name", &colorPickerPopupData.newPaletteStr);
-            text_button(gui, "addpalettebutton", "Create", {
-                .wide = true,
-                .onClick = [&] {
+    };
+
+    auto paletteGUI = [&] {
+        CLAY_AUTO_ID({
+            .layout = {
+                .sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_GROW(0)},
+                .childGap = gui.io.theme->childGap1,
+                .childAlignment = {.x = CLAY_ALIGN_X_CENTER, .y = CLAY_ALIGN_Y_TOP},
+                .layoutDirection = CLAY_TOP_TO_BOTTOM
+            }
+        }) {
+            CLAY_AUTO_ID({
+                .layout = {
+                    .sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_GROW(0)},
+                    .childGap = gui.io.theme->childGap1,
+                    .childAlignment = {.x = CLAY_ALIGN_X_LEFT, .y = CLAY_ALIGN_Y_CENTER},
+                    .layoutDirection = CLAY_LEFT_TO_RIGHT
+                }
+            }) {
+                svg_icon_button(gui, "palette back", "data/icons/RemixIcon/arrow-left-s-line.svg", {
+                    .drawType = SelectableButton::DrawType::TRANSPARENT_ALL,
+                    .onClick = [&] {
+                        colorPickerPopupData.screenType = ColorPickerPopupData::ScreenType::EXTRA;
+                    }
+                });
+                text_label(gui, "Palettes");
+            }
+
+            gui.element<TreeListing>("palette list", TreeListing::Data{
+                .selectedIndices = &colorPickerPopupData.paletteListSelection,
+                .dirInfo = [&](const TreeListingObjIndexList& objIndex) {
+                    std::optional<TreeListing::DirectoryInfo> d;
+                    if(objIndex.empty()) {
+                        d = TreeListing::DirectoryInfo();
+                        d.value().isOpen = true;
+                        d.value().dirSize = main.conf.palettes.size();
+                    }
+                    return d;
+                },
+                .drawNonDirectoryObjIconGUI = [&](const TreeListingObjIndexList& objIndex) {},
+                .drawObjGUI = [&](const TreeListingObjIndexList& objIndex) {
+                    CLAY_AUTO_ID({
+                        .layout = {
+                            .sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_GROW(0)},
+                            .childAlignment = {.x = CLAY_ALIGN_X_LEFT, .y = CLAY_ALIGN_Y_CENTER}
+                        }
+                    }) {
+                        text_label(gui, main.conf.palettes[objIndex.back()].name);
+                    }
+                    gui.set_z_index_keep_clipping_region(gui.get_z_index() + 1, [&] {
+                        svg_icon_button(gui, "edit button", "data/icons/pencil.svg", {
+                            .drawType = SelectableButton::DrawType::TRANSPARENT_ALL,
+                            .size = TreeListing::ENTRY_HEIGHT,
+                            .onClick = [&, objIndex] {
+                                colorPickerPopupData.screenType = ColorPickerPopupData::ScreenType::EXTRA;
+                                colorPickerPopupData.selectedPalette = objIndex.back();
+                            }
+                        });
+                    });
+                    if(objIndex.back() != 0) {
+                        gui.set_z_index_keep_clipping_region(gui.get_z_index() + 1, [&] {
+                            svg_icon_button(gui, "delete button", "data/icons/trash.svg", {
+                                .drawType = SelectableButton::DrawType::TRANSPARENT_ALL,
+                                .size = TreeListing::ENTRY_HEIGHT,
+                                .onClick = [&, objIndex] {
+                                    colorPickerPopupData.selectedPalette = 0;
+                                    main.conf.palettes.erase(main.conf.palettes.begin() + objIndex.back());
+                                }
+                            });
+                        });
+                    }
+                },
+                .onDoubleClick = [&](const TreeListingObjIndexList& objIndex) {
+                    colorPickerPopupData.screenType = ColorPickerPopupData::ScreenType::EXTRA;
+                    colorPickerPopupData.selectedPalette = objIndex.back();
+                },
+                .moveObj = [&](const std::vector<TreeListingObjIndexList>& objIndices, const TreeListingObjIndexList& newObjIndex) {
+                    if(newObjIndex.back() == 0)
+                        return;
+                    std::deque<GlobalConfig::Palette> movedPalettes;
+                    size_t moveIndex = newObjIndex.back();
+                    for(auto& p : objIndices | std::views::reverse) {
+                        if(p.back() != 0) {
+                            if(moveIndex > p.back())
+                                moveIndex--;
+                            movedPalettes.emplace_front(main.conf.palettes[p.back()]);
+                            main.conf.palettes.erase(main.conf.palettes.begin() + p.back());
+                        }
+                    }
+                    main.conf.palettes.insert(main.conf.palettes.begin() + moveIndex, movedPalettes.begin(), movedPalettes.end());
+                }
+            });
+            CLAY_AUTO_ID({
+                .layout = {
+                    .sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_GROW(0)},
+                    .childGap = gui.io.theme->childGap1,
+                    .childAlignment = {.x = CLAY_ALIGN_X_LEFT, .y = CLAY_ALIGN_Y_CENTER},
+                    .layoutDirection = CLAY_LEFT_TO_RIGHT
+                }
+            }) {
+                auto addPaletteFunc = [&] {
                     if(!colorPickerPopupData.newPaletteStr.empty()) {
                         main.conf.palettes.emplace_back();
                         main.conf.palettes.back().name = colorPickerPopupData.newPaletteStr;
                         colorPickerPopupData.selectedPalette = main.conf.palettes.size() - 1;
-                        colorPickerPopupData.addingPalette = false;
+                        colorPickerPopupData.screenType = ColorPickerPopupData::ScreenType::EXTRA;
+                        gui.set_to_layout();
                     }
-                }
-            });
+                };
+                input_text_field(gui, "paletteinputname", "Name", &colorPickerPopupData.newPaletteStr, {
+                    .onEnter = addPaletteFunc
+                });
+                svg_icon_button(gui, "paletteadd", "data/icons/plus.svg", {
+                    .onClick = addPaletteFunc
+                });
+            }
         }
     };
 
@@ -381,28 +487,34 @@ void PhoneDrawingProgramScreen::color_settings_popup(Vector4f* color) {
             .backgroundColor = convert_vec4<Clay_Color>(gui.io.theme->backColor1),
             .cornerRadius = CLAY_CORNER_RADIUS(gui.io.theme->windowCorners1)
         }) {
-            if(colorPickerPopupData.extraSettingsOpen) {
-                CLAY_AUTO_ID({
-                    .layout = {
-                        .sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_GROW(0)},
-                        .childGap = gui.io.theme->childGap1,
-                        .layoutDirection = CLAY_TOP_TO_BOTTOM
-                    },
-                }) {
+            switch(colorPickerPopupData.screenType) {
+                case ColorPickerPopupData::ScreenType::NORMAL:
                     paletteColorPickerGrid();
-                }
-                CLAY_AUTO_ID({
-                    .layout = {
-                        .sizing = {.width = CLAY_SIZING_FIT(0), .height = CLAY_SIZING_FIT(0)},
-                        .childGap = gui.io.theme->childGap1,
-                        .layoutDirection = CLAY_TOP_TO_BOTTOM
-                    },
-                }) {
-                    paletteColorPickerExtras();
-                }
+                    break;
+                case ColorPickerPopupData::ScreenType::EXTRA:
+                    CLAY_AUTO_ID({
+                        .layout = {
+                            .sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_GROW(0)},
+                            .childGap = gui.io.theme->childGap1,
+                            .layoutDirection = CLAY_TOP_TO_BOTTOM
+                        },
+                    }) {
+                        paletteColorPickerGrid();
+                    }
+                    CLAY_AUTO_ID({
+                        .layout = {
+                            .sizing = {.width = CLAY_SIZING_FIT(0), .height = CLAY_SIZING_FIT(0)},
+                            .childGap = gui.io.theme->childGap1,
+                            .layoutDirection = CLAY_TOP_TO_BOTTOM
+                        },
+                    }) {
+                        paletteColorPickerExtras();
+                    }
+                    break;
+                case ColorPickerPopupData::ScreenType::PALETTES:
+                    paletteGUI();
+                    break;
             }
-            else
-                paletteColorPickerGrid();
         }
     });
 }

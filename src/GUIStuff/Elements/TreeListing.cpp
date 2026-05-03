@@ -121,7 +121,7 @@ void TreeListing::layout(const Clay_ElementId& id, const Data& newDisplayData) {
                                 }
                             }
                         }, LayoutElement::Callbacks {
-                            .mouseButton = [&, i] (LayoutElement* l, const InputManager::MouseButtonCallbackArgs& button) {
+                            .onClick = [&, i] (LayoutElement* l, const InputManager::MouseButtonCallbackArgs& button) {
                                 if(l->mouseHovering && button.button == InputManager::MouseButton::LEFT && button.down) {
                                     gui.set_post_callback_func([&, i, button, l]{
                                         auto& objIndex = flattenedIndexList[i].objIndex;
@@ -143,7 +143,7 @@ void TreeListing::layout(const Clay_ElementId& id, const Data& newDisplayData) {
                                                 if(d.onSelectChange) d.onSelectChange();
                                             }
                                             else {
-                                                if(button.clicks == 2 && d.onDoubleClick) d.onDoubleClick(objIndex);
+                                                if(button.clicks >= 2 && d.onDoubleClick && wasSelected) d.onDoubleClick(objIndex);
                                                 if(!wasSelected) {
                                                     d.selectedIndices->clear();
                                                     d.selectedIndices->emplace(objIndex);
@@ -154,13 +154,13 @@ void TreeListing::layout(const Clay_ElementId& id, const Data& newDisplayData) {
                                                 dragFromTop = button.pos.y() - l->get_bb().value().min.y() < ENTRY_HEIGHT * 0.5f;
                                             }
                                         }
-                                        else if(button.clicks == 2)
+                                        else if(button.clicks >= 2)
                                             if(d.onDoubleClick) d.onDoubleClick(objIndex);
                                     });
                                     gui.set_to_layout();
                                 }
                             },
-                            .mouseMotion = [&, i] (LayoutElement* l, const InputManager::MouseMotionCallbackArgs& motion) {
+                            .onMotion = [&, i] (LayoutElement* l, const InputManager::MouseMotionCallbackArgs& motion) {
                                 if(isDragging && l->mouseHovering) {
                                     size_t newDragIndexEnd = i;
                                     bool newDragFromTop = motion.pos.y() - l->get_bb().value().min.y() < ENTRY_HEIGHT * 0.5f;
@@ -176,7 +176,7 @@ void TreeListing::layout(const Clay_ElementId& id, const Data& newDisplayData) {
                 });
             }
         }, LayoutElement::Callbacks {
-            .mouseButton = [&] (LayoutElement* l, const InputManager::MouseButtonCallbackArgs& button) {
+            .onClick = [&] (LayoutElement* l, const InputManager::MouseButtonCallbackArgs& button) {
                 if(button.button == InputManager::MouseButton::LEFT && !button.down) {
                     if(isDragging) {
                         gui.set_to_layout();

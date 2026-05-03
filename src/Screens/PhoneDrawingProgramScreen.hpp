@@ -1,6 +1,7 @@
 #pragma once
 #include "DrawingProgramScreen.hpp"
 #include "../Toolbar.hpp"
+#include "../GUIStuff/Elements/TreeListing.hpp"
 
 class PhoneDrawingProgramScreen : public DrawingProgramScreen {
     public:
@@ -25,10 +26,14 @@ class PhoneDrawingProgramScreen : public DrawingProgramScreen {
             BG_COLOR
         } settingsMenuPopup = SettingsMenuPopup::NONE;
         struct ColorPickerPopupData {
-            bool extraSettingsOpen = false;
+            enum class ScreenType {
+                NORMAL,
+                EXTRA,
+                PALETTES
+            } screenType = ScreenType::NORMAL;
             size_t selectedPalette = 0;
-            bool addingPalette = false;
             std::string newPaletteStr;
+            std::set<GUIStuff::TreeListingObjIndexList> paletteListSelection;
         } colorPickerPopupData;
         void reset_color_picker_popup_data();
 };
