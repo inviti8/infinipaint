@@ -25,6 +25,18 @@ public class InfiniPaintSurface extends SDLSurface {
                     WindowInsets.Type.displayCutout());
 
             SDLActivity.onNativeInsetsChanged(combined.left, combined.right, combined.top, combined.bottom);
+
+            if (insets.isVisible(WindowInsets.Type.ime())) {
+                if (!mKeyboardVisible) {
+                    mKeyboardVisible = true;
+                    SDLActivity.onNativeScreenKeyboardShown();
+                }
+            } else {
+                if (mKeyboardVisible) {
+                    mKeyboardVisible = false;
+                    SDLActivity.onNativeScreenKeyboardHidden();
+                }
+            }
         }
 
         // Pass these to any child views in case they need them

@@ -83,6 +83,7 @@ void EyeDropperTool::input_mouse_button_on_canvas_callback(const InputManager::M
             toolConfig.globalConf.foregroundColor = readData.cast<float>() / 255.0f;
         else
             toolConfig.globalConf.backgroundColor = readData.cast<float>() / 255.0f;
+        drawP.world.main.g.gui.set_to_layout();
     }
 }
 
