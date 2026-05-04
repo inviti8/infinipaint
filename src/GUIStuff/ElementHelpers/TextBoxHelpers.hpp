@@ -13,11 +13,13 @@ template <typename T, typename OptT> TextBoxData<T> textbox_options_to_data(cons
     toRet.immutable = options.immutable;
     toRet.onSelect = options.onSelect;
     toRet.onDeselect = options.onDeselect;
+    toRet.emptyText = options.emptyText;
     return toRet;
 }
 
 struct TextBoxOptions {
     bool immutable = false;
+    std::string emptyText;
     std::function<void()> onEnter;
     std::function<void()> onEdit;
     std::function<void()> onSelect;
@@ -27,6 +29,7 @@ struct TextBoxOptions {
 struct TextBoxScalarOptions {
     int decimalPrecision = 0;
     bool immutable = false;
+    std::string emptyText;
     std::function<void()> onEnter;
     std::function<void()> onEdit;
     std::function<void()> onSelect;
@@ -36,6 +39,7 @@ struct TextBoxScalarOptions {
 struct TextBoxScalarsOptions {
     int decimalPrecision = 0;
     bool immutable = false;
+    std::string emptyText;
     std::function<void(size_t)> onEnter;
     std::function<void(size_t)> onEdit;
     std::function<void(size_t)> onSelect;
@@ -45,6 +49,7 @@ struct TextBoxScalarsOptions {
 struct TextBoxPathOptions {
     std::filesystem::file_type fileTypeRestriction;
     bool immutable = false;
+    std::string emptyText;
     std::function<void()> onEnter;
     std::function<void()> onEdit;
     std::function<void()> onSelect;
@@ -54,6 +59,7 @@ struct TextBoxPathOptions {
 struct TextBoxHexColorOptions {
     bool hasAlpha = true;
     bool immutable = false;
+    std::string emptyText;
     std::function<void()> onEnter;
     std::function<void()> onEdit;
     std::function<void()> onSelect;

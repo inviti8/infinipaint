@@ -412,16 +412,6 @@ void PhoneDrawingProgramScreen::color_settings_popup(Vector4f* color) {
                     }) {
                         text_label(gui, main.conf.palettes[objIndex.back()].name);
                     }
-                    gui.set_z_index_keep_clipping_region(gui.get_z_index() + 1, [&] {
-                        svg_icon_button(gui, "edit button", "data/icons/pencil.svg", {
-                            .drawType = SelectableButton::DrawType::TRANSPARENT_ALL,
-                            .size = TreeListing::ENTRY_HEIGHT,
-                            .onClick = [&, objIndex] {
-                                colorPickerPopupData.screenType = ColorPickerPopupData::ScreenType::EXTRA;
-                                colorPickerPopupData.selectedPalette = objIndex.back();
-                            }
-                        });
-                    });
                     if(objIndex.back() != 0) {
                         gui.set_z_index_keep_clipping_region(gui.get_z_index() + 1, [&] {
                             svg_icon_button(gui, "delete button", "data/icons/trash.svg", {
@@ -434,10 +424,6 @@ void PhoneDrawingProgramScreen::color_settings_popup(Vector4f* color) {
                             });
                         });
                     }
-                },
-                .onDoubleClick = [&](const TreeListingObjIndexList& objIndex) {
-                    colorPickerPopupData.screenType = ColorPickerPopupData::ScreenType::EXTRA;
-                    colorPickerPopupData.selectedPalette = objIndex.back();
                 },
                 .moveObj = [&](const std::vector<TreeListingObjIndexList>& objIndices, const TreeListingObjIndexList& newObjIndex) {
                     if(newObjIndex.back() == 0)
@@ -452,6 +438,7 @@ void PhoneDrawingProgramScreen::color_settings_popup(Vector4f* color) {
                             main.conf.palettes.erase(main.conf.palettes.begin() + p.back());
                         }
                     }
+                    colorPickerPopupData.selectedPalette = 0;
                     main.conf.palettes.insert(main.conf.palettes.begin() + moveIndex, movedPalettes.begin(), movedPalettes.end());
                 }
             });
@@ -472,7 +459,8 @@ void PhoneDrawingProgramScreen::color_settings_popup(Vector4f* color) {
                         gui.set_to_layout();
                     }
                 };
-                input_text_field(gui, "paletteinputname", "Name", &colorPickerPopupData.newPaletteStr, {
+                input_text(gui, "paletteinputname", &colorPickerPopupData.newPaletteStr, {
+                    .emptyText = "New Palette Name...",
                     .onEnter = addPaletteFunc
                 });
                 svg_icon_button(gui, "paletteadd", "data/icons/plus.svg", {

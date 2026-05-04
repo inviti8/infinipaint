@@ -16,6 +16,7 @@ template <typename T> struct TextBoxData {
     bool singleLine = true;
     bool immutable = false;
     InputManager::TextInputProperties textInputProps;
+    std::string emptyText;
     std::function<void()> onEdit;
     std::function<void()> onEnter;
     std::function<void()> onSelect;
@@ -48,6 +49,7 @@ template <typename T> class TextBox : public Element {
         virtual void input_mouse_motion_callback(const InputManager::MouseMotionCallbackArgs& motion) override;
         ~TextBox();
     private:
+        void populate_empty_textbox();
         void after_text_input_callback();
         void init_textbox(UpdateInputData& io);
         void reset_textbox_text();
@@ -60,10 +62,12 @@ template <typename T> class TextBox : public Element {
             RichText::TextBox::Cursor cur;
         } oldDD;
 
+        bool isEmptyText = false;
         bool isHeld = false;
         std::optional<TextEditData> edit;
 
         std::optional<T> oldData;
+        std::string oldEmptyText;
         TextBoxData<T> userInfo;
         std::shared_ptr<RichText::TextBox> textbox;
         std::shared_ptr<RichText::TextBox::Cursor> cur;

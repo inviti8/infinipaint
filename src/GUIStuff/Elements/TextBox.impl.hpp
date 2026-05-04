@@ -9,8 +9,11 @@ template <typename T> void TextBox<T>::layout(const Clay_ElementId& id, const Te
     auto& io = gui.io;
     this->userInfo = userInfo;
     init_textbox(io);
-    if(!oldData.has_value() || oldData.value() != *userInfo.data)
+    if(!oldData.has_value() || oldData.value() != *userInfo.data || (oldEmptyText != userInfo.emptyText)) {
         reset_textbox_text();
+        populate_empty_textbox();
+        gui.invalidate_draw_element(this);
+    }
 
     CLAY(id, {
         .layout = {
@@ -75,6 +78,8 @@ template <typename T> void TextBox<T>::select() {
     if(!is_selected()) {
         SCollision::AABB<float> rect = {boundingBox.value().min * gui.io.guiScaleMultiplier, boundingBox.value().max * gui.io.guiScaleMultiplier};
         unsigned id = gui.io.input->set_text_box_front(rect, userInfo.textInputProps);
+        if(isEmptyText)
+            textbox->clear_text();
         edit = TextEditData(id, textbox, cur);
     }
 }
@@ -85,6 +90,7 @@ template <typename T> void TextBox<T>::deselect() {
         if(userInfo.onDeselect) userInfo.onDeselect();
         reset_textbox_text();
         edit = std::nullopt;
+        populate_empty_textbox();
     }
 }
 
@@ -111,6 +117,21 @@ template <typename T> void TextBox<T>::input_text_key_callback(const InputManage
             if(edit.value().userInput.input_key_callback(*gui.io.input, key).textEdited)
                 after_text_input_callback();
         }
+    }
+}
+
+template <typename T> void TextBox<T>::populate_empty_textbox() {
+    if(!is_selected() && isEmptyText && !userInfo.emptyText.empty()) {
+        RichText::TextData text;
+        RichText::TextData::Paragraph& par = text.paragraphs.emplace_back();
+        par.text = userInfo.emptyText;
+
+        RichText::PositionedTextStyleMod& positionedMod = text.tStyleMods.emplace_back();
+        positionedMod.pos = {0, 0};
+        positionedMod.mods[RichText::TextStyleModifier::ModifierType::SLANT] = std::make_shared<RichText::SlantTextStyleModifier>(SkFontStyle::kItalic_Slant);
+        positionedMod.mods[RichText::TextStyleModifier::ModifierType::COLOR] = std::make_shared<RichText::ColorTextStyleModifier>(convert_vec4<Vector4f>(gui.io.theme->frontColor2));
+
+        textbox->set_rich_text_data(text);
     }
 }
 
@@ -167,7 +188,9 @@ template <typename T> void TextBox<T>::init_textbox(UpdateInputData& io) {
 }
 
 template <typename T> void TextBox<T>::reset_textbox_text() {
-    textbox->set_string(userInfo.toStr(*userInfo.data));
+    std::string newStr = userInfo.toStr(*userInfo.data);
+    isEmptyText = newStr.empty();
+    textbox->set_string(newStr);
     cur->pos = textbox->move(RichText::TextBox::Movement::NOWHERE, cur->pos);
     cur->selectionBeginPos = textbox->move(RichText::TextBox::Movement::NOWHERE, cur->selectionBeginPos);
     cur->selectionEndPos = textbox->move(RichText::TextBox::Movement::NOWHERE, cur->selectionEndPos);
