@@ -727,7 +727,7 @@ void InputManager::touch_finger_do_mouse_up(const SDL_TouchFingerEvent& e) {
 void InputManager::touch_finger_do_mouse_motion(const SDL_TouchFingerEvent& e) {
     Vector2f mouseNewPos = backend_touch_cursor_pos_calculation({e.x, e.y});
     mouse.set_pos(mouseNewPos);
-    Vector2f mouseRel = backend_touch_cursor_pos_calculation({e.dx, e.dy});
+    Vector2f mouseRel = backend_touch_cursor_delta_calculation({e.dx, e.dy});
     main.input_mouse_motion_callback({
         .deviceType = MouseDeviceType::TOUCH,
         .pos = mouseNewPos,
@@ -861,7 +861,7 @@ void InputManager::backend_touch_finger_motion_update(const SDL_TouchFingerEvent
     main.input_finger_motion_callback({
         .fingerID = e.fingerID,
         .pos = backend_touch_cursor_pos_calculation({e.x, e.y}),
-        .move = backend_touch_cursor_pos_calculation({e.x, e.y}),
+        .move = backend_touch_cursor_delta_calculation({e.dx, e.dy}),
         .fingerDownCount = touch.fingers.size()
     });
 
