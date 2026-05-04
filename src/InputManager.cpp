@@ -11,7 +11,9 @@
 #include <optional>
 
 #include <Helpers/Logger.hpp>
+#include "MainProgram.hpp"
 
+InputManager* globalInputManager = nullptr;
 
 #ifdef _WIN32
     #include <include/core/SkStream.h>
@@ -30,10 +32,22 @@ extern "C" {
 }
 #endif
 
-#include "MainProgram.hpp"
+#ifdef __ANDROID__
+#include <jni.h>
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_erroratline0_infinipaint_InfiniPaintSurface_nativeInfiniPaintUpdateIMESafeArea(JNIEnv *env, jclass clazz, jint top, jint bottom, jint left, jint right) {
+    if(globalInputManager)
+        globalInputManager->safeAreaWithoutIME = {{left, top}, {globalInputManager->main.window.size.x() - right, globalInputManager->main.window.size.y() - bottom}};
+}
+
+#endif
 
 InputManager::InputManager(MainProgram& initMain):
     main(initMain) {
+    globalInputManager = this;
+
     frame_reset({0, 0});
 
     defaultKeyAssignments[{0, SDLK_W}] = KEY_CAMERA_ROTATE_COUNTERCLOCKWISE;
@@ -101,7 +115,7 @@ unsigned InputManager::set_text_box_front(const std::optional<SCollision::AABB<f
     textBoxInfo.textInputProperties = inputProps;
     textBoxInfo.id = text.get_id();
     text.textBoxes.emplace_front(textBoxInfo);
-    text.update_accepting_input(main.window.sdlWindow);
+    update_accepting_input(main.window.sdlWindow);
     return textBoxInfo.id;
 }
 
@@ -111,7 +125,7 @@ unsigned InputManager::set_text_box_back(const std::optional<SCollision::AABB<fl
     textBoxInfo.textInputProperties = inputProps;
     textBoxInfo.id = text.get_id();
     text.textBoxes.emplace_back(textBoxInfo);
-    text.update_accepting_input(main.window.sdlWindow);
+    update_accepting_input(main.window.sdlWindow);
     return textBoxInfo.id;
 }
 
@@ -119,7 +133,7 @@ void InputManager::remove_text_box(unsigned id) {
     std::erase_if(text.textBoxes, [id](Text::TextBoxInfo& info) {
         return (info.id == id);
     });
-    text.update_accepting_input(main.window.sdlWindow);
+    update_accepting_input(main.window.sdlWindow);
 }
 
 bool InputManager::Text::is_accepting_input() {
@@ -132,24 +146,27 @@ std::optional<unsigned> InputManager::Text::current_textbox_editing_id() {
     return textBoxes.front().id;
 }
 
-void InputManager::Text::update_accepting_input(SDL_Window* window) {
-    if(!textBoxes.empty()) {
-        auto& textbox = textBoxes.front();
-        if(!propID.has_value())
-            propID = SDL_CreateProperties();
-        SDL_PropertiesID propIDVal = propID.value();
+void InputManager::update_textbox_rectangle(unsigned textboxID, const SCollision::AABB<float>& textboxRect) {
+    auto it = std::find_if(text.textBoxes.begin(), text.textBoxes.end(), [&](const auto& t) {return t.id == textboxID;});
+    it->rect = textboxRect;
+}
+
+void InputManager::update_accepting_input(SDL_Window* window) {
+    if(!text.textBoxes.empty()) {
+        auto& textbox = text.textBoxes.front();
+        if(!text.propID.has_value())
+            text.propID = SDL_CreateProperties();
+        SDL_PropertiesID propIDVal = text.propID.value();
         // There is a bug where decimal places disappear when textinput type is set to number on android. We'll just set those textinputs back to text type
         SDL_SetNumberProperty(propIDVal, SDL_PROP_TEXTINPUT_TYPE_NUMBER, (textbox.textInputProperties.inputType == SDL_TEXTINPUT_TYPE_NUMBER) ? SDL_TEXTINPUT_TYPE_TEXT : textbox.textInputProperties.inputType);
         SDL_SetNumberProperty(propIDVal, SDL_PROP_TEXTINPUT_CAPITALIZATION_NUMBER, textbox.textInputProperties.capitalization);
         SDL_SetNumberProperty(propIDVal, SDL_PROP_TEXTINPUT_AUTOCORRECT_BOOLEAN, textbox.textInputProperties.autocorrect);
         SDL_SetNumberProperty(propIDVal, SDL_PROP_TEXTINPUT_MULTILINE_BOOLEAN, textbox.textInputProperties.multiline);
         SDL_SetNumberProperty(propIDVal, SDL_PROP_TEXTINPUT_ANDROID_INPUTTYPE_NUMBER, (textbox.textInputProperties.androidInputType & ANDROIDTEXT_TYPE_CLASS_NUMBER) ? ANDROIDTEXT_TYPE_CLASS_TEXT : textbox.textInputProperties.androidInputType);
-        if(!textBoxes.front().rect)
-            SDL_SetTextInputArea(window, nullptr, 0);
-        else {
-            SDL_Rect r = textBoxes.front().rect->get_sdl_rect();
-            SDL_SetTextInputArea(window, &r, 0);
-        }
+        if(text.textBoxes.front().rect)
+            excludeIMEFromSafeArea = false;
+        else
+            excludeIMEFromSafeArea = true;
         SDL_StartTextInputWithProperties(window, propIDVal);
         #ifdef __EMSCRIPTEN__
             isAcceptingInputEmscripten = 1;
@@ -157,7 +174,8 @@ void InputManager::Text::update_accepting_input(SDL_Window* window) {
     }
     else {
         SDL_StopTextInput(window);
-        SDL_SetTextInputArea(window, nullptr, 0);
+        excludeIMEFromSafeArea = false;
+        screenOffset = {0.0f, 0.0f};
         #ifdef __EMSCRIPTEN__
             isAcceptingInputEmscripten = 0;
         #endif
@@ -364,8 +382,24 @@ void InputManager::backend_input_text_event(const std::string& str) {
     main.input_text_callback(TextCallbackArgs{ .str = str });
 }
 
+Vector2f InputManager::backend_cursor_pos_calculation(const Vector2f& cursorPos) {
+    return cursorPos * main.window.density - screenOffset;
+}
+
+Vector2f InputManager::backend_cursor_delta_calculation(const Vector2f& cursorDelta) {
+    return cursorDelta * main.window.density;
+}
+
+Vector2f InputManager::backend_touch_cursor_pos_calculation(const Vector2f& cursorPos) {
+    return Vector2f{cursorPos.x() * main.window.size.x() * main.window.density, cursorPos.y() * main.window.size.y() * main.window.density} - screenOffset;
+}
+
+Vector2f InputManager::backend_touch_cursor_delta_calculation(const Vector2f& cursorDelta) {
+    return Vector2f{cursorDelta.x() * main.window.size.x() * main.window.density, cursorDelta.y() * main.window.size.y() * main.window.density};
+}
+
 void InputManager::backend_drop_file_event(const SDL_DropEvent& e) {
-    Vector2f mousePos = {e.x * main.window.density, e.y * main.window.density};
+    Vector2f mousePos = backend_cursor_pos_calculation({e.x, e.y});
     mouse.set_pos(mousePos);
 
     main.input_drop_file_callback({
@@ -376,7 +410,7 @@ void InputManager::backend_drop_file_event(const SDL_DropEvent& e) {
 }
 
 void InputManager::backend_drop_text_event(const SDL_DropEvent& e) {
-    Vector2f mousePos = {e.x * main.window.density, e.y * main.window.density};
+    Vector2f mousePos = backend_cursor_pos_calculation({e.x, e.y});
     mouse.set_pos(mousePos);
 
     main.input_drop_text_callback({
@@ -387,7 +421,7 @@ void InputManager::backend_drop_text_event(const SDL_DropEvent& e) {
 }
 
 void InputManager::backend_mouse_button_up_update(const SDL_MouseButtonEvent& e) {
-    Vector2f mousePos = {e.x * main.window.density, e.y * main.window.density};
+    Vector2f mousePos = backend_cursor_pos_calculation({e.x, e.y});
     mouse.set_pos(mousePos);
 
     if(e.button == 1)
@@ -409,7 +443,7 @@ void InputManager::backend_mouse_button_up_update(const SDL_MouseButtonEvent& e)
 }
 
 void InputManager::backend_mouse_button_down_update(const SDL_MouseButtonEvent& e) {
-    Vector2f mousePos = {e.x * main.window.density, e.y * main.window.density};
+    Vector2f mousePos = backend_cursor_pos_calculation({e.x, e.y});
     mouse.set_pos(mousePos);
 
     if(e.button == 1)
@@ -432,10 +466,10 @@ void InputManager::backend_mouse_button_down_update(const SDL_MouseButtonEvent& 
 }
 
 void InputManager::backend_mouse_motion_update(const SDL_MouseMotionEvent& e) {
-    Vector2f mouseNewPos = {e.x * main.window.density, e.y * main.window.density};
+    Vector2f mouseNewPos = backend_cursor_pos_calculation({e.x, e.y});
     mouse.set_pos(mouseNewPos);
 
-    Vector2f mouseRel = {e.xrel * main.window.density, e.yrel * main.window.density};
+    Vector2f mouseRel = backend_cursor_delta_calculation({e.xrel, e.yrel});
     main.input_mouse_motion_callback({
         .deviceType = MouseDeviceType::MOUSE,
         .pos = mouseNewPos,
@@ -446,7 +480,7 @@ void InputManager::backend_mouse_motion_update(const SDL_MouseMotionEvent& e) {
 }
 
 void InputManager::backend_mouse_wheel_update(const SDL_MouseWheelEvent& e) {
-    Vector2f mouseNewPos = {e.mouse_x * main.window.density, e.mouse_y * main.window.density};
+    Vector2f mouseNewPos = backend_cursor_pos_calculation({e.mouse_x, e.mouse_y});
     mouse.set_pos(mouseNewPos);
 
     main.input_mouse_wheel_callback({
@@ -459,7 +493,7 @@ void InputManager::backend_mouse_wheel_update(const SDL_MouseWheelEvent& e) {
 }
 
 void InputManager::backend_pen_button_down_update(const SDL_PenButtonEvent& e) {
-    Vector2f mouseNewPos = {e.x * main.window.density, e.y * main.window.density};
+    Vector2f mouseNewPos = backend_cursor_pos_calculation({e.x, e.y});
     mouse.set_pos(mouseNewPos);
 
     pen.previousPos = mouseNewPos;
@@ -495,7 +529,7 @@ void InputManager::backend_pen_button_down_update(const SDL_PenButtonEvent& e) {
 }
 
 void InputManager::backend_pen_button_up_update(const SDL_PenButtonEvent& e) {
-    Vector2f mouseNewPos = {e.x * main.window.density, e.y * main.window.density};
+    Vector2f mouseNewPos = backend_cursor_pos_calculation({e.x, e.y});
     mouse.set_pos(mouseNewPos);
 
     pen.previousPos = mouseNewPos;
@@ -531,7 +565,7 @@ void InputManager::backend_pen_button_up_update(const SDL_PenButtonEvent& e) {
 }
 
 void InputManager::backend_pen_touch_down_update(const SDL_PenTouchEvent& e) {
-    Vector2f mouseNewPos = {e.x * main.window.density, e.y * main.window.density};
+    Vector2f mouseNewPos = backend_cursor_pos_calculation({e.x, e.y});
     mouse.set_pos(mouseNewPos);
 
     pen.previousPos = mouseNewPos;
@@ -560,7 +594,7 @@ void InputManager::backend_pen_touch_down_update(const SDL_PenTouchEvent& e) {
 }
 
 void InputManager::backend_pen_touch_up_update(const SDL_PenTouchEvent& e) {
-    Vector2f mouseNewPos = {e.x * main.window.density, e.y * main.window.density};
+    Vector2f mouseNewPos = backend_cursor_pos_calculation({e.x, e.y});
     mouse.set_pos(mouseNewPos);
 
     pen.previousPos = mouseNewPos;
@@ -586,7 +620,7 @@ void InputManager::backend_pen_touch_up_update(const SDL_PenTouchEvent& e) {
 }
 
 void InputManager::backend_pen_motion_update(const SDL_PenMotionEvent& e) {
-    Vector2f mouseNewPos = {e.x * main.window.density, e.y * main.window.density};
+    Vector2f mouseNewPos = backend_cursor_pos_calculation({e.x, e.y});
     mouse.set_pos(mouseNewPos);
 
     Vector2f mouseRel = mouseNewPos - pen.previousPos;
@@ -607,7 +641,7 @@ void InputManager::backend_pen_motion_update(const SDL_PenMotionEvent& e) {
 }
 
 void InputManager::backend_pen_axis_update(const SDL_PenAxisEvent& e) {
-    Vector2f mouseNewPos = {e.x * main.window.density, e.y * main.window.density};
+    Vector2f mouseNewPos = backend_cursor_pos_calculation({e.x, e.y});
     mouse.set_pos(mouseNewPos);
 
     pen.previousPos = mouseNewPos;
@@ -645,20 +679,20 @@ InputManager::MouseMotionCallbackArgs InputManager::convert_finger_motion_to_mou
 std::vector<Vector2f> InputManager::get_multiple_finger_positions() {
     std::vector<Vector2f> pos;
     for(const SDL_TouchFingerEvent& fingerEvent : touch.fingers)
-        pos.emplace_back(fingerEvent.x * main.window.size.x() * main.window.density, fingerEvent.y * main.window.size.y() * main.window.density);
+        pos.emplace_back(backend_touch_cursor_pos_calculation({fingerEvent.x, fingerEvent.y}));
     return pos;
 }
 
 std::vector<Vector2f> InputManager::get_multiple_finger_motions() {
     std::vector<Vector2f> pos;
     for(const SDL_TouchFingerEvent& fingerEvent : touch.fingers)
-        pos.emplace_back(fingerEvent.dx * main.window.size.x() * main.window.density, fingerEvent.dy * main.window.size.y() * main.window.density);
+        pos.emplace_back(backend_touch_cursor_delta_calculation({fingerEvent.dx, fingerEvent.dy}));
     return pos;
 }
 
 void InputManager::touch_finger_do_mouse_down() {
     auto& prevTouch = touch.fingers[0];
-    Vector2f mouseNewPos = {prevTouch.x * main.window.size.x() * main.window.density, prevTouch.y * main.window.size.y() * main.window.density};
+    Vector2f mouseNewPos = backend_touch_cursor_pos_calculation({prevTouch.x, prevTouch.y});
     mouse.set_pos(mouseNewPos);
     mouse.leftDown = true;
 
@@ -677,7 +711,7 @@ void InputManager::touch_finger_do_mouse_down() {
 }
 
 void InputManager::touch_finger_do_mouse_up(const SDL_TouchFingerEvent& e) {
-    Vector2f mouseNewPos = {e.x * main.window.size.x() * main.window.density, e.y * main.window.size.y() * main.window.density};
+    Vector2f mouseNewPos = backend_touch_cursor_pos_calculation({e.x, e.y});
     mouse.set_pos(mouseNewPos);
     mouse.leftDown = false;
 
@@ -691,9 +725,9 @@ void InputManager::touch_finger_do_mouse_up(const SDL_TouchFingerEvent& e) {
 }
 
 void InputManager::touch_finger_do_mouse_motion(const SDL_TouchFingerEvent& e) {
-    Vector2f mouseNewPos = {e.x * main.window.size.x() * main.window.density, e.y * main.window.size.y() * main.window.density};
+    Vector2f mouseNewPos = backend_touch_cursor_pos_calculation({e.x, e.y});
     mouse.set_pos(mouseNewPos);
-    Vector2f mouseRel = {e.dx * main.window.size.x() * main.window.density, e.dy * main.window.size.y() * main.window.density};
+    Vector2f mouseRel = backend_touch_cursor_pos_calculation({e.dx, e.dy});
     main.input_mouse_motion_callback({
         .deviceType = MouseDeviceType::TOUCH,
         .pos = mouseNewPos,
@@ -782,7 +816,7 @@ void InputManager::backend_touch_finger_up_update(const SDL_TouchFingerEvent& e)
     main.input_finger_touch_callback({
         .fingerID = e.fingerID,
         .down = false,
-        .pos = {e.x * main.window.size.x() * main.window.density, e.y * main.window.size.y() * main.window.density},
+        .pos = backend_touch_cursor_pos_calculation({e.x, e.y}),
         .fingerDownCount = touch.fingers.size(),
         .fingerTapCount = 0
     });
@@ -826,8 +860,8 @@ void InputManager::backend_touch_finger_motion_update(const SDL_TouchFingerEvent
 
     main.input_finger_motion_callback({
         .fingerID = e.fingerID,
-        .pos = {e.x * main.window.size.x() * main.window.density, e.y * main.window.size.y() * main.window.density},
-        .move = {e.dx * main.window.size.x() * main.window.density, e.dy * main.window.size.y() * main.window.density},
+        .pos = backend_touch_cursor_pos_calculation({e.x, e.y}),
+        .move = backend_touch_cursor_pos_calculation({e.x, e.y}),
         .fingerDownCount = touch.fingers.size()
     });
 
@@ -840,6 +874,9 @@ void InputManager::update_safe_area() {
         main.window.safeArea = SCollision::AABB<float>({safeArea.x, safeArea.y}, {safeArea.x + safeArea.w, safeArea.y + safeArea.h});
     else
         main.window.safeArea = SCollision::AABB<float>({0, 0}, {main.window.size.x(), main.window.size.y()});
+
+    if(excludeIMEFromSafeArea && safeAreaWithoutIME.has_value())
+        main.window.safeArea = safeAreaWithoutIME.value();
 }
 
 void InputManager::backend_window_resize_update() {
@@ -1108,15 +1145,22 @@ void InputManager::update() {
         touch_finger_do_mouse_down();
         touch.touchEventType = Touch::ONE_FINGER_EVENT;
     }
+    constexpr float PADDING_BETWEEN_TEXTBOX_AND_IME = 15.0f;
     if(!text.textBoxes.empty()) {
-        //auto& textbox = text.textBoxes.front();
-        //if(textbox.rect) {
-        //    SDL_Rect r = textbox.rect->get_sdl_rect();
-        //    //SDL_SetTextInputArea(main.window.sdlWindow, &r, textbox.cursor->pos.fTextByteIndex);
-        //}
-        //else
-        //    //SDL_SetTextInputArea(main.window.sdlWindow, nullptr, textbox.cursor->pos.fTextByteIndex);
+        auto& r = text.textBoxes.front().rect;
+        if(r.has_value() && safeAreaWithoutIME.has_value()) {
+            float bottomY = r.value().max.y();
+            float yLimit = safeAreaWithoutIME.value().max.y() - PADDING_BETWEEN_TEXTBOX_AND_IME;
+            if(bottomY >= yLimit)
+                screenOffset = {0.0f, -(bottomY - yLimit)};
+            else
+                screenOffset = {0.0f, 0.0f};
+        }
+        else
+            screenOffset = {0.0f, 0.0f};
     }
+    else
+        screenOffset = {0.0f, 0.0f};
 }
 
 void InputManager::frame_reset(const Vector2i& windowSize) {

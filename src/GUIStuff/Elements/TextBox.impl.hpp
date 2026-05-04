@@ -32,6 +32,10 @@ template <typename T> void TextBox<T>::update() {
         oldDD.cur = *cur;
         gui.invalidate_draw_element(this);
     }
+    if(edit.has_value()) {
+        SCollision::AABB<float> rect = {boundingBox.value().min * gui.io.guiScaleMultiplier, boundingBox.value().max * gui.io.guiScaleMultiplier};
+        gui.io.input->update_textbox_rectangle(edit.value().textboxInputID, rect);
+    }
 }
 
 template <typename T> void TextBox<T>::clay_draw(SkCanvas* canvas, UpdateInputData& io, Clay_RenderCommand* command, bool skiaAA) {

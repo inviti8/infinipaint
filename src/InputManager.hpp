@@ -154,10 +154,13 @@ struct InputManager {
     unsigned set_text_box_front(const std::optional<SCollision::AABB<float>>& textboxRect, const TextInputProperties& inputProps);
     unsigned set_text_box_back(const std::optional<SCollision::AABB<float>>& textboxRect, const TextInputProperties& inputProps);
     void remove_text_box(unsigned textboxID);
+    void update_accepting_input(SDL_Window* window);
+    void update_textbox_rectangle(unsigned textboxID, const SCollision::AABB<float>& textboxRect);
     
     struct Text {
         bool is_accepting_input();
         std::optional<unsigned> current_textbox_editing_id();
+        void update_textbox_rectangle();
 
         private:
             struct TextBoxInfo {
@@ -165,8 +168,6 @@ struct InputManager {
                 TextInputProperties textInputProperties;
                 unsigned id;
             };
-
-            void update_accepting_input(SDL_Window* window);
 
             std::optional<SDL_PropertiesID> propID;
 
@@ -255,6 +256,11 @@ struct InputManager {
     void touch_finger_do_mouse_down();
     void touch_finger_do_mouse_up(const SDL_TouchFingerEvent& f);
     void touch_finger_do_mouse_motion(const SDL_TouchFingerEvent& f);
+
+    Vector2f backend_cursor_pos_calculation(const Vector2f& cursorPos);
+    Vector2f backend_cursor_delta_calculation(const Vector2f& cursorDelta);
+    Vector2f backend_touch_cursor_pos_calculation(const Vector2f& cursorPos);
+    Vector2f backend_touch_cursor_delta_calculation(const Vector2f& cursorDelta);
 
     void backend_input_text_event(const std::string& str);
     void backend_drop_file_event(const SDL_DropEvent& e);
@@ -407,6 +413,10 @@ struct InputManager {
     struct WindowScaleCallbackArgs {
         float scale;
     };
+
+    std::optional<SCollision::AABB<float>> safeAreaWithoutIME;
+    bool excludeIMEFromSafeArea = false;
+    Vector2f screenOffset = {0.0f, 0.0f};
 
     MainProgram& main;
 };

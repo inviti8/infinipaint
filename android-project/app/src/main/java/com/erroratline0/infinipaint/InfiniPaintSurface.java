@@ -14,6 +14,8 @@ public class InfiniPaintSurface extends SDLSurface {
         super(context);
     }
 
+    public static native void nativeInfiniPaintUpdateIMESafeArea(int top, int bottom, int left, int right);
+
     // Window inset calculations are different from SDL defaults
     @Override
     public WindowInsets onApplyWindowInsets(View v, WindowInsets insets) {
@@ -23,6 +25,15 @@ public class InfiniPaintSurface extends SDLSurface {
                     //WindowInsets.Type.mandatorySystemGestures() |
                     WindowInsets.Type.tappableElement() |
                     WindowInsets.Type.displayCutout());
+
+            Insets imeInsets = insets.getInsets(WindowInsets.Type.systemBars() |
+                    //WindowInsets.Type.systemGestures() |
+                    //WindowInsets.Type.mandatorySystemGestures() |
+                    WindowInsets.Type.tappableElement() |
+                    WindowInsets.Type.displayCutout() |
+                    WindowInsets.Type.ime());
+
+            nativeInfiniPaintUpdateIMESafeArea(imeInsets.top, imeInsets.bottom, imeInsets.left, imeInsets.right);
 
             SDLActivity.onNativeInsetsChanged(combined.left, combined.right, combined.top, combined.bottom);
 

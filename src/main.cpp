@@ -561,6 +561,7 @@ void regular_draw(MainStruct& mS) {
     if(mS.m->window.intermediateSurfaceMSAA) {
         SkCanvas* intermediateCanvas = mS.m->window.intermediateSurfaceMSAA->getCanvas();
         intermediateCanvas->save();
+        intermediateCanvas->translate(mS.m->input.screenOffset.x(), mS.m->input.screenOffset.y());
         mS.m->draw(intermediateCanvas);
         intermediateCanvas->restore();
 
@@ -580,7 +581,10 @@ void regular_draw(MainStruct& mS) {
             mS.ctx->flushAndSubmit();
             mS.vulkanWindowContext->swapBuffers();
         #elif USE_BACKEND_OPENGL
+            mS.canvas->save();
+            mS.canvas->translate(mS.m->input.screenOffset.x(), mS.m->input.screenOffset.y());
             mS.m->draw(mS.canvas);
+            mS.canvas->restore();
             mS.ctx->flushAndSubmit();
             SDL_GL_SwapWindow(mS.window);
         #endif

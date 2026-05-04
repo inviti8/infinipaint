@@ -28,10 +28,6 @@ public class InfiniPaint extends SDLActivity {
         //    window.setNavigationBarContrastEnforced(false);
     }
 
-    protected void get_window_insets() {
-        Window window = this.getWindow();
-    }
-
     protected SDLSurface createSDLSurface(Context context) {
         return new InfiniPaintSurface(context);
     }
