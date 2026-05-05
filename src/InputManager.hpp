@@ -414,6 +414,7 @@ struct InputManager {
         float scale;
     };
 
+    std::mutex safeAreaWithoutIMEMutex;
     std::optional<SCollision::AABB<float>> safeAreaWithoutIME;
     bool excludeIMEFromSafeArea = false;
     Vector2f screenOffset = {0.0f, 0.0f};

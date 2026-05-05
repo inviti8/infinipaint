@@ -30,6 +30,7 @@ option(MACOS_MAKE_BUNDLE "Package the application as a bundle" ON)
 set(sources "src/main.cpp"
             "src/SwitchCWD.cpp"
             "src/MainProgram.cpp"
+            "src/AndroidJNICalls.cpp"
             "src/DrawData.cpp"
             "src/FontData.cpp"
             "src/ClientData.cpp"

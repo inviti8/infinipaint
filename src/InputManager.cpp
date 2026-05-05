@@ -12,8 +12,7 @@
 
 #include <Helpers/Logger.hpp>
 #include "MainProgram.hpp"
-
-InputManager* globalInputManager = nullptr;
+#include "AndroidJNICalls.hpp"
 
 #ifdef _WIN32
     #include <include/core/SkStream.h>
@@ -32,21 +31,11 @@ extern "C" {
 }
 #endif
 
-#ifdef __ANDROID__
-#include <jni.h>
-
-extern "C"
-JNIEXPORT void JNICALL
-Java_com_erroratline0_infinipaint_InfiniPaintSurface_nativeInfiniPaintUpdateIMESafeArea(JNIEnv *env, jclass clazz, jint top, jint bottom, jint left, jint right) {
-    if(globalInputManager)
-        globalInputManager->safeAreaWithoutIME = {{left, top}, {globalInputManager->main.window.size.x() - right, globalInputManager->main.window.size.y() - bottom}};
-}
-
-#endif
-
 InputManager::InputManager(MainProgram& initMain):
     main(initMain) {
-    globalInputManager = this;
+#ifdef __ANDROID__
+    AndroidJNICalls::globalInputManager = this;
+#endif
 
     frame_reset({0, 0});
 
@@ -167,7 +156,13 @@ void InputManager::update_accepting_input(SDL_Window* window) {
             excludeIMEFromSafeArea = false;
         else
             excludeIMEFromSafeArea = true;
-        SDL_StartTextInputWithProperties(window, propIDVal);
+
+        #ifdef __ANDROID__
+            AndroidJNICalls::startTextInput();
+        #else
+            SDL_StartTextInputWithProperties(window, propIDVal);
+        #endif
+
         #ifdef __EMSCRIPTEN__
             isAcceptingInputEmscripten = 1;
         #endif
@@ -875,6 +870,7 @@ void InputManager::update_safe_area() {
     else
         main.window.safeArea = SCollision::AABB<float>({0, 0}, {main.window.size.x(), main.window.size.y()});
 
+    std::scoped_lock a{safeAreaWithoutIMEMutex};
     if(excludeIMEFromSafeArea && safeAreaWithoutIME.has_value())
         main.window.safeArea = safeAreaWithoutIME.value();
 }
@@ -1148,6 +1144,7 @@ void InputManager::update() {
     constexpr float PADDING_BETWEEN_TEXTBOX_AND_IME = 15.0f;
     if(!text.textBoxes.empty()) {
         auto& r = text.textBoxes.front().rect;
+        std::scoped_lock a{safeAreaWithoutIMEMutex};
         if(r.has_value() && safeAreaWithoutIME.has_value()) {
             float bottomY = r.value().max.y();
             float yLimit = safeAreaWithoutIME.value().max.y() - PADDING_BETWEEN_TEXTBOX_AND_IME;

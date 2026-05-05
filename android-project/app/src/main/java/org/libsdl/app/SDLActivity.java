@@ -980,7 +980,7 @@ public class SDLActivity extends Activity implements View.OnSystemUiVisibilityCh
     }
 
     // Handler for the messages
-    Handler commandHandler = new SDLCommandHandler();
+    public Handler commandHandler = new SDLCommandHandler();
 
     // Send a message from the SDLMain thread
     protected boolean sendCommand(int command, Object data) {

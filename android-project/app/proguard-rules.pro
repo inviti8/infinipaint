@@ -16,6 +16,10 @@
 #   public *;
 #}
 
+-keep,includedescriptorclasses,allowoptimization class com.erroratline0.infinipaint.InfiniPaint {
+    void startTextInput();
+}
+
 -keep,includedescriptorclasses,allowoptimization class org.libsdl.app.SDLActivity {
     java.lang.String nativeGetHint(java.lang.String); # Java-side doesn't use this, so it gets minified, but C-side still tries to register it
     java.lang.String clipboardGetText();
