@@ -117,7 +117,14 @@ class CompressorRecipe(ConanFile):
         if self.settings.os != "Emscripten":
             self.requires("libdatachannel/0.23.2")
             self.requires("libcurl/8.17.0")
-            
+
+        # libmypaint (vendored under deps/libmypaint) needs json-c for brush
+        # serialization. Desktop targets only — disabled on web and Android in
+        # Phase 1 (PHASE1.md §4 — Emscripten/web build) and (CMakeLists.txt
+        # add_subdirectory guard for Android).
+        if self.settings.os not in ("Emscripten", "Android"):
+            self.requires("json-c/0.18")
+
         self.requires("zstd/1.5.7")
         self.requires("icu-infinipaint/77.1")
 

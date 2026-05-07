@@ -99,6 +99,7 @@
 #include <Helpers/Logger.hpp>
 #include "SwitchCWD.hpp"
 #include "CustomEvents.hpp"
+#include "Brushes/LibMyPaintBridgeTest.hpp"
 
 // Use dedicated graphics card on Windows
 #ifdef _WIN32
@@ -374,6 +375,17 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv) {
 #ifdef __ANDROID__
     std::scoped_lock a{AndroidJNICalls::globalCallMutex};
 #endif
+
+    // M1 spike (PHASE1.md §4): --mypaint-hello-dab <out.png> drives a single
+    // libmypaint dab onto a Skia raster surface and exits. Bypasses normal app
+    // startup, so it must run before icu/SDL/MainProgram init.
+    for (int i = 1; i + 1 < argc; ++i) {
+        if (std::string_view(argv[i]) == "--mypaint-hello-dab") {
+            const bool ok = HVYM::Brushes::run_libmypaint_hello_dab(
+                std::filesystem::path(argv[i + 1]));
+            return ok ? SDL_APP_SUCCESS : SDL_APP_FAILURE;
+        }
+    }
 
     std::vector<std::filesystem::path> listOfFilesToOpenFromCommand;
     for(int i = 1; i < argc; i++)

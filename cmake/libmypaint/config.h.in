@@ -1,0 +1,20 @@
+/* config.h for libmypaint built via the HVYM Mischief CMake wrapper.
+ *
+ * The upstream libmypaint build is autotools-based and generates this file
+ * via AC_CONFIG_HEADERS. We don't run autotools here; this template is
+ * `configure_file`'d by deps/libmypaint/CMakeLists.txt. Keep this file
+ * narrow — only the macros that libmypaint .c files reference.
+ */
+
+#ifndef LIBMYPAINT_CMAKE_CONFIG_H
+#define LIBMYPAINT_CMAKE_CONFIG_H
+
+/* Required by mypaint-brush-settings.c for dgettext(GETTEXT_PACKAGE, ...).
+ * Build-time HAVE_GETTEXT is left undefined so the macro becomes (String). */
+#define GETTEXT_PACKAGE "libmypaint-2.0"
+
+/* Toggled off — we don't pull in glib for the HVYM build. mypaint-glib-compat.h
+ * provides the gboolean / gchar / G_BEGIN_DECLS shims when this is 0. */
+#define MYPAINT_CONFIG_USE_GLIB 0
+
+#endif /* LIBMYPAINT_CMAKE_CONFIG_H */

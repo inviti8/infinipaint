@@ -109,6 +109,7 @@ set(sources "src/main.cpp"
             "src/CanvasComponents/EllipseCanvasComponent.cpp"
             "src/CanvasComponents/ImageCanvasComponent.cpp"
             "src/CanvasComponents/CanvasComponent.cpp"
+            "src/Brushes/LibMyPaintBridgeTest.cpp"
             "src/GUIStuff/GUIManager.cpp"
             "src/GUIStuff/GUIFloatAnimation.cpp"
             "src/GUIStuff/GUIManagerID.cpp"
@@ -366,6 +367,16 @@ if((NOT EMSCRIPTEN) AND WIN32)
     set(CLIP_ENABLE_IMAGE ON CACHE BOOL "Compile with image clipboard support")
     add_subdirectory(deps/clip)
     target_link_libraries(main clip)
+endif()
+
+# libmypaint — natural-media brush engine, scoped to ink/markers in Phase 1.
+# Disabled on Emscripten and Android in Phase 1 (PHASE1.md §4). Wrapper
+# CMakeLists.txt lives in cmake/libmypaint/ so the deps/libmypaint submodule
+# stays untouched.
+if((NOT EMSCRIPTEN) AND (NOT ANDROID))
+    add_subdirectory(cmake/libmypaint)
+    target_link_libraries(main mypaint)
+    target_compile_definitions(main PRIVATE HVYM_HAS_LIBMYPAINT)
 endif()
 
 if(EMSCRIPTEN)
