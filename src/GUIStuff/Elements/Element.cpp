@@ -21,6 +21,7 @@ namespace GUIStuff {
         input_mouse_motion_callback(InputManager::convert_finger_motion_to_mouse_motion(motion));
     }
     void Element::input_key_callback(const InputManager::KeyCallbackArgs& key) {}
+    std::optional<InputManager::TextBoxStartInfo> Element::get_text_box_start_info() { return std::nullopt; }
 
     void Element::clay_draw(SkCanvas* canvas, UpdateInputData& io, Clay_RenderCommand* command, bool skiaAA) {}
 

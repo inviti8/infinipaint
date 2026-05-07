@@ -108,6 +108,7 @@ class GUIManager {
         void input_mouse_wheel_callback(InputManager::MouseWheelCallbackArgs wheel);
         void input_finger_touch_callback(InputManager::FingerTouchCallbackArgs touch);
         void input_finger_motion_callback(InputManager::FingerMotionCallbackArgs motion);
+        std::optional<InputManager::TextBoxStartInfo> get_text_box_start_info();
 
         bool cursor_obstructed() const;
     private:

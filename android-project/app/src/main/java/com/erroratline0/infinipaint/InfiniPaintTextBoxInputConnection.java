@@ -9,6 +9,7 @@ import android.os.Bundle;
 import android.os.CancellationSignal;
 import android.os.Handler;
 import android.text.Editable;
+import android.text.SpannableStringBuilder;
 import android.view.*;
 import android.view.inputmethod.BaseInputConnection;
 import android.view.inputmethod.CompletionInfo;
@@ -38,14 +39,23 @@ import android.widget.EditText;
 import org.libsdl.app.SDL;
 import org.libsdl.app.SDLActivity;
 
-class InfiniPaintTextBoxInputConnection extends BaseInputConnection
-{
+public class InfiniPaintTextBoxInputConnection extends BaseInputConnection {
+    public static native void nativeCommitText(int textboxID, String text, int newCursorPosition);
+    public static native void nativeDeleteSurroundingText(int textboxID, int beforeLength, int afterLength);
+    public static native void nativeSetSelection(int textboxID, int start, int end);
+
     protected EditText mEditText;
-    protected String mCommittedText = "";
+    protected int mTextBoxID;
 
     InfiniPaintTextBoxInputConnection(View targetView, boolean fullEditor) {
         super(targetView, fullEditor);
         mEditText = new EditText(SDL.getContext());
+    }
+
+    public void setInitialData(int textboxID, String initialText, int begin, int end) {
+        mTextBoxID = textboxID;
+        mEditText.setText(initialText);
+        mEditText.setSelection(begin, end);
     }
 
     @Override
@@ -63,7 +73,7 @@ class InfiniPaintTextBoxInputConnection extends BaseInputConnection
          */
 
         /*
-         * Return DOES still generate a key event, however.  So rather than using it as the 'click a button' key
+         * Return DOES still generate a key event, however. So rather than using it as the 'click a button' key
          * as we do with physical keyboards, let's just use it to hide the keyboard.
          */
 
@@ -78,253 +88,34 @@ class InfiniPaintTextBoxInputConnection extends BaseInputConnection
 
     @Override
     public boolean commitText(CharSequence text, int newCursorPosition) {
-        if (!super.commitText(text, newCursorPosition)) {
+        if (!super.commitText(text, newCursorPosition))
             return false;
-        }
-        updateText();
+        nativeCommitText(mTextBoxID, text.toString(), newCursorPosition);
         return true;
     }
 
     @Override
     public boolean setComposingText(CharSequence text, int newCursorPosition) {
-        if (!super.setComposingText(text, newCursorPosition)) {
+        if (!super.setComposingText(text, newCursorPosition))
             return false;
-        }
-        updateText();
+        nativeCommitText(mTextBoxID, text.toString(), newCursorPosition);
         return true;
     }
 
     @Override
     public boolean deleteSurroundingText(int beforeLength, int afterLength) {
-        // Workaround to capture backspace key. Ref: http://stackoverflow.com/questions>/14560344/android-backspace-in-webview-baseinputconnection
-        // and https://bugzilla.libsdl.org/show_bug.cgi?id=2265
-        if (beforeLength > 0 && afterLength == 0) {
-            // backspace(s)
-            while (beforeLength-- > 0) {
-            }
-            return true;
-        }
-
-        if (!super.deleteSurroundingText(beforeLength, afterLength)) {
+        if (!super.deleteSurroundingText(beforeLength, afterLength))
             return false;
-        }
-        updateText();
+        nativeDeleteSurroundingText(mTextBoxID, beforeLength, afterLength);
         return true;
     }
 
-    protected void updateText() {
-        final Editable content = getEditable();
-        if (content == null) {
-            return;
-        }
-
-        String text = content.toString();
-        int compareLength = Math.min(text.length(), mCommittedText.length());
-        int matchLength, offset;
-
-        /* Backspace over characters that are no longer in the string */
-        for (matchLength = 0; matchLength < compareLength; ) {
-            int codePoint = mCommittedText.codePointAt(matchLength);
-            if (codePoint != text.codePointAt(matchLength)) {
-                break;
-            }
-            matchLength += Character.charCount(codePoint);
-        }
-        /* FIXME: This doesn't handle graphemes, like '🌬️' */
-        for (offset = matchLength; offset < mCommittedText.length(); ) {
-            int codePoint = mCommittedText.codePointAt(offset);
-            offset += Character.charCount(codePoint);
-        }
-
-        if (matchLength < text.length()) {
-            String pendingText = text.subSequence(matchLength, text.length()).toString();
-            if (!SDLActivity.dispatchingKeyEvent()) {
-                for (offset = 0; offset < pendingText.length(); ) {
-                    int codePoint = pendingText.codePointAt(offset);
-                    if (codePoint == '\n') {
-                        if (SDLActivity.onNativeSoftReturnKey()) {
-                            return;
-                        }
-                    }
-                    /* Higher code points don't generate simulated scancodes */
-                    if (codePoint > 0 && codePoint < 128) {
-                    }
-                    offset += Character.charCount(codePoint);
-                }
-            }
-        }
-        mCommittedText = text;
+    @Override
+    public boolean setSelection(int start, int end) {
+        if(!super.setSelection(start, end))
+            return false;
+        nativeSetSelection(mTextBoxID, start, end);
+        return true;
     }
 }
-
-//class InfiniPaintTextBoxInputConnection extends BaseInputConnection {
-//    InfiniPaintTextBoxInputConnection(View targetView, boolean fullEditor) {
-//        super(targetView, fullEditor);
-//    }
-//
-//    public native void nativeBeginBatchEdit();
-//    public native void nativeClearMetaKeyStates(int states);
-//    public native void nativeSetComposingText(CharSequence text, int newCursorPosition);
-//    public native void nativeSetComposingRegion(int start, int end);
-//    public native void nativeSetSelection(int start, int end);
-//    public native void nativeCommitCorrection(int offset, CharSequence oldText, CharSequence newText);
-//    public native void nativeCommitText(CharSequence text, int newCursorPosition);
-//    public native void nativeDeleteSurroundingText(int beforeLength, int afterLength);
-//    public native void nativeDeleteSurroundingTextInCodePoints(int beforeLength, int afterLength);
-//    public native void nativeEndBatchEdit();
-//    public native void nativeFinishComposingText();
-//    public native CharSequence nativeGetSelectedText();
-//    public native CharSequence nativeGetTextAfterCursor(int n);
-//    public native CharSequence nativeGetTextBeforeCursor(int n);
-//    public native void nativePerformContextMenuAction(int action);
-//    public native void nativePerformEditorAction(int action);
-//
-//    @Override
-//    public boolean beginBatchEdit() {
-//        nativeBeginBatchEdit();
-//        return true;
-//    }
-//
-//    @Override
-//    public boolean clearMetaKeyStates(int states) {
-//        nativeClearMetaKeyStates(states);
-//        return true;
-//    }
-//
-//    @Override
-//    public boolean performSpellCheck() {
-//        return true;
-//    }
-//
-//    @Override
-//    public TextSnapshot takeSnapshot() {
-//        return null;
-//    }
-//
-//    @Override
-//    public CharSequence getTextBeforeCursor(int n, int flags) {
-//        return nativeGetTextBeforeCursor(n);
-//    }
-//
-//    @Override
-//    public CharSequence getTextAfterCursor(int n, int flags) {
-//        return nativeGetTextAfterCursor(n);
-//    }
-//
-//    @Override
-//    public CharSequence getSelectedText(int i) {
-//        return nativeGetSelectedText();
-//    }
-//
-//    @Override
-//    public int getCursorCapsMode(int i) {
-//        return CAP_MODE_SENTENCES;
-//    }
-//
-//    @Override
-//    public ExtractedText getExtractedText(ExtractedTextRequest extractedTextRequest, int i) {
-//        return null;
-//    }
-//
-//    @Override
-//    public boolean deleteSurroundingText(int i, int i1) {
-//        nativeDeleteSurroundingText(i, i1);
-//        return true;
-//    }
-//
-//    @Override
-//    public boolean deleteSurroundingTextInCodePoints(int beforeLength, int afterLength) {
-//        nativeDeleteSurroundingTextInCodePoints(beforeLength, afterLength);
-//        return true;
-//    }
-//
-//    @Override
-//    public boolean setComposingRegion(int i, int i1) {
-//        nativeSetComposingRegion(i, i1);
-//        return true;
-//    }
-//
-//    @Override
-//    public boolean finishComposingText() {
-//        nativeFinishComposingText();
-//        return true;
-//    }
-//
-//    @Override
-//    public boolean commitCompletion(CompletionInfo completionInfo) {
-//        return true;
-//    }
-//
-//    @Override
-//    public boolean commitCorrection(CorrectionInfo correctionInfo) {
-//        nativeCommitCorrection(correctionInfo.getOffset(), correctionInfo.getOldText(), correctionInfo.getNewText());
-//        return true;
-//    }
-//
-//    @Override
-//    public boolean setSelection(int i, int i1) {
-//        nativeSetSelection(i, i1);
-//        return true;
-//    }
-//
-//    @Override
-//    public boolean performEditorAction(int i) {
-//        nativePerformEditorAction(i);
-//        return true;
-//    }
-//
-//    @Override
-//    public boolean performContextMenuAction(int i) {
-//        nativePerformContextMenuAction(i);
-//        return true;
-//    }
-//
-//    @Override
-//    public boolean endBatchEdit() {
-//        nativeEndBatchEdit();
-//        return true;
-//    }
-//
-//    @Override
-//    public boolean sendKeyEvent(KeyEvent keyEvent) {
-//        return true;
-//    }
-//
-//    @Override
-//    public boolean reportFullscreenMode(boolean b) {
-//        return true;
-//    }
-//
-//    @Override
-//    public boolean performPrivateCommand(String s, Bundle bundle) {
-//        return false;
-//    }
-//
-//    @Override
-//    public boolean requestCursorUpdates(int i) {
-//        return true;
-//    }
-//
-//    @Override
-//    public Handler getHandler() {
-//        return null;
-//    }
-//
-//    @Override
-//    public boolean commitContent(InputContentInfo inputContentInfo, int i, Bundle bundle) {
-//        return true;
-//    }
-//
-//    @Override
-//    public boolean commitText(CharSequence text, int newCursorPosition) {
-//        nativeCommitText(text, newCursorPosition);
-//        return true;
-//    }
-//
-//    @Override
-//    public boolean setComposingText(CharSequence text, int newCursorPosition) {
-//        nativeSetComposingText(text, newCursorPosition);
-//        return true;
-//    }
-//}
 

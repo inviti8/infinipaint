@@ -22,9 +22,9 @@ class TextBoxEditTool : public DrawingProgramEditToolBase {
         virtual void input_text_callback(const InputManager::TextCallbackArgs& text) override;
         virtual void input_mouse_button_on_canvas_callback(const InputManager::MouseButtonCallbackArgs& button, bool isDraggingPoint) override;
         virtual void input_mouse_motion_callback(const InputManager::MouseMotionCallbackArgs& motion, bool isDraggingPoint) override;
+        virtual std::optional<InputManager::TextBoxStartInfo> get_text_box_start_info() override;
     private:
         std::unique_ptr<RichTextUserInput> userInput;
-        std::optional<unsigned> textboxID;
 
         struct TextBoxEditToolAllData {
             TextBoxCanvasComponent::Data textboxData;

@@ -176,6 +176,12 @@ void EditTool::input_mouse_motion_callback(const InputManager::MouseMotionCallba
     drawP.selection.input_mouse_motion_callback_modify_selection(motion);
 }
 
+std::optional<InputManager::TextBoxStartInfo> EditTool::get_text_box_start_info() {
+    if(objInfoBeingEdited)
+        return compEditTool->get_text_box_start_info();
+    return std::nullopt;
+}
+
 void EditTool::right_click_popup_gui(Toolbar& t, Vector2f popupPos) {
     if(objInfoBeingEdited)
         return compEditTool->right_click_popup_gui(t, popupPos);

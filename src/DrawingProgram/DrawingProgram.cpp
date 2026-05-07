@@ -268,6 +268,10 @@ void DrawingProgram::input_pen_axis_callback(const InputManager::PenAxisCallback
     drawTool->input_pen_axis_callback(axis);
 }
 
+std::optional<InputManager::TextBoxStartInfo> DrawingProgram::get_text_box_start_info() {
+    return drawTool->get_text_box_start_info();
+}
+
 void DrawingProgram::server_init_no_file() {
     layerMan.server_init_no_file();
 }

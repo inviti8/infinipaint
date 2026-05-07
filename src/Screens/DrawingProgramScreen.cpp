@@ -102,3 +102,7 @@ void DrawingProgramScreen::input_window_resize_callback(const InputManager::Wind
 
 void DrawingProgramScreen::input_window_scale_callback(const InputManager::WindowScaleCallbackArgs& w) {
 }
+
+std::optional<InputManager::TextBoxStartInfo> DrawingProgramScreen::get_text_box_start_info() {
+    return main.world->get_text_box_start_info();
+}

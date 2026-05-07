@@ -8,7 +8,8 @@ template <typename T> std::optional<T> shared_ptr_to_opt(const std::shared_ptr<T
         return std::nullopt;
 }
 
-RichTextUserInput::RichTextUserInput(const std::shared_ptr<RichText::TextBox>& initTextBox, const std::shared_ptr<RichText::TextBox::Cursor>& initCursor, const std::shared_ptr<RichText::TextStyleModifier::ModifierMap>& initModMap):
+RichTextUserInput::RichTextUserInput(InputManager::TextBoxID initId, const std::shared_ptr<RichText::TextBox>& initTextBox, const std::shared_ptr<RichText::TextBox::Cursor>& initCursor, const std::shared_ptr<RichText::TextStyleModifier::ModifierMap>& initModMap):
+    id(initId),
     textBox(initTextBox),
     cursor(initCursor),
     modMap(initModMap)

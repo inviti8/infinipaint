@@ -74,6 +74,7 @@ class DrawingProgram {
         void input_pen_touch_callback(const InputManager::PenTouchCallbackArgs& touch);
         void input_pen_motion_callback(const InputManager::PenMotionCallbackArgs& motion);
         void input_pen_axis_callback(const InputManager::PenAxisCallbackArgs& axis);
+        std::optional<InputManager::TextBoxStartInfo> get_text_box_start_info();
 
         void set_right_click_popup_location(const Vector2f& newLoc);
         void clear_right_click_popup();

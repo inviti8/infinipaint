@@ -158,6 +158,8 @@ class MainProgram {
         void input_window_resize_callback(const InputManager::WindowResizeCallbackArgs& w);
         void input_window_scale_callback(const InputManager::WindowScaleCallbackArgs& w);
 
+        std::optional<InputManager::TextBoxStartInfo> get_text_box_start_info();
+
         void create_new_tab(const CustomEvents::OpenInfiniPaintFileEvent& openFile);
         void set_tab_to_close(World* world);
         void switch_to_tab(size_t wIndex);

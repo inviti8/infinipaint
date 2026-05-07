@@ -1,5 +1,6 @@
 #include "TextBox.decl.hpp"
 #include "../GUIManager.hpp"
+#include <SDL3/SDL_keyboard.h>
 
 namespace GUIStuff {
 
@@ -13,6 +14,11 @@ template <typename T> void TextBox<T>::layout(const Clay_ElementId& id, const Te
         reset_textbox_text();
         populate_empty_textbox();
         gui.invalidate_draw_element(this);
+    }
+
+    if(edit) {
+        SCollision::AABB<float> rect = {boundingBox.value().min * gui.io.guiScaleMultiplier, boundingBox.value().max * gui.io.guiScaleMultiplier};
+        gui.io.input->update_textbox_rectangle(edit->id, rect);
     }
 
     CLAY(id, {
@@ -31,10 +37,6 @@ template <typename T> void TextBox<T>::update() {
         oldDD.textboxStr = newTextboxStr;
         oldDD.cur = *cur;
         gui.invalidate_draw_element(this);
-    }
-    if(edit.has_value()) {
-        SCollision::AABB<float> rect = {boundingBox.value().min * gui.io.guiScaleMultiplier, boundingBox.value().max * gui.io.guiScaleMultiplier};
-        gui.io.input->update_textbox_rectangle(edit.value().textboxInputID, rect);
     }
 }
 
@@ -80,30 +82,29 @@ template <typename T> void TextBox<T>::clay_draw(SkCanvas* canvas, UpdateInputDa
 
 template <typename T> void TextBox<T>::select() {
     if(!is_selected()) {
-        SCollision::AABB<float> rect = {boundingBox.value().min * gui.io.guiScaleMultiplier, boundingBox.value().max * gui.io.guiScaleMultiplier};
-        unsigned id = gui.io.input->set_text_box_front(rect, userInfo.textInputProps);
         if(isEmptyText)
             textbox->clear_text();
-        edit = TextEditData(id, textbox, cur);
+        edit = std::make_unique<RichTextUserInput>(gui.io.input->text_box_get_new_id(), textbox, cur, nullptr);
+        CustomEvents::emit_event(CustomEvents::RefreshTextBoxInputEvent{});
     }
 }
 
 template <typename T> void TextBox<T>::deselect() {
     if(is_selected()) {
-        gui.io.input->remove_text_box(edit.value().textboxInputID);
+        edit = nullptr;
         if(userInfo.onDeselect) userInfo.onDeselect();
+        CustomEvents::emit_event(CustomEvents::RefreshTextBoxInputEvent{});
         reset_textbox_text();
-        edit = std::nullopt;
         populate_empty_textbox();
     }
 }
 
 template <typename T> bool TextBox<T>::is_selected() const {
-    return edit.has_value();
+    return edit != nullptr;
 }
 
 template <typename T> void TextBox<T>::input_paste_callback(const CustomEvents::PasteEvent& paste) {
-    if(is_selected() && edit.value().userInput.input_paste_callback(paste))
+    if(is_selected() && edit->input_paste_callback(paste))
         after_text_input_callback();
 }
 
@@ -118,7 +119,7 @@ template <typename T> void TextBox<T>::input_text_key_callback(const InputManage
             });
         }
         else {
-            if(edit.value().userInput.input_key_callback(*gui.io.input, key).textEdited)
+            if(edit->input_key_callback(*gui.io.input, key).textEdited)
                 after_text_input_callback();
         }
     }
@@ -150,7 +151,7 @@ template <typename T> void TextBox<T>::after_text_input_callback() {
 
 template <typename T> void TextBox<T>::input_text_callback(const InputManager::TextCallbackArgs& text) {
     if(is_selected()) {
-        edit.value().userInput.add_text_to_textbox(text.str);
+        edit->add_text_to_textbox(text.str);
         after_text_input_callback();
     }
 }
@@ -179,6 +180,18 @@ template <typename T> void TextBox<T>::input_mouse_button_callback(const InputMa
 template <typename T> void TextBox<T>::input_mouse_motion_callback(const InputManager::MouseMotionCallbackArgs& motion) {
     if(boundingBox.has_value())
         textbox->process_mouse_left_button(*cur, motion.pos - boundingBox.value().min, 0, isHeld, gui.io.input->key(InputManager::KEY_GENERIC_LSHIFT).held);
+}
+
+template <typename T> std::optional<InputManager::TextBoxStartInfo> TextBox<T>::get_text_box_start_info() {
+    if(edit) {
+        SCollision::AABB<float> rect = {boundingBox.value().min * gui.io.guiScaleMultiplier, boundingBox.value().max * gui.io.guiScaleMultiplier};
+        return InputManager::TextBoxStartInfo{
+            .id = edit->id,
+            .rect = rect,
+            .inputProperties = userInfo.textInputProps
+        };
+    }
+    return std::nullopt;
 }
 
 template <typename T> void TextBox<T>::init_textbox(UpdateInputData& io) {
@@ -212,7 +225,7 @@ template <typename T> bool TextBox<T>::update_data() {
 
 template <typename T> TextBox<T>::~TextBox() {
     if(is_selected())
-        gui.io.input->remove_text_box(edit.value().textboxInputID);
+        CustomEvents::emit_event(CustomEvents::RefreshTextBoxInputEvent{});
 }
 
 }

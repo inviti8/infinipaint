@@ -109,6 +109,7 @@ class World {
         void input_pen_axis_callback(const InputManager::PenAxisCallbackArgs& axis);
         void input_multi_finger_touch_callback(const InputManager::MultiFingerTouchCallbackArgs& touch);
         void input_multi_finger_motion_callback(const InputManager::MultiFingerMotionCallbackArgs& motion);
+        std::optional<InputManager::TextBoxStartInfo> get_text_box_start_info();
     private:
         bool saveThumbnail = false;
         bool hasUnsavedLocalChanges = false;

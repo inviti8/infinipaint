@@ -48,6 +48,7 @@ class DrawingProgramToolBase {
         virtual void input_pen_touch_callback(const InputManager::PenTouchCallbackArgs& touch);
         virtual void input_pen_motion_callback(const InputManager::PenMotionCallbackArgs& motion);
         virtual void input_pen_axis_callback(const InputManager::PenAxisCallbackArgs& axis);
+        virtual std::optional<InputManager::TextBoxStartInfo> get_text_box_start_info();
         virtual ~DrawingProgramToolBase(); 
         static std::unique_ptr<DrawingProgramToolBase> allocate_tool_type(DrawingProgram& drawP, DrawingProgramToolType t);
     protected:

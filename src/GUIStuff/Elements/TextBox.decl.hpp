@@ -23,16 +23,6 @@ template <typename T> struct TextBoxData {
     std::function<void()> onDeselect;
 };
 
-
-struct TextEditData {
-    TextEditData(unsigned initTextboxInputID, const std::shared_ptr<RichText::TextBox>& initTextBox, const std::shared_ptr<RichText::TextBox::Cursor>& initCursor):
-        textboxInputID(initTextboxInputID),
-        userInput(initTextBox, initCursor, nullptr)
-    {}
-    unsigned textboxInputID;
-    RichTextUserInput userInput;
-};
-
 template <typename T> class TextBox : public Element {
     public:
         TextBox(GUIManager& gui);
@@ -47,6 +37,7 @@ template <typename T> class TextBox : public Element {
         virtual void input_text_callback(const InputManager::TextCallbackArgs& text) override;
         virtual void input_mouse_button_callback(const InputManager::MouseButtonCallbackArgs& button) override;
         virtual void input_mouse_motion_callback(const InputManager::MouseMotionCallbackArgs& motion) override;
+        virtual std::optional<InputManager::TextBoxStartInfo> get_text_box_start_info() override;
         ~TextBox();
     private:
         void populate_empty_textbox();
@@ -64,7 +55,8 @@ template <typename T> class TextBox : public Element {
 
         bool isEmptyText = false;
         bool isHeld = false;
-        std::optional<TextEditData> edit;
+
+        std::unique_ptr<RichTextUserInput> edit;
 
         std::optional<T> oldData;
         std::string oldEmptyText;

@@ -422,6 +422,13 @@ void MainProgram::input_window_scale_callback(const InputManager::WindowScaleCal
     post_callback();
 }
 
+std::optional<InputManager::TextBoxStartInfo> MainProgram::get_text_box_start_info() {
+    auto toRet = g.get_text_box_start_info();
+    if(toRet)
+        return toRet;
+    return screen->get_text_box_start_info();
+}
+
 void MainProgram::toggle_full_screen() {
     window.fullscreen = !window.fullscreen;
     SDL_SetWindowFullscreen(window.sdlWindow, window.fullscreen);

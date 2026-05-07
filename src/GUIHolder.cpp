@@ -163,3 +163,7 @@ void GUIHolder::input_finger_touch_callback(const InputManager::FingerTouchCallb
 void GUIHolder::input_finger_motion_callback(const InputManager::FingerMotionCallbackArgs& motion) {
     gui.input_finger_motion_callback(motion);
 }
+
+std::optional<InputManager::TextBoxStartInfo> GUIHolder::get_text_box_start_info() {
+    return gui.get_text_box_start_info();
+}

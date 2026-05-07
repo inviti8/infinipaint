@@ -65,3 +65,4 @@ void DrawingProgramToolBase::input_pen_button_callback(const InputManager::PenBu
 void DrawingProgramToolBase::input_pen_touch_callback(const InputManager::PenTouchCallbackArgs& touch) {}
 void DrawingProgramToolBase::input_pen_motion_callback(const InputManager::PenMotionCallbackArgs& motion) {}
 void DrawingProgramToolBase::input_pen_axis_callback(const InputManager::PenAxisCallbackArgs& axis) {}
+std::optional<InputManager::TextBoxStartInfo> DrawingProgramToolBase::get_text_box_start_info() { return std::nullopt; }

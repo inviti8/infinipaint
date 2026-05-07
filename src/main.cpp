@@ -109,6 +109,8 @@ extern "C"
 }
 #endif
 
+#include "AndroidJNICalls.hpp"
+
 #include <unicode/udata.h>
 std::string icudt; // Put this in global space so that it isn't deallocated
 
@@ -369,6 +371,10 @@ void init_logs(MainStruct& mS) {
 }
 
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv) {
+#ifdef __ANDROID__
+    std::scoped_lock a{AndroidJNICalls::globalCallMutex};
+#endif
+
     std::vector<std::filesystem::path> listOfFilesToOpenFromCommand;
     for(int i = 1; i < argc; i++)
         listOfFilesToOpenFromCommand.emplace_back(std::filesystem::canonical(std::filesystem::path(std::u8string_view(reinterpret_cast<char8_t*>(argv[i])))));
@@ -592,6 +598,10 @@ void regular_draw(MainStruct& mS) {
 }
 
 SDL_AppResult SDL_AppIterate(void *appstate) {
+#ifdef __ANDROID__
+    std::scoped_lock a{AndroidJNICalls::globalCallMutex};
+#endif
+
     std::chrono::steady_clock::time_point frameTimeStart = std::chrono::steady_clock::now();
 
     MainStruct& mS = *((MainStruct*)appstate);
@@ -631,6 +641,10 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
 }
 
 SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
+#ifdef __ANDROID__
+    std::scoped_lock a{AndroidJNICalls::globalCallMutex};
+#endif
+
     MainStruct& mS = *((MainStruct*)appstate);
 
 #ifdef NDEBUG
@@ -788,6 +802,8 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
                     mS.m->input_open_infinipaint_file_callback(*CustomEvents::get_event<CustomEvents::OpenInfiniPaintFileEvent>());
                 else if(event->type == CustomEvents::AddFileToCanvasEvent::EVENT_NUM)
                     mS.m->input_add_file_to_canvas_callback(*CustomEvents::get_event<CustomEvents::AddFileToCanvasEvent>());
+                else if(event->type == CustomEvents::RefreshTextBoxInputEvent::EVENT_NUM)
+                    mS.m->input.refresh_receiving_text_box_input();
                 break;
             }
         }

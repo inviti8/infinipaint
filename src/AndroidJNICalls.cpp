@@ -11,15 +11,15 @@ namespace AndroidJNICalls {
     InputManager* globalInputManager;
     std::mutex globalCallMutex;
 
-    void startTextInput() {
+    void startTextInput(int input_type) {
         JNIEnv* env = static_cast<JNIEnv*>(SDL_GetAndroidJNIEnv());
         Logger::get().log("INFO", std::to_string((uint64_t)env) + " jni env value");
         jobject activity = (jobject)SDL_GetAndroidActivity();
         Logger::get().log("INFO", std::to_string((uint64_t)activity) + " activity value");
         jclass clazz = env->GetObjectClass(activity);
-        jmethodID method_id = env->GetStaticMethodID(clazz, "startTextInput", "()V");
+        jmethodID method_id = env->GetStaticMethodID(clazz, "startTextInput", "(I)V");
         Logger::get().log("INFO", std::to_string((uint64_t)method_id) + " method value");
-        env->CallStaticVoidMethod(clazz, method_id);
+        env->CallStaticVoidMethod(clazz, method_id, input_type);
         env->DeleteLocalRef(activity);
         env->DeleteLocalRef(clazz);
     }
@@ -35,6 +35,27 @@ JNIEnv* jniEnv;
 
 using namespace AndroidJNICalls;
 
+
+// https://stackoverflow.com/questions/41820039/jstringjni-to-stdstringc-with-utf8-characters
+std::string jstring2string(JNIEnv *env, jstring jStr) {
+    if (!jStr)
+        return "";
+
+    const jclass stringClass = env->GetObjectClass(jStr);
+    const jmethodID getBytes = env->GetMethodID(stringClass, "getBytes", "(Ljava/lang/String;)[B");
+    const jbyteArray stringJbytes = (jbyteArray) env->CallObjectMethod(jStr, getBytes, env->NewStringUTF("UTF-8"));
+
+    size_t length = (size_t) env->GetArrayLength(stringJbytes);
+    jbyte* pBytes = env->GetByteArrayElements(stringJbytes, NULL);
+
+    std::string ret = std::string((char *)pBytes, length);
+    env->ReleaseByteArrayElements(stringJbytes, pBytes, JNI_ABORT);
+
+    env->DeleteLocalRef(stringJbytes);
+    env->DeleteLocalRef(stringClass);
+    return ret;
+}
+
 extern "C"
 JNIEXPORT void JNICALL
 Java_com_erroratline0_infinipaint_InfiniPaintSurface_nativeInfiniPaintUpdateIMESafeArea(JNIEnv *env, jclass clazz, jint top, jint bottom, jint left, jint right) {
@@ -46,103 +67,12 @@ Java_com_erroratline0_infinipaint_InfiniPaintSurface_nativeInfiniPaintUpdateIMES
 
 extern "C"
 JNIEXPORT void JNICALL
-Java_com_erroratline0_infinipaint_InfiniPaintTextBoxInputConnection_nativeBeginBatchEdit(
-        JNIEnv *env, jobject jobject1) {
-    // TODO: implement nativeBeginBatchEdit()
-}
-extern "C"
-JNIEXPORT void JNICALL
-Java_com_erroratline0_infinipaint_InfiniPaintTextBoxInputConnection_nativeClearMetaKeyStates(
-        JNIEnv *env, jobject jobject1, jint states) {
-    // TODO: implement nativeClearMetaKeyStates()
-}
-extern "C"
-JNIEXPORT void JNICALL
-Java_com_erroratline0_infinipaint_InfiniPaintTextBoxInputConnection_nativeSetComposingText(
-        JNIEnv *env, jobject jobject1, jobject text, jint new_cursor_position) {
-    // TODO: implement nativeSetComposingText()
-}
-extern "C"
-JNIEXPORT void JNICALL
-Java_com_erroratline0_infinipaint_InfiniPaintTextBoxInputConnection_nativeSetComposingRegion(
-        JNIEnv *env, jobject jobject1, jint start, jint end) {
-    // TODO: implement nativeSetComposingRegion()
-}
-extern "C"
-JNIEXPORT void JNICALL
-Java_com_erroratline0_infinipaint_InfiniPaintTextBoxInputConnection_nativeSetSelection(JNIEnv *env,
-                                                                                       jobject jobject1,
-                                                                                       jint start,
-                                                                                       jint end) {
-    // TODO: implement nativeSetSelection()
-}
-extern "C"
-JNIEXPORT void JNICALL
-Java_com_erroratline0_infinipaint_InfiniPaintTextBoxInputConnection_nativeCommitCorrection(
-        JNIEnv *env, jobject jobject1, jint offset, jobject old_text, jobject new_text) {
-    // TODO: implement nativeCommitCorrection()
-}
-extern "C"
-JNIEXPORT void JNICALL
-Java_com_erroratline0_infinipaint_InfiniPaintTextBoxInputConnection_nativeCommitText(JNIEnv *env,
-                                                                                     jobject jobject1,
-                                                                                     jobject text,
-                                                                                     jint new_cursor_position) {
-    // TODO: implement nativeCommitText()
-}
-extern "C"
-JNIEXPORT void JNICALL
-Java_com_erroratline0_infinipaint_InfiniPaintTextBoxInputConnection_nativeDeleteSurroundingText(
-        JNIEnv *env, jobject jobject1, jint before_length, jint after_length) {
-    // TODO: implement nativeDeleteSurroundingText()
-}
-extern "C"
-JNIEXPORT void JNICALL
-Java_com_erroratline0_infinipaint_InfiniPaintTextBoxInputConnection_nativeDeleteSurroundingTextInCodePoints(
-        JNIEnv *env, jobject jobject1, jint before_length, jint after_length) {
-    // TODO: implement nativeDeleteSurroundingTextInCodePoints()
-}
-extern "C"
-JNIEXPORT void JNICALL
-Java_com_erroratline0_infinipaint_InfiniPaintTextBoxInputConnection_nativeEndBatchEdit(JNIEnv *env,
-                                                                                       jobject jobject1) {
-    // TODO: implement nativeEndBatchEdit()
-}
-extern "C"
-JNIEXPORT void JNICALL
-Java_com_erroratline0_infinipaint_InfiniPaintTextBoxInputConnection_nativeFinishComposingText(
-        JNIEnv *env, jobject jobject1) {
-    // TODO: implement nativeFinishComposingText()
-}
-extern "C"
-JNIEXPORT jobject JNICALL
-Java_com_erroratline0_infinipaint_InfiniPaintTextBoxInputConnection_nativeGetSelectedText(
-        JNIEnv *env, jobject jobject1) {
-    // TODO: implement nativeGetSelectedText()
-}
-extern "C"
-JNIEXPORT jobject JNICALL
-Java_com_erroratline0_infinipaint_InfiniPaintTextBoxInputConnection_nativeGetTextAfterCursor(
-        JNIEnv *env, jobject jobject1, jint n) {
-    // TODO: implement nativeGetTextAfterCursor()
-}
-extern "C"
-JNIEXPORT jobject JNICALL
-Java_com_erroratline0_infinipaint_InfiniPaintTextBoxInputConnection_nativeGetTextBeforeCursor(
-        JNIEnv *env, jobject jobject1, jint n) {
-    // TODO: implement nativeGetTextBeforeCursor()
-}
-extern "C"
-JNIEXPORT void JNICALL
-Java_com_erroratline0_infinipaint_InfiniPaintTextBoxInputConnection_nativePerformContextMenuAction(
-        JNIEnv *env, jobject jobject1, jint action) {
-    // TODO: implement nativePerformContextMenuAction()
-}
-extern "C"
-JNIEXPORT void JNICALL
-Java_com_erroratline0_infinipaint_InfiniPaintTextBoxInputConnection_nativePerformEditorAction(
-        JNIEnv *env, jobject jobject1, jint action) {
-    // TODO: implement nativePerformEditorAction()
+Java_com_erroratline0_infinipaint_InfiniPaintTextBoxInputConnection_nativeSetTextBoxCursor(
+        JNIEnv *env, jclass clazz, jint cursor_begin, jint cursor_end) {
+    if(globalInputManager) {
+        std::scoped_lock a{globalCallMutex};
+        globalInputManager->main.input_android_text_box_set_cursor(cursor_begin, cursor_end);
+    }
 }
 
 #endif

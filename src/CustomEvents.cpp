@@ -15,6 +15,7 @@ void init() {
         PasteEvent::EVENT_NUM = SDL_RegisterEvents(1);
         OpenInfiniPaintFileEvent::EVENT_NUM = SDL_RegisterEvents(1);
         AddFileToCanvasEvent::EVENT_NUM = SDL_RegisterEvents(1);
+        RefreshTextBoxInputEvent::EVENT_NUM = SDL_RegisterEvents(1);
         alreadyInitialized = true;
     }
 }
@@ -22,5 +23,6 @@ void init() {
 uint32_t PasteEvent::EVENT_NUM;
 uint32_t OpenInfiniPaintFileEvent::EVENT_NUM;
 uint32_t AddFileToCanvasEvent::EVENT_NUM;
+uint32_t RefreshTextBoxInputEvent::EVENT_NUM;
 
 }

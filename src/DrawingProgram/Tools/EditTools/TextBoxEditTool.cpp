@@ -203,7 +203,7 @@ void TextBoxEditTool::edit_gui(Toolbar& t) {
 }
 
 void TextBoxEditTool::input_paste_callback(const CustomEvents::PasteEvent& paste) {
-    if(textboxID.has_value() && textboxID.value() == drawP.world.main.input.text.current_textbox_editing_id()) {
+    if(userInput && userInput->id == drawP.world.main.input.currentTextboxID.value()) {
         auto& a = static_cast<TextBoxCanvasComponent&>(comp->obj->get_comp());
         if(userInput->input_paste_callback(paste)) {
             commit_update_and_layout_func();
@@ -213,7 +213,7 @@ void TextBoxEditTool::input_paste_callback(const CustomEvents::PasteEvent& paste
 }
 
 void TextBoxEditTool::input_text_key_callback(const InputManager::KeyCallbackArgs& key) {
-    if(textboxID.has_value() && textboxID.value() == drawP.world.main.input.text.current_textbox_editing_id()) {
+    if(userInput && userInput->id == drawP.world.main.input.currentTextboxID.value()) {
         auto& a = static_cast<TextBoxCanvasComponent&>(comp->obj->get_comp());
         auto changes = userInput->input_key_callback(drawP.world.main.input, key);
         if(changes.textEdited || changes.cursorChanged) {
@@ -224,7 +224,7 @@ void TextBoxEditTool::input_text_key_callback(const InputManager::KeyCallbackArg
 }
 
 void TextBoxEditTool::input_text_callback(const InputManager::TextCallbackArgs& text) {
-    if(textboxID.has_value() && textboxID.value() == drawP.world.main.input.text.current_textbox_editing_id()) {
+    if(userInput && userInput->id == drawP.world.main.input.currentTextboxID.value()) {
         auto& a = static_cast<TextBoxCanvasComponent&>(comp->obj->get_comp());
         userInput->add_text_to_textbox(text.str);
         commit_update_and_layout_func();
@@ -273,6 +273,25 @@ void TextBoxEditTool::input_mouse_motion_callback(const InputManager::MouseMotio
             commit_update_and_layout_func();
         }
     }
+}
+
+std::optional<InputManager::TextBoxStartInfo> TextBoxEditTool::get_text_box_start_info() {
+    if(userInput) {
+        InputManager::TextInputProperties tProps {
+            .inputType = SDL_TextInputType::SDL_TEXTINPUT_TYPE_TEXT,
+            .capitalization = SDL_Capitalization::SDL_CAPITALIZE_NONE,
+            .autocorrect = true,
+            .multiline = true,
+            .androidInputType = InputManager::AndroidInputType::ANDROIDTEXT_TYPE_CLASS_TEXT
+        };
+
+        return InputManager::TextBoxStartInfo {
+            .id = userInput->id,
+            .rect = std::nullopt,
+            .inputProperties = tProps,
+        };
+    }
+    return std::nullopt;
 }
 
 void TextBoxEditTool::right_click_popup_gui(Toolbar& t, Vector2f popupPos) {
@@ -375,8 +394,8 @@ void TextBoxEditTool::commit_edit_updates(std::any& prevData) {
     auto& a = static_cast<TextBoxCanvasComponent&>(comp->obj->get_comp());
     a.d.editing = false;
     comp->obj->commit_update(drawP);
-    if(textboxID.has_value())
-        drawP.world.main.input.remove_text_box(textboxID.value());
+    userInput = nullptr;
+    CustomEvents::emit_event(CustomEvents::RefreshTextBoxInputEvent{});
 }
 
 TextBoxEditTool::TextBoxEditToolAllData TextBoxEditTool::get_all_data(const TextBoxCanvasComponent& a) {
@@ -406,14 +425,8 @@ void TextBoxEditTool::edit_start(EditTool& editTool, std::any& prevData) {
 
     comp->obj->commit_update(drawP);
 
-    userInput = std::make_unique<RichTextUserInput>(textbox, cur, currentModsPtr);
-    textboxID = drawP.world.main.input.set_text_box_back(std::nullopt, {
-        .inputType = SDL_TextInputType::SDL_TEXTINPUT_TYPE_TEXT,
-        .capitalization = SDL_Capitalization::SDL_CAPITALIZE_NONE,
-        .autocorrect = true,
-        .multiline = true,
-        .androidInputType = InputManager::AndroidInputType::ANDROIDTEXT_TYPE_CLASS_TEXT
-    });
+    userInput = std::make_unique<RichTextUserInput>(drawP.world.main.input.text_box_get_new_id(), textbox, cur, currentModsPtr);
+    CustomEvents::emit_event(CustomEvents::RefreshTextBoxInputEvent{});
 }
 
 bool TextBoxEditTool::edit_update() {

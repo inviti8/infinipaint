@@ -16,5 +16,6 @@ void DrawingProgramEditToolBase::input_text_callback(const InputManager::TextCal
 void DrawingProgramEditToolBase::input_key_callback(const InputManager::KeyCallbackArgs& key) {}
 void DrawingProgramEditToolBase::input_mouse_button_on_canvas_callback(const InputManager::MouseButtonCallbackArgs& button, bool isDraggingPoint) {}
 void DrawingProgramEditToolBase::input_mouse_motion_callback(const InputManager::MouseMotionCallbackArgs& motion, bool isDraggingPoint) {}
+std::optional<InputManager::TextBoxStartInfo> DrawingProgramEditToolBase::get_text_box_start_info() { return std::nullopt; }
 
 DrawingProgramEditToolBase::~DrawingProgramEditToolBase() {}

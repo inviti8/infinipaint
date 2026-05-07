@@ -143,6 +143,7 @@ struct InputManager {
         ANDROIDTEXT_TYPE_TEXT_VARIATION_WEB_PASSWORD = 0x000000e0
     };
 
+    typedef int64_t TextBoxID;
     struct TextInputProperties {
         SDL_TextInputType inputType;
         SDL_Capitalization capitalization;
@@ -151,31 +152,27 @@ struct InputManager {
         int androidInputType;
     };
 
-    unsigned set_text_box_front(const std::optional<SCollision::AABB<float>>& textboxRect, const TextInputProperties& inputProps);
-    unsigned set_text_box_back(const std::optional<SCollision::AABB<float>>& textboxRect, const TextInputProperties& inputProps);
-    void remove_text_box(unsigned textboxID);
-    void update_accepting_input(SDL_Window* window);
-    void update_textbox_rectangle(unsigned textboxID, const SCollision::AABB<float>& textboxRect);
-    
-    struct Text {
-        bool is_accepting_input();
-        std::optional<unsigned> current_textbox_editing_id();
-        void update_textbox_rectangle();
+    struct TextBoxStartInfo {
+        TextBoxID id;
+        std::optional<SCollision::AABB<float>> rect;
+        TextInputProperties inputProperties;
 
-        private:
-            struct TextBoxInfo {
-                std::optional<SCollision::AABB<float>> rect;
-                TextInputProperties textInputProperties;
-                unsigned id;
-            };
+        // Android textbox info
+        std::string str;
+        int startCursorPos;
+        int endCursorPos;
+    };
 
-            std::optional<SDL_PropertiesID> propID;
+    void refresh_receiving_text_box_input();
+    void update_textbox_rectangle(TextBoxID textboxID, std::optional<SCollision::AABB<float>> textboxRect);
+    bool text_is_accepting_input();
 
-            std::deque<TextBoxInfo> textBoxes;
-            unsigned get_id();
+    void text_update_textbox_rectangle();
+    TextBoxID text_box_get_new_id();
+    void update_text_box_area_offset();
 
-            friend struct InputManager;
-    } text;
+    std::optional<TextBoxID> currentTextboxID;
+    std::optional<SDL_PropertiesID> textPropID;
 
 #ifdef __APPLE__
     SDL_Keymod CTRL_MOD = SDL_KMOD_GUI;

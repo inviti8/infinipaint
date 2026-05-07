@@ -17,7 +17,7 @@
 #}
 
 -keep,includedescriptorclasses,allowoptimization class com.erroratline0.infinipaint.InfiniPaint {
-    void startTextInput();
+    void startTextInput(int);
 }
 
 -keep,includedescriptorclasses,allowoptimization class org.libsdl.app.SDLActivity {

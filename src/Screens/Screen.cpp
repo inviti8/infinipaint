@@ -30,5 +30,6 @@ void Screen::input_finger_motion_callback(const InputManager::FingerMotionCallba
 void Screen::input_window_resize_callback(const InputManager::WindowResizeCallbackArgs& w) {}
 void Screen::input_window_scale_callback(const InputManager::WindowScaleCallbackArgs& w) {}
 void Screen::input_app_about_to_go_to_background_callback() {}
+std::optional<InputManager::TextBoxStartInfo> Screen::get_text_box_start_info() { return std::nullopt; }
 
 Screen::~Screen() {}

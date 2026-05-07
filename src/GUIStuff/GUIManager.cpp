@@ -757,6 +757,15 @@ void GUIManager::input_finger_motion_callback(InputManager::FingerMotionCallback
     mouse_callback(motion.pos, [&motion] (ElementContainer* e) { e->elem->input_finger_motion_callback(motion); });
 }
 
+std::optional<InputManager::TextBoxStartInfo> GUIManager::get_text_box_start_info() {
+    for(ElementContainer* e : orderedElements) {
+        auto toRet = e->elem->get_text_box_start_info();
+        if(toRet)
+            return toRet;
+    }
+    return std::nullopt;
+}
+
 void GUIManager::mouse_callback(const Vector2f& mousePos, const std::function<void(ElementContainer*)>& f) {
     cursorObstructed = false;
     int16_t zIndexObstructed = 0;

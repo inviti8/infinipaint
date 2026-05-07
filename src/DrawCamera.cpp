@@ -114,7 +114,7 @@ void DrawCamera::update_main(World& w) {
         checks_after_input(w);
     }
     else {
-        if(w.main.input.key(InputManager::KEY_CAMERA_ROTATE_COUNTERCLOCKWISE).held && !w.main.input.text.is_accepting_input()) {
+        if(w.main.input.key(InputManager::KEY_CAMERA_ROTATE_COUNTERCLOCKWISE).held && !w.main.input.text_is_accepting_input()) {
             c.rotate_about(c.from_space(w.main.window.size.cast<float>() * 0.5f), -w.main.deltaTime);
             InputManager::MouseMotionCallbackArgs motion{
                 .pos = w.main.input.mouse.pos,
@@ -124,7 +124,7 @@ void DrawCamera::update_main(World& w) {
             w.main.g.gui.set_to_layout();
             checks_after_input(w);
         }
-        if(w.main.input.key(InputManager::KEY_CAMERA_ROTATE_CLOCKWISE).held && !w.main.input.text.is_accepting_input()) {
+        if(w.main.input.key(InputManager::KEY_CAMERA_ROTATE_CLOCKWISE).held && !w.main.input.text_is_accepting_input()) {
             c.rotate_about(c.from_space(w.main.window.size.cast<float>() * 0.5f), w.main.deltaTime);
             InputManager::MouseMotionCallbackArgs motion{
                 .pos = w.main.input.mouse.pos,

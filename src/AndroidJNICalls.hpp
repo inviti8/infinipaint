@@ -8,7 +8,7 @@ namespace AndroidJNICalls {
     extern InputManager* globalInputManager;
     extern std::mutex globalCallMutex;
 
-    void startTextInput();
+    void startTextInput(int input_type);
 }
 
 #endif

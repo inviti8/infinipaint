@@ -35,6 +35,7 @@ namespace GUIStuff {
             virtual void input_finger_touch_callback(const InputManager::FingerTouchCallbackArgs& touch);
             virtual void input_finger_motion_callback(const InputManager::FingerMotionCallbackArgs& motion);
             virtual void input_key_callback(const InputManager::KeyCallbackArgs& key);
+            virtual std::optional<InputManager::TextBoxStartInfo> get_text_box_start_info();
         protected:
             static SCollision::AABB<float> get_bb_from_command(Clay_RenderCommand* command);
             std::optional<SCollision::AABB<float>> boundingBox;

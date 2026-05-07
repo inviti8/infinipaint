@@ -347,6 +347,12 @@ void World::input_multi_finger_motion_callback(const InputManager::MultiFingerMo
         drawData.cam.input_multi_finger_motion_callback(*this, motion);
 }
 
+std::optional<InputManager::TextBoxStartInfo> World::get_text_box_start_info() {
+    if(!clientStillConnecting)
+        return drawProg.get_text_box_start_info();
+    return std::nullopt;
+}
+
 void World::send_chat_message(const std::string& message) {
     if(!clientStillConnecting)
         ownClientData->send_chat_message(ownClientData, *this, message);

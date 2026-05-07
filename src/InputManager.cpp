@@ -91,76 +91,33 @@ InputManager::InputManager(MainProgram& initMain):
     keyAssignments = defaultKeyAssignments;
 }
 
-unsigned InputManager::Text::get_id() {
-    static unsigned nextID = 0;
-    while(std::find_if(textBoxes.begin(), textBoxes.end(), [&](const TextBoxInfo& info) { return info.id == nextID; }) != textBoxes.end())
-        ++nextID;
+InputManager::TextBoxID InputManager::text_box_get_new_id() {
+    static TextBoxID nextID = 0;
+    ++nextID;
     return nextID;
 }
 
-unsigned InputManager::set_text_box_front(const std::optional<SCollision::AABB<float>>& textboxRect, const TextInputProperties& inputProps) {
-    Text::TextBoxInfo textBoxInfo;
-    textBoxInfo.rect = textboxRect;
-    textBoxInfo.textInputProperties = inputProps;
-    textBoxInfo.id = text.get_id();
-    text.textBoxes.emplace_front(textBoxInfo);
-    update_accepting_input(main.window.sdlWindow);
-    return textBoxInfo.id;
-}
+void InputManager::refresh_receiving_text_box_input() {
+    std::optional<TextBoxStartInfo> startInfo = main.get_text_box_start_info();
+    if(startInfo.has_value()) {
+        if(!textPropID.has_value())
+            textPropID = SDL_CreateProperties();
+        currentTextboxID = startInfo->id;
 
-unsigned InputManager::set_text_box_back(const std::optional<SCollision::AABB<float>>& textboxRect, const TextInputProperties& inputProps) {
-    Text::TextBoxInfo textBoxInfo;
-    textBoxInfo.rect = textboxRect;
-    textBoxInfo.textInputProperties = inputProps;
-    textBoxInfo.id = text.get_id();
-    text.textBoxes.emplace_back(textBoxInfo);
-    update_accepting_input(main.window.sdlWindow);
-    return textBoxInfo.id;
-}
-
-void InputManager::remove_text_box(unsigned id) {
-    std::erase_if(text.textBoxes, [id](Text::TextBoxInfo& info) {
-        return (info.id == id);
-    });
-    update_accepting_input(main.window.sdlWindow);
-}
-
-bool InputManager::Text::is_accepting_input() {
-    return !textBoxes.empty();
-}
-
-std::optional<unsigned> InputManager::Text::current_textbox_editing_id() {
-    if(textBoxes.empty())
-        return std::nullopt;
-    return textBoxes.front().id;
-}
-
-void InputManager::update_textbox_rectangle(unsigned textboxID, const SCollision::AABB<float>& textboxRect) {
-    auto it = std::find_if(text.textBoxes.begin(), text.textBoxes.end(), [&](const auto& t) {return t.id == textboxID;});
-    it->rect = textboxRect;
-}
-
-void InputManager::update_accepting_input(SDL_Window* window) {
-    if(!text.textBoxes.empty()) {
-        auto& textbox = text.textBoxes.front();
-        if(!text.propID.has_value())
-            text.propID = SDL_CreateProperties();
-        SDL_PropertiesID propIDVal = text.propID.value();
+        SDL_PropertiesID propIDVal = textPropID.value();
         // There is a bug where decimal places disappear when textinput type is set to number on android. We'll just set those textinputs back to text type
-        SDL_SetNumberProperty(propIDVal, SDL_PROP_TEXTINPUT_TYPE_NUMBER, (textbox.textInputProperties.inputType == SDL_TEXTINPUT_TYPE_NUMBER) ? SDL_TEXTINPUT_TYPE_TEXT : textbox.textInputProperties.inputType);
-        SDL_SetNumberProperty(propIDVal, SDL_PROP_TEXTINPUT_CAPITALIZATION_NUMBER, textbox.textInputProperties.capitalization);
-        SDL_SetNumberProperty(propIDVal, SDL_PROP_TEXTINPUT_AUTOCORRECT_BOOLEAN, textbox.textInputProperties.autocorrect);
-        SDL_SetNumberProperty(propIDVal, SDL_PROP_TEXTINPUT_MULTILINE_BOOLEAN, textbox.textInputProperties.multiline);
-        SDL_SetNumberProperty(propIDVal, SDL_PROP_TEXTINPUT_ANDROID_INPUTTYPE_NUMBER, (textbox.textInputProperties.androidInputType & ANDROIDTEXT_TYPE_CLASS_NUMBER) ? ANDROIDTEXT_TYPE_CLASS_TEXT : textbox.textInputProperties.androidInputType);
-        if(text.textBoxes.front().rect)
-            excludeIMEFromSafeArea = false;
-        else
-            excludeIMEFromSafeArea = true;
+        SDL_SetNumberProperty(propIDVal, SDL_PROP_TEXTINPUT_TYPE_NUMBER, (startInfo->inputProperties.inputType == SDL_TEXTINPUT_TYPE_NUMBER) ? SDL_TEXTINPUT_TYPE_TEXT : startInfo->inputProperties.inputType);
+        SDL_SetNumberProperty(propIDVal, SDL_PROP_TEXTINPUT_CAPITALIZATION_NUMBER, startInfo->inputProperties.capitalization);
+        SDL_SetNumberProperty(propIDVal, SDL_PROP_TEXTINPUT_AUTOCORRECT_BOOLEAN, startInfo->inputProperties.autocorrect);
+        SDL_SetNumberProperty(propIDVal, SDL_PROP_TEXTINPUT_MULTILINE_BOOLEAN, startInfo->inputProperties.multiline);
+        SDL_SetNumberProperty(propIDVal, SDL_PROP_TEXTINPUT_ANDROID_INPUTTYPE_NUMBER, (startInfo->inputProperties.androidInputType & ANDROIDTEXT_TYPE_CLASS_NUMBER) ? ANDROIDTEXT_TYPE_CLASS_TEXT : startInfo->inputProperties.androidInputType);
+
+        update_textbox_rectangle(currentTextboxID.value(), startInfo->rect);
 
         #ifdef __ANDROID__
-            AndroidJNICalls::startTextInput();
+            AndroidJNICalls::startTextInput(startInfo->inputProperties.androidInputType);
         #else
-            SDL_StartTextInputWithProperties(window, propIDVal);
+            SDL_StartTextInputWithProperties(main.window.sdlWindow, propIDVal);
         #endif
 
         #ifdef __EMSCRIPTEN__
@@ -168,12 +125,39 @@ void InputManager::update_accepting_input(SDL_Window* window) {
         #endif
     }
     else {
-        SDL_StopTextInput(window);
+        SDL_StopTextInput(main.window.sdlWindow);
+        currentTextboxID = std::nullopt;
         excludeIMEFromSafeArea = false;
         screenOffset = {0.0f, 0.0f};
         #ifdef __EMSCRIPTEN__
             isAcceptingInputEmscripten = 0;
         #endif
+    }
+}
+
+bool InputManager::text_is_accepting_input() {
+    return currentTextboxID.has_value();
+}
+
+void InputManager::update_textbox_rectangle(TextBoxID textboxID, std::optional<SCollision::AABB<float>> textboxRect) {
+    if(currentTextboxID.has_value() && textboxID == currentTextboxID.value()) {
+        excludeIMEFromSafeArea = !textboxRect.has_value();
+        if(excludeIMEFromSafeArea)
+            screenOffset = {0.0f, 0.0f};
+        else {
+            constexpr float PADDING_BETWEEN_TEXTBOX_AND_IME = 15.0f;
+            std::scoped_lock a{safeAreaWithoutIMEMutex};
+            if(safeAreaWithoutIME.has_value()) {
+                float bottomY = textboxRect->max.y();
+                float yLimit = safeAreaWithoutIME->max.y() - PADDING_BETWEEN_TEXTBOX_AND_IME;
+                if(bottomY >= yLimit)
+                    screenOffset = {0.0f, -(bottomY - yLimit)};
+                else
+                    screenOffset = {0.0f, 0.0f};
+            }
+            else
+                screenOffset = {0.0f, 0.0f};
+        }
     }
 }
 
@@ -908,7 +892,7 @@ void InputManager::backend_key_down_update(const SDL_KeyboardEvent& e) {
             return;
     }
 
-    bool acceptingTextInput = text.is_accepting_input();
+    bool acceptingTextInput = text_is_accepting_input();
 
     switch(kPress) {
         case SDLK_UP:
@@ -1060,7 +1044,7 @@ bool InputManager::ctrl_or_meta_held() {
 void InputManager::backend_key_up_update(const SDL_KeyboardEvent& e) {
     auto kPress = e.key;
 
-    bool acceptingTextInput = text.is_accepting_input();
+    bool acceptingTextInput = text_is_accepting_input();
 
     switch(kPress) {
         case SDLK_UP:
@@ -1141,23 +1125,6 @@ void InputManager::update() {
         touch_finger_do_mouse_down();
         touch.touchEventType = Touch::ONE_FINGER_EVENT;
     }
-    constexpr float PADDING_BETWEEN_TEXTBOX_AND_IME = 15.0f;
-    if(!text.textBoxes.empty()) {
-        auto& r = text.textBoxes.front().rect;
-        std::scoped_lock a{safeAreaWithoutIMEMutex};
-        if(r.has_value() && safeAreaWithoutIME.has_value()) {
-            float bottomY = r.value().max.y();
-            float yLimit = safeAreaWithoutIME.value().max.y() - PADDING_BETWEEN_TEXTBOX_AND_IME;
-            if(bottomY >= yLimit)
-                screenOffset = {0.0f, -(bottomY - yLimit)};
-            else
-                screenOffset = {0.0f, 0.0f};
-        }
-        else
-            screenOffset = {0.0f, 0.0f};
-    }
-    else
-        screenOffset = {0.0f, 0.0f};
 }
 
 void InputManager::frame_reset(const Vector2i& windowSize) {

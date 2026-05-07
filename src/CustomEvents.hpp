@@ -67,4 +67,8 @@ namespace CustomEvents {
         std::filesystem::path filePath;
         Vector2f pos;
     };
+
+    struct RefreshTextBoxInputEvent {
+        static uint32_t EVENT_NUM;
+    };
 }

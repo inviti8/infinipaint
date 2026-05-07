@@ -6,7 +6,7 @@
 
 class RichTextUserInput {
     public:
-        RichTextUserInput(const std::shared_ptr<RichText::TextBox>& initTextBox, const std::shared_ptr<RichText::TextBox::Cursor>& initCursor, const std::shared_ptr<RichText::TextStyleModifier::ModifierMap>& initModMap);
+        RichTextUserInput(InputManager::TextBoxID initId, const std::shared_ptr<RichText::TextBox>& initTextBox, const std::shared_ptr<RichText::TextBox::Cursor>& initCursor, const std::shared_ptr<RichText::TextStyleModifier::ModifierMap>& initModMap);
         struct Changes {
             bool textEdited = false;
             bool cursorChanged = false;
@@ -16,6 +16,7 @@ class RichTextUserInput {
         void add_text_to_textbox(const std::string& inputText);
         void do_textbox_operation_with_undo(const std::function<void()>& func);
         void add_textbox_undo(const RichText::TextBox::Cursor& prevCursor, const RichText::TextData& prevRichText);
+        const InputManager::TextBoxID id;
     private:
         std::shared_ptr<RichText::TextBox> textBox;
         std::shared_ptr<RichText::TextBox::Cursor> cursor;

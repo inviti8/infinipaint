@@ -33,6 +33,8 @@ class GUIHolder {
         void input_finger_touch_callback(const InputManager::FingerTouchCallbackArgs& touch);
         void input_finger_motion_callback(const InputManager::FingerMotionCallbackArgs& motion);
 
+        std::optional<InputManager::TextBoxStartInfo> get_text_box_start_info();
+
         float final_gui_scale();
     private:
         void calculate_final_gui_scale();

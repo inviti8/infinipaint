@@ -33,6 +33,7 @@ class EditTool : public DrawingProgramToolBase {
         virtual void input_key_callback(const InputManager::KeyCallbackArgs& key) override;
         virtual void input_mouse_button_on_canvas_callback(const InputManager::MouseButtonCallbackArgs& button) override;
         virtual void input_mouse_motion_callback(const InputManager::MouseMotionCallbackArgs& motion) override;
+        virtual std::optional<InputManager::TextBoxStartInfo> get_text_box_start_info() override;
         ~EditTool();
 
         void add_point_handle(const HandleData& handle);

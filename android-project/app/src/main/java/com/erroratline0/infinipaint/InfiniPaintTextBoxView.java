@@ -8,12 +8,26 @@ import android.view.inputmethod.InputConnection;
 
 public class InfiniPaintTextBoxView extends View
 {
-    InputConnection ic;
+    public InfiniPaintTextBoxInputConnection ic;
+
+    int mTextBoxID;
+    String mStr;
+    int mSelectionBegin;
+    int mSelectionEnd;
+    int mInputType;
 
     InfiniPaintTextBoxView(Context context) {
         super(context);
         setFocusableInTouchMode(true);
         setFocusable(true);
+    }
+
+    void setInitialData(int textboxID, String str, int selectionBegin, int selectionEnd, int inputType) {
+        mTextBoxID = textboxID;
+        mStr = str;
+        mSelectionBegin = selectionBegin;
+        mSelectionEnd = selectionEnd;
+        mInputType = inputType;
     }
 
     @Override
@@ -24,8 +38,9 @@ public class InfiniPaintTextBoxView extends View
     @Override
     public InputConnection onCreateInputConnection(EditorInfo outAttrs) {
         ic = new InfiniPaintTextBoxInputConnection(this, true);
+        ic.setInitialData(mTextBoxID, mStr, mSelectionBegin, mSelectionEnd);
 
-        outAttrs.inputType = InputType.TYPE_CLASS_TEXT;
+        outAttrs.inputType = mInputType;
         outAttrs.imeOptions = EditorInfo.IME_FLAG_NO_EXTRACT_UI |
                 EditorInfo.IME_FLAG_NO_FULLSCREEN /* API 11 */ |
                 EditorInfo.IME_ACTION_DONE;

@@ -40,7 +40,19 @@ public class InfiniPaint extends SDLActivity {
     }
 
     static class StartInfiniPaintTextInputTask implements Runnable {
-        public StartInfiniPaintTextInputTask() {}
+        public StartInfiniPaintTextInputTask(int textboxID, String str, int selectionBegin, int selectionEnd, int inputType) {
+            mTextBoxID = textboxID;
+            mStr = str;
+            mSelectionBegin = selectionBegin;
+            mSelectionEnd = selectionEnd;
+            mInputType = inputType;
+        }
+
+        int mTextBoxID;
+        String mStr;
+        int mSelectionBegin;
+        int mSelectionEnd;
+        int mInputType;
 
         @Override
         public void run() {
@@ -50,9 +62,11 @@ public class InfiniPaint extends SDLActivity {
                 mTextEdit = new InfiniPaintTextBoxView(getContext());
                 mLayout.addView(mTextEdit, params);
             }
-            else
+            else {
                 mTextEdit.setLayoutParams(params);
+            }
 
+            mTextEdit.setInitialData(mTextBoxID, mStr, mSelectionBegin, mSelectionEnd, mInputType);
             mTextEdit.setVisibility(View.VISIBLE);
             mTextEdit.requestFocus();
             InputMethodManager imm = (InputMethodManager) getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
@@ -63,8 +77,8 @@ public class InfiniPaint extends SDLActivity {
         }
     }
 
-    static public void startTextInput() {
-        mSingleton.commandHandler.post(new StartInfiniPaintTextInputTask());
+    static public void startTextInput(int textboxID, String str, int selectionBegin, int selectionEnd, int inputType) {
+        mSingleton.commandHandler.post(new StartInfiniPaintTextInputTask(textboxID, str, selectionBegin, selectionEnd, inputType));
     }
 
     static InfiniPaintTextBoxView mTextEdit;
