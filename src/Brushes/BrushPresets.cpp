@@ -20,6 +20,9 @@ void reset_base_values(MyPaintBrush* b) {
     mypaint_brush_set_base_value(b, MYPAINT_BRUSH_SETTING_HARDNESS, 0.85f);
     mypaint_brush_set_base_value(b, MYPAINT_BRUSH_SETTING_RADIUS_LOGARITHMIC, 1.5f);
     mypaint_brush_set_base_value(b, MYPAINT_BRUSH_SETTING_RADIUS_BY_RANDOM, 0.0f);
+    mypaint_brush_set_base_value(b, MYPAINT_BRUSH_SETTING_OFFSET_BY_RANDOM, 0.0f);
+    mypaint_brush_set_base_value(b, MYPAINT_BRUSH_SETTING_ELLIPTICAL_DAB_RATIO, 1.0f);
+    mypaint_brush_set_base_value(b, MYPAINT_BRUSH_SETTING_ELLIPTICAL_DAB_ANGLE, 0.0f);
     mypaint_brush_set_base_value(b, MYPAINT_BRUSH_SETTING_DABS_PER_BASIC_RADIUS, 4.0f);
     mypaint_brush_set_base_value(b, MYPAINT_BRUSH_SETTING_DABS_PER_ACTUAL_RADIUS, 4.0f);
     mypaint_brush_set_base_value(b, MYPAINT_BRUSH_SETTING_COLOR_H, 0.0f);
@@ -120,10 +123,22 @@ void apply_broad_marker(MyPaintBrush* b) {
     mypaint_brush_set_base_value(b, MYPAINT_BRUSH_SETTING_ELLIPTICAL_DAB_ANGLE, 20.0f);
 }
 
-void apply_reserved(MyPaintBrush* b) {
-    // PHASE1.md §4 reserves one slot for "tuning during integration".
-    // Defaults to fine-inker until a real preset claims the slot.
-    apply_fine_inker(b);
+void apply_wet_ink(MyPaintBrush* b) {
+    reset_base_values(b);
+    // Inky fountain-pen visual — full saturation, soft edges, drops of
+    // ink scatter slightly so lines aren't crisp. Note this stays inside
+    // PHASE1.md §4 (no wet/smudge media): "wet" here is the look (random
+    // dab variance), not actual blending with surrounding pixels.
+    mypaint_brush_set_base_value(b, MYPAINT_BRUSH_SETTING_RADIUS_LOGARITHMIC, 1.8f);
+    mypaint_brush_set_base_value(b, MYPAINT_BRUSH_SETTING_HARDNESS, 0.55f);
+    mypaint_brush_set_base_value(b, MYPAINT_BRUSH_SETTING_OPAQUE, 1.0f);
+    mypaint_brush_set_base_value(b, MYPAINT_BRUSH_SETTING_DABS_PER_BASIC_RADIUS, 5.0f);
+    mypaint_brush_set_base_value(b, MYPAINT_BRUSH_SETTING_DABS_PER_ACTUAL_RADIUS, 5.0f);
+    set_linear_pressure_mapping(b, MYPAINT_BRUSH_SETTING_RADIUS_LOGARITHMIC, -0.5f, 0.4f);
+    // Opacity stays at full (1.0) regardless of pressure — wet ink lines
+    // are always solid; only drop *size* varies, not saturation.
+    mypaint_brush_set_base_value(b, MYPAINT_BRUSH_SETTING_RADIUS_BY_RANDOM, 0.50f);
+    mypaint_brush_set_base_value(b, MYPAINT_BRUSH_SETTING_OFFSET_BY_RANDOM, 0.50f);
 }
 
 // defaults must mirror the values set by each apply_* function below; the
@@ -134,7 +149,7 @@ const std::vector<BrushPreset> kPresets = {
     { "Brush pen",     "data/icons/brush-pen.svg",     { 2.0f, 0.85f, 1.0f }, apply_brush_pen     },
     { "Fine marker",   "data/icons/fine-marker.svg",   { 1.6f, 0.60f, 0.7f }, apply_fine_marker   },
     { "Broad marker",  "data/icons/broad-marker.svg",  { 3.0f, 0.35f, 0.4f }, apply_broad_marker  },
-    { "Reserved",      "data/icons/reserved.svg",      { 1.5f, 1.00f, 1.0f }, apply_reserved      },
+    { "Wet ink",       "data/icons/wet-ink.svg",       { 1.8f, 0.55f, 1.0f }, apply_wet_ink       },
 };
 
 }  // namespace
