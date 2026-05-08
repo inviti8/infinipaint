@@ -34,10 +34,17 @@ void MyPaintLayerCanvasComponent::save(cereal::PortableBinaryOutputArchive&) con
 void MyPaintLayerCanvasComponent::load(cereal::PortableBinaryInputArchive&) {
 }
 
-void MyPaintLayerCanvasComponent::save_file(cereal::PortableBinaryOutputArchive&) const {
+void MyPaintLayerCanvasComponent::save_file(cereal::PortableBinaryOutputArchive& a) const {
+    surface_->save_tiles_to_archive(a);
 }
 
-void MyPaintLayerCanvasComponent::load_file(cereal::PortableBinaryInputArchive&, VersionNumber) {
+void MyPaintLayerCanvasComponent::load_file(cereal::PortableBinaryInputArchive& a, VersionNumber version) {
+    if (version >= VersionNumber(0, 7, 0)) {
+        surface_->load_tiles_from_archive(a);
+        boundsCacheValid_ = false;
+    }
+    // Pre-0.7 files had MyPaintLayer save_file as a stub (no bytes
+    // written), so there's nothing to read. The layer just stays empty.
 }
 
 std::unique_ptr<CanvasComponent> MyPaintLayerCanvasComponent::get_data_copy() const {

@@ -6,6 +6,8 @@
 #include <cstring>
 #include <limits>
 
+#include <cereal/types/vector.hpp>
+
 #include <include/core/SkBitmap.h>
 #include <include/core/SkImageInfo.h>
 
@@ -117,6 +119,34 @@ void LibMyPaintSkiaSurface::composite_to_bitmap(SkBitmap& dst, int dstOriginPxX,
                 dstRow += 4;
             }
         }
+    }
+}
+
+void LibMyPaintSkiaSurface::save_tiles_to_archive(cereal::PortableBinaryOutputArchive& a) const {
+    const uint32_t count = static_cast<uint32_t>(tiles_.size());
+    a(count);
+    constexpr size_t bytesPerTile = kU16PerTile * sizeof(uint16_t);
+    for (const auto& [key, buf] : tiles_) {
+        const int32_t tx = key.tx;
+        const int32_t ty = key.ty;
+        a(tx, ty);
+        // Write the raw tile bytes via cereal's binary_data helper —
+        // matches how cereal serializes PODs without per-element overhead.
+        a(cereal::binary_data(buf.get(), bytesPerTile));
+    }
+}
+
+void LibMyPaintSkiaSurface::load_tiles_from_archive(cereal::PortableBinaryInputArchive& a) {
+    tiles_.clear();
+    uint32_t count = 0;
+    a(count);
+    constexpr size_t bytesPerTile = kU16PerTile * sizeof(uint16_t);
+    for (uint32_t i = 0; i < count; ++i) {
+        int32_t tx = 0, ty = 0;
+        a(tx, ty);
+        auto buf = std::make_unique<uint16_t[]>(kU16PerTile);
+        a(cereal::binary_data(buf.get(), bytesPerTile));
+        tiles_.emplace(TileKey{tx, ty}, std::move(buf));
     }
 }
 

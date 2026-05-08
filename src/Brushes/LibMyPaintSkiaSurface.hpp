@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cereal/archives/portable_binary.hpp>
 #include <cstdint>
 #include <functional>
 #include <memory>
@@ -68,6 +69,15 @@ public:
     // dstOriginPxY + dst.height()). Tiles outside that destination rect are
     // skipped. dst pixels outside any allocated tile are left untouched.
     void composite_to_bitmap(SkBitmap& dst, int dstOriginPxX, int dstOriginPxY) const;
+
+    // Persist tile data: count + per-tile (tx, ty, raw 16bpc-premul-RGBA
+    // buffer). Format is uncompressed for simplicity — each 64x64 tile
+    // is 32 KiB; libmypaint strokes typically touch only a handful of
+    // tiles, so total cost is small. zstd / per-tile PNG is a future
+    // optimization if file sizes become problematic.
+    void save_tiles_to_archive(cereal::PortableBinaryOutputArchive& a) const;
+    // Drops any existing tiles, then loads the count + tiles back.
+    void load_tiles_from_archive(cereal::PortableBinaryInputArchive& a);
 
 private:
     static void s_tile_request_start(MyPaintTiledSurface*, MyPaintTileRequest*);
