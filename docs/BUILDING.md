@@ -42,11 +42,21 @@ Then run:
 conan install . --build=missing -pr=conan/profiles/win-x86_64
 cd build
 .\generators\conanbuild.bat
-cmake .. -DCMAKE_TOOLCHAIN_FILE="generators\conan_toolchain.cmake" -DCMAKE_BUILD_TYPE=Release
+cmake .. -T host=x64 -DCMAKE_TOOLCHAIN_FILE="generators\conan_toolchain.cmake" -DCMAKE_BUILD_TYPE=Release
 cmake --build . --config Release
 .\generators\deactivate_conanbuild.bat
 ```
-After building the project, you should place the `data` folder located in the root of the repository next to the `infinipaint.exe` executable before running it.
+
+`-T host=x64` forces the 64-bit MSVC host compiler. Without it some
+translation units (notably `src/Toolbar.cpp`) hit C1060 "compiler is out
+of heap space" on the default 32-bit `cl.exe`.
+
+After building the project, the repo's `assets/data/` folder must be
+reachable as `data/` next to `infinipaint.exe` — either copy it or, more
+conveniently, create a directory junction:
+```
+mklink /J build\Release\data assets\data
+```
 
 You can create an NSIS installer of the application by running:
 ```
