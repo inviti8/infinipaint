@@ -55,13 +55,19 @@ void apply_technical_pen(MyPaintBrush* b) {
 
 void apply_fine_inker(MyPaintBrush* b) {
     reset_base_values(b);
-    // Slight pressure response in line weight; crisp edges.
+    // Crisper than the technical pen (max hardness, no opacity falloff)
+    // with about half the pressure variance. Same line-weight purpose,
+    // less hand-drawn looseness.
     mypaint_brush_set_base_value(b, MYPAINT_BRUSH_SETTING_RADIUS_LOGARITHMIC, 1.5f);
-    mypaint_brush_set_base_value(b, MYPAINT_BRUSH_SETTING_HARDNESS, 0.95f);
+    mypaint_brush_set_base_value(b, MYPAINT_BRUSH_SETTING_HARDNESS, 1.0f);
     mypaint_brush_set_base_value(b, MYPAINT_BRUSH_SETTING_OPAQUE, 1.0f);
     mypaint_brush_set_base_value(b, MYPAINT_BRUSH_SETTING_DABS_PER_BASIC_RADIUS, 5.0f);
     mypaint_brush_set_base_value(b, MYPAINT_BRUSH_SETTING_DABS_PER_ACTUAL_RADIUS, 5.0f);
-    set_linear_pressure_mapping(b, MYPAINT_BRUSH_SETTING_RADIUS_LOGARITHMIC, -0.3f, 0.2f);
+    set_linear_pressure_mapping(b, MYPAINT_BRUSH_SETTING_RADIUS_LOGARITHMIC, -1.0f, 0.5f);
+    // Lighter pressure also drops opacity a bit, so faint pen-touches
+    // leave a faint mark. Range chosen so a 0.5 base opacity still has
+    // a visible variance and a 1.0 base only fades on the lightest taps.
+    set_linear_pressure_mapping(b, MYPAINT_BRUSH_SETTING_OPAQUE, -0.4f, 0.0f);
 }
 
 void apply_brush_pen(MyPaintBrush* b) {
@@ -105,11 +111,11 @@ void apply_reserved(MyPaintBrush* b) {
 // slider UI uses these to seed the per-preset overrides on first use.
 const std::vector<BrushPreset> kPresets = {
     { "Technical pen", "data/icons/technical-pen.svg", { 1.0f, 1.00f, 1.0f }, apply_technical_pen },
-    { "Fine inker",    "data/icons/fine-inker.svg",    { 1.5f, 0.95f, 1.0f }, apply_fine_inker    },
+    { "Fine inker",    "data/icons/fine-inker.svg",    { 1.5f, 1.00f, 1.0f }, apply_fine_inker    },
     { "Brush pen",     "data/icons/brush-pen.svg",     { 2.0f, 0.85f, 1.0f }, apply_brush_pen     },
     { "Fine marker",   "data/icons/fine-marker.svg",   { 1.6f, 0.60f, 0.5f }, apply_fine_marker   },
     { "Broad marker",  "data/icons/broad-marker.svg",  { 3.0f, 0.35f, 0.4f }, apply_broad_marker  },
-    { "Reserved",      "data/icons/reserved.svg",      { 1.5f, 0.95f, 1.0f }, apply_reserved      },
+    { "Reserved",      "data/icons/reserved.svg",      { 1.5f, 1.00f, 1.0f }, apply_reserved      },
 };
 
 }  // namespace
