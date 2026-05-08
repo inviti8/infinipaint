@@ -1,12 +1,12 @@
-# HVYM Mischief — Phase 1 Design Doc
+# Inkternity — Phase 1 Design Doc
 
-> **Audience:** the agent (and any human contributor) working inside the HVYM Mischief repo, which is a fork of [`ErrorAtLine0/infinipaint`](https://github.com/ErrorAtLine0/infinipaint).
+> **Audience:** the agent (and any human contributor) working inside the Inkternity repo, which is a fork of [`ErrorAtLine0/infinipaint`](https://github.com/ErrorAtLine0/infinipaint).
 >
 > **Goal of this doc:** define what Phase 1 ships, where each new piece slots into the existing InfiniPaint codebase, and what is explicitly out of scope.
 
 ## 1. Product summary
 
-HVYM Mischief is an infinite-canvas app for **producing and reading comics**. Phase 1 introduces two distinguishing features on top of the InfiniPaint base:
+Inkternity is an infinite-canvas app for **producing and reading comics**. Phase 1 introduces two distinguishing features on top of the InfiniPaint base:
 
 1. **Waypoints** — droppable canvas markers that capture camera state, panel framing, and a position in a comic's reading graph.
 2. **A separate node/tree window** — a real second OS window for connecting waypoints into a graph that defines reading order and (optionally) branches.
@@ -23,7 +23,7 @@ InfiniPaint already provides:
 - Skia 2D drawing on a Vulkan surface, via SDL3
 - Pressure-sensitive tablet input
 - Existing tools: `BrushTool`, `EraserTool`, `LineDrawTool`, `RectDrawTool`, `EllipseDrawTool`, `TextBoxTool`, selection tools, eyedropper, pan, zoom
-- **Bookmarks** ("Place bookmarks on the canvas to jump to later") — the data model HVYM waypoints extend
+- **Bookmarks** ("Place bookmarks on the canvas to jump to later") — the data model Inkternity waypoints extend
 - Cross-platform builds: Windows / macOS / Linux / Android, plus web via Emscripten
 - Conan-managed deps, CMake builds
 
@@ -103,7 +103,7 @@ Wet/oily/watercolor/smudge/charcoal/bristle presets are **out of scope for Phase
 
 ### License compatibility
 
-libmypaint (MIT) × InfiniPaint (MIT) × Skia (BSD-3) × SDL3 (zlib). All compatible. HVYM Mischief stays MIT.
+libmypaint (MIT) × InfiniPaint (MIT) × Skia (BSD-3) × SDL3 (zlib). All compatible. Inkternity stays MIT.
 
 ### Phase 1 brush risks
 
@@ -269,9 +269,9 @@ Tracked as harness tasks #2 through #9 (#1 — the fork itself — is being done
 | M4 | ✅ | Waypoint data model | `Waypoint`, `WaypointGraph`; ~~bookmark migration~~; file format updated; round-trip tested (manual) |
 | M5 | ✅ | WaypointTool + canvas component | Drop / edit / delete waypoints on canvas; ~~framing rect handles~~ (deferred); author chrome (label, framing outline, edge previews); reader chrome with M7 |
 | M6 | ✅ | Tree window | ~~Second SDL_Window with imnodes~~ (descoped to side panel for ship-speed); Skia-rendered graph view as a collapsible right-side panel in the main window; bidirectional sync with canvas |
-| M7 | | Reader mode | Mode toggle, hidden chrome, camera transitions, branching choice UI (skinned where available) |
-| M-skin | | ButtonSelectTool + Waypoint skins | Rect-drag captures canvas pixels into `Waypoint::skin`; tree nodes render the skin; canvas marker tints; format bump for skin payload |
-| M8 | | Phase 1 release | Rebrand (name, icons, splash, About, .hvym extension); installers; release notes |
+| M7 | ✅ | Reader mode | Mode toggle, hidden chrome, camera transitions, branching choice UI (skinned where available); dead-end "the end" affordance descoped — back-button on dead-ends is sufficient |
+| M-skin | ✅ | ButtonSelectTool + Waypoint skins | Rect-drag captures canvas pixels into `Waypoint::skin`; tree nodes render the skin; canvas marker tints; format bump for skin payload |
+| M8 | | Phase 1 release | Rebrand to **Inkternity** (name, icons, splash, About, `.inkternity` extension); installers; release notes |
 
 **M3 follow-ups deferred:** persistent tile serialization (rolls into M4 file format); real `.myb` file loading (current presets are hardcoded `apply()` functions; the public BrushPreset shape is stable across that swap); per-brush pressure-sensitivity slider in the picker (currently only diameter/hardness/opacity are user-tunable).
 
@@ -310,7 +310,7 @@ Conventions for working in this repo on the maintainer's machine. Not user-facin
 | 2026-05-07 | Waypoints participate in NetObj sync | Bookmarks today are NetObj-synced; preserving that means waypoints must be too. Counts as extending collaboration despite §9, but silently breaking bookmark sync was judged worse. |
 | 2026-05-07 | Folders flattened into label prefixes on migration | Doc's flat `WaypointGraph::nodes` matches the user's choice. Folder names survive as `"Folder / Sub / Name"` prefixes; structure is recoverable, not preserved. |
 | 2026-05-07 | Bookmark side panel removed; tree window replaces it | Single navigator. `BookmarkManager` stays as a thin compat shim until M6 lands the tree window, then is removed. |
-| 2026-05-07 | File extension stays `.infpnt` until M8 rebrand | Format version bumps in M4 (so old files can load forward), but the user-visible `.hvym` rename happens with the rest of the rebrand in M8. |
+| 2026-05-07 | File extension stays `.infpnt` until M8 rebrand | Format version bumps in M4 (so old files can load forward), but the user-visible `.inkternity` rename happens with the rest of the rebrand in M8. |
 | 2026-05-07 | Reader mode is per-session, not per-document | Default; can revisit if authors want per-comic preview state. |
 | 2026-05-07 | libmypaint integrated as `deps/libmypaint` git submodule, not a Conan recipe | libmypaint is autotools-only and not on stock ConanCenter; writing an MSVC-clean Conan recipe is 4–8h of yak-shaving before any brush code runs. Matches existing `deps/clip` precedent. Krita/GIMP both vendor libmypaint for the same reason. Revisit if the spike grows into a maintenance burden. |
 | 2026-05-07 | Repo and Conan cache on `D:\` instead of `C:\` | `C:\` was running out of space; Conan cache can balloon to many GB during Skia builds. `CONAN_HOME=D:\.conan2` set as user env var. |
