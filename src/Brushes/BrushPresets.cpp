@@ -86,12 +86,19 @@ void apply_brush_pen(MyPaintBrush* b) {
 
 void apply_fine_marker(MyPaintBrush* b) {
     reset_base_values(b);
-    // Sub-opaque so overlapping passes build up; soft-ish edges.
+    // Soft marker tip with light tactile pressure response — pressing
+    // harder squeezes out more pigment and flexes the tip slightly,
+    // so it feels less mechanical without going wet/blendy (which
+    // PHASE1.md §4 explicitly excludes).
     mypaint_brush_set_base_value(b, MYPAINT_BRUSH_SETTING_RADIUS_LOGARITHMIC, 1.6f);
     mypaint_brush_set_base_value(b, MYPAINT_BRUSH_SETTING_HARDNESS, 0.6f);
-    mypaint_brush_set_base_value(b, MYPAINT_BRUSH_SETTING_OPAQUE, 0.5f);
+    mypaint_brush_set_base_value(b, MYPAINT_BRUSH_SETTING_OPAQUE, 0.7f);
     mypaint_brush_set_base_value(b, MYPAINT_BRUSH_SETTING_DABS_PER_BASIC_RADIUS, 4.0f);
     mypaint_brush_set_base_value(b, MYPAINT_BRUSH_SETTING_DABS_PER_ACTUAL_RADIUS, 4.0f);
+    set_linear_pressure_mapping(b, MYPAINT_BRUSH_SETTING_RADIUS_LOGARITHMIC, -0.4f, 0.3f);
+    set_linear_pressure_mapping(b, MYPAINT_BRUSH_SETTING_OPAQUE, -0.3f, 0.0f);
+    // Slight per-dab radius jitter for a textured felt-tip edge.
+    mypaint_brush_set_base_value(b, MYPAINT_BRUSH_SETTING_RADIUS_BY_RANDOM, 0.15f);
 }
 
 void apply_broad_marker(MyPaintBrush* b) {
@@ -116,7 +123,7 @@ const std::vector<BrushPreset> kPresets = {
     { "Technical pen", "data/icons/technical-pen.svg", { 1.0f, 1.00f, 1.0f }, apply_technical_pen },
     { "Fine inker",    "data/icons/fine-inker.svg",    { 1.5f, 1.00f, 1.0f }, apply_fine_inker    },
     { "Brush pen",     "data/icons/brush-pen.svg",     { 2.0f, 0.85f, 1.0f }, apply_brush_pen     },
-    { "Fine marker",   "data/icons/fine-marker.svg",   { 1.6f, 0.60f, 0.5f }, apply_fine_marker   },
+    { "Fine marker",   "data/icons/fine-marker.svg",   { 1.6f, 0.60f, 0.7f }, apply_fine_marker   },
     { "Broad marker",  "data/icons/broad-marker.svg",  { 3.0f, 0.35f, 0.4f }, apply_broad_marker  },
     { "Reserved",      "data/icons/reserved.svg",      { 1.5f, 1.00f, 1.0f }, apply_reserved      },
 };
