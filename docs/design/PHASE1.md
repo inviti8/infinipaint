@@ -240,16 +240,18 @@ Real things the app might want — explicitly **not now**:
 
 Tracked as harness tasks #2 through #9 (#1 — the fork itself — is being done by the project owner outside this repo).
 
-| # | Milestone | Deliverable |
-|---|---|---|
-| M1 | libmypaint plumbed | Conan dep added; "hello dab" test draws to a Skia surface |
-| M2 | LibMyPaintSkiaSurface adapter | `MyPaintTiledSurface` implementation with lazy tile allocation; unit-tested against synthetic stroke input |
-| M3 | MyPaintBrushTool + curated presets | New tool registered in `DrawingProgram`; brush picker shows the curated set; eraser interaction defined |
-| M4 | Waypoint data model | `Waypoint`, `WaypointGraph`; bookmark migration; file format updated; round-trip tested |
-| M5 | WaypointTool + canvas component | Drop / edit / delete waypoints on canvas; framing rect handles; author/reader chrome |
-| M6 | Tree window | Second SDL_Window with imnodes (or Skia) graph view; bidirectional sync with canvas |
-| M7 | Reader mode | Mode toggle, hidden chrome, camera transitions, branching choice UI |
-| M8 | Phase 1 release | Rebrand (name, icons, splash, About, .hvym extension); installers; release notes |
+| # | Status | Milestone | Deliverable |
+|---|---|---|---|
+| M1 | ✅ | libmypaint plumbed | Conan dep added; "hello dab" test draws to a Skia surface |
+| M2 | ✅ | LibMyPaintSkiaSurface adapter | `MyPaintTiledSurface` implementation with lazy tile allocation; unit-tested against synthetic stroke input |
+| M3 | ✅ | MyPaintBrushTool + curated presets | New tool registered in `DrawingProgram`; brush picker shows the curated set; eraser interaction defined |
+| M4 | | Waypoint data model | `Waypoint`, `WaypointGraph`; bookmark migration; file format updated; round-trip tested |
+| M5 | | WaypointTool + canvas component | Drop / edit / delete waypoints on canvas; framing rect handles; author/reader chrome |
+| M6 | | Tree window | Second SDL_Window with imnodes (or Skia) graph view; bidirectional sync with canvas |
+| M7 | | Reader mode | Mode toggle, hidden chrome, camera transitions, branching choice UI |
+| M8 | | Phase 1 release | Rebrand (name, icons, splash, About, .hvym extension); installers; release notes |
+
+**M3 follow-ups deferred:** persistent tile serialization (rolls into M4 file format); real `.myb` file loading (current presets are hardcoded `apply()` functions; the public BrushPreset shape is stable across that swap); per-brush pressure-sensitivity slider in the picker (currently only diameter/hardness/opacity are user-tunable).
 
 Workstreams A (brushes: M1–M3) and B+C (waypoints + tree: M4–M6) run in parallel after the fork is built clean. M7 depends on M5 + M6. M8 depends on M3 + M7.
 
