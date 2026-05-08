@@ -8,6 +8,7 @@
 #include "../GUIStuff/GUIManager.hpp"
 #include "../GUIStuff/Elements/Element.hpp"
 #include "../GUIStuff/Elements/LayoutElement.hpp"
+#include "../GUIStuff/ElementHelpers/ButtonHelpers.hpp"
 #include "Helpers/ConvertVec.hpp"
 #include <Helpers/NetworkingObjects/NetObjTemporaryPtr.decl.hpp>
 
@@ -233,10 +234,12 @@ class BranchChoiceElement : public GUIStuff::Element {
 void render_reader_branch_overlay(World& world, GUIStuff::GUIManager& gui) {
     if (!world.readerMode.is_active()) return;
     auto choices = world.readerMode.outgoing_choices();
-    // Show the overlay whenever there's at least one choice — single-
-    // path comics get a clickable forward affordance, branching comics
-    // get a row of options. Zero outgoing edges (dead-end) is M7-d.
-    if (choices.empty()) return;
+    // Render whenever there's something to show — at least one
+    // outgoing choice OR history to step back through. Dead-ends with
+    // history still get a back button so the reader isn't stranded.
+    // (M7-d will add a "the end" affordance for true dead-ends with
+    // no history either.)
+    if (choices.empty() && !world.readerMode.has_history()) return;
     using namespace GUIStuff;
 
     gui.element<LayoutElement>("reader branch overlay", [&] (LayoutElement*, const Clay_ElementId& lId) {
@@ -262,6 +265,18 @@ void render_reader_branch_overlay(World& world, GUIStuff::GUIManager& gui) {
                 .attachTo = CLAY_ATTACH_TO_ROOT
             },
         }) {
+            // Back button as the first item, only when there's history
+            // to pop. Same square size as the choice buttons so the row
+            // reads as a uniform strip.
+            if (world.readerMode.has_history()) {
+                GUIStuff::ElementHelpers::svg_icon_button(
+                    gui, "reader back",
+                    "data/icons/RemixIcon/arrow-left-s-line.svg", {
+                    .drawType = GUIStuff::SelectableButton::DrawType::TRANSPARENT_ALL,
+                    .size = BRANCH_BUTTON_SIDE,
+                    .onClick = [&world] { world.readerMode.back(); }
+                });
+            }
             for (size_t i = 0; i < choices.size(); ++i) {
                 gui.new_id(static_cast<int64_t>(i), [&] {
                     gui.element<BranchChoiceElement>("button", &world, choices[i].first, choices[i].second);

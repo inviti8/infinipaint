@@ -38,6 +38,7 @@ class ReaderMode {
         // Back: pops the most recent visit off the history stack and
         // navigates to it. No-op at the start.
         void back();
+        bool has_history() const { return !history.empty(); }
 
         // Outgoing edges from the current waypoint, in graph order.
         // Each entry is (target waypoint id, optional edge label).
