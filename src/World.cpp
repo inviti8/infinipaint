@@ -471,8 +471,16 @@ void World::start_hosting(const std::string& initNetSource, const std::string& s
 
 void World::autosave_to_directory(const std::filesystem::path& directoryToSaveAt) {
     std::vector<std::string> strList;
+    // Glob both the canonical and legacy extensions so a stem already
+    // taken by a .infpnt file isn't reused by a fresh .inkternity save.
     try {
         strList = glob_path_as_string_list(directoryToSaveAt, ("*" + World::DOT_FILE_EXTENSION).c_str(), 0, [&](const auto& p){ return p.stem().string();});
+    }
+    catch(...) {
+    }
+    try {
+        auto legacy = glob_path_as_string_list(directoryToSaveAt, ("*" + World::LEGACY_DOT_FILE_EXTENSION).c_str(), 0, [&](const auto& p){ return p.stem().string();});
+        strList.insert(strList.end(), legacy.begin(), legacy.end());
     }
     catch(...) {
     }

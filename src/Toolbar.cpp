@@ -386,7 +386,7 @@ void Toolbar::save_as_func() {
         optionsMenuOpen = true;
         optionsMenuType = SET_DOWNLOAD_NAME;
     #else
-        open_file_selector("Save", {{"InfiniPaint Canvas", World::FILE_EXTENSION}}, [w = make_weak_ptr(main.world)](const std::filesystem::path& p, const auto& e) {
+        open_file_selector("Save", {{"Inkternity Canvas", World::FILE_EXTENSION}}, [w = make_weak_ptr(main.world)](const std::filesystem::path& p, const auto& e) {
             auto world = w.lock();
             if(world)
                 world->save_to_file(p);
@@ -635,11 +635,11 @@ void Toolbar::web_version_welcome() {
         .floating = {.attachPoints = {.element = CLAY_ATTACH_POINT_CENTER_CENTER, .parent = CLAY_ATTACH_POINT_CENTER_CENTER}, .attachTo = CLAY_ATTACH_TO_PARENT}
     }) {
         gui.new_id("web version welcome gui", [&] {
-            text_label_centered(gui, "Welcome to the web version of InfiniPaint!");
-            text_label(gui, 
+            text_label_centered(gui, "Welcome to the web version of Inkternity!");
+            text_label(gui,
 R"(This version contains more known issues than the native version of the app. This includes:
 - Rare crashes
-- If this browser tab is unfocused, or the window is minimized, any InfiniPaint tabs connected online (whether host or client) will be disconnected
+- If this browser tab is unfocused, or the window is minimized, any Inkternity tabs connected online (whether host or client) will be disconnected
 - 4GB memory limit. Might be a problem if you're uploading many files/images
 - Not multithreaded
 - Can't access local fonts
@@ -1467,7 +1467,8 @@ void Toolbar::open_world_file(bool isClient, const std::string& netSource, const
     uploadData.nS = netSource;
     uploadData.sLID = serverLocalID2;
     uploadData.main = &main;
-    emscripten_browser_file::upload("." + World::FILE_EXTENSION, [](std::string const& fileName, std::string const& mimeType, std::string_view buffer, void* callbackData) {
+    // Accept both the canonical and legacy extension in the browser picker.
+    emscripten_browser_file::upload(World::DOT_FILE_EXTENSION + "," + World::LEGACY_DOT_FILE_EXTENSION, [](std::string const& fileName, std::string const& mimeType, std::string_view buffer, void* callbackData) {
         if(!buffer.empty()) {
             UploadData* uD = (UploadData*)callbackData;
             CustomEvents::emit_event<CustomEvents::OpenInfiniPaintFileEvent>({
@@ -1480,7 +1481,7 @@ void Toolbar::open_world_file(bool isClient, const std::string& netSource, const
         }
     }, &uploadData);
 #else
-    open_file_selector("Open", {{"InfiniPaint Canvas", World::FILE_EXTENSION}, {"Any File", "*"}}, [&, isClient = isClient, netSource = netSource, serverLocalID2 = serverLocalID2](const std::filesystem::path& p, const auto& e) {
+    open_file_selector("Open", {{"Inkternity Canvas", World::FILE_EXTENSION}, {"InfiniPaint Canvas (legacy)", "infpnt"}, {"Any File", "*"}}, [&, isClient = isClient, netSource = netSource, serverLocalID2 = serverLocalID2](const std::filesystem::path& p, const auto& e) {
         CustomEvents::emit_event<CustomEvents::OpenInfiniPaintFileEvent>({
             .isClient = isClient,
             .filePathSource = p,
@@ -1917,7 +1918,7 @@ void Toolbar::about_menu_inner_gui() {
                                 .sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_FIT(0)}
                             }
                         }) {
-                            text_button(gui, "infinipaintnoticebutton", "InfiniPaint", {
+                            text_button(gui, "infinipaintnoticebutton", "Inkternity", {
                                 .drawType = SelectableButton::DrawType::TRANSPARENT_ALL,
                                 .isSelected = selectedLicense == -1,
                                 .wide = true,

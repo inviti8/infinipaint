@@ -62,10 +62,11 @@ void FileSelectScreen::update_file_list(std::vector<FileInfo>& fL, const std::fi
         for(int i = 0; i < globCount; i++) {
             std::filesystem::path p = filesInPath[i];
             std::string fExt = p.extension().string();
-            if(fExt == World::DOT_FILE_EXTENSION) {
+            if(fExt == World::DOT_FILE_EXTENSION || fExt == World::LEGACY_DOT_FILE_EXTENSION) {
                 std::filesystem::path fullPath = savePath / filesInPath[i];
                 FileInfo fileInfoToAdd;
                 fileInfoToAdd.fileName = p.stem().string();
+                fileInfoToAdd.fileExtension = fExt;
 
                 if(trashUpdate) {
                     auto it = trashInfo.files.find(fileInfoToAdd.fileName);
@@ -257,9 +258,12 @@ void FileSelectScreen::move_selected_files(const std::filesystem::path& fromPath
         if(f.selected) {
             std::string newFileName = ensure_string_unique(toFolderListNames, f.fileName);
             toFolderListNames.emplace_back(newFileName);
-            std::filesystem::path filePath = fromPath / (f.fileName + World::DOT_FILE_EXTENSION);
+            // Preserve the existing extension on move/rename so legacy
+            // .infpnt files don't silently change format-by-association.
+            // First save will migrate to the canonical .inkternity extension.
+            std::filesystem::path filePath = fromPath / (f.fileName + f.fileExtension);
             std::filesystem::path thumbnailPath = fromPath / (f.fileName + ".jpg");
-            std::filesystem::path newFilePath = toPath / (newFileName + World::DOT_FILE_EXTENSION);
+            std::filesystem::path newFilePath = toPath / (newFileName + f.fileExtension);
             std::filesystem::path newThumbnailPath = toPath / (newFileName + ".jpg");
             SDL_RenamePath(filePath.string().c_str(), newFilePath.string().c_str());
             SDL_RenamePath(thumbnailPath.string().c_str(), newThumbnailPath.string().c_str());
@@ -291,9 +295,9 @@ void FileSelectScreen::duplicate_selected_files(const std::filesystem::path& inP
         if(f.selected) {
             std::string newFileName = ensure_string_unique(toFolderListNames, f.fileName);
             toFolderListNames.emplace_back(newFileName);
-            std::filesystem::path filePath = inPath / (f.fileName + World::DOT_FILE_EXTENSION);
+            std::filesystem::path filePath = inPath / (f.fileName + f.fileExtension);
             std::filesystem::path thumbnailPath = inPath / (f.fileName + ".jpg");
-            std::filesystem::path newFilePath = inPath / (newFileName + World::DOT_FILE_EXTENSION);
+            std::filesystem::path newFilePath = inPath / (newFileName + f.fileExtension);
             std::filesystem::path newThumbnailPath = inPath / (newFileName + ".jpg");
             SDL_CopyFile(filePath.string().c_str(), newFilePath.string().c_str());
             SDL_CopyFile(thumbnailPath.string().c_str(), newThumbnailPath.string().c_str());
@@ -304,7 +308,7 @@ void FileSelectScreen::duplicate_selected_files(const std::filesystem::path& inP
 void FileSelectScreen::delete_selected_files_in_trash() {
     for(const FileInfo& f : fileList) {
         if(f.selected) {
-            std::filesystem::path filePath = trashPath / (f.fileName + World::DOT_FILE_EXTENSION);
+            std::filesystem::path filePath = trashPath / (f.fileName + f.fileExtension);
             std::filesystem::path thumbnailPath = trashPath / (f.fileName + ".jpg");
             SDL_RemovePath(filePath.string().c_str());
             SDL_RemovePath(thumbnailPath.string().c_str());
@@ -593,7 +597,7 @@ void FileSelectScreen::file_view() {
     std::filesystem::path folderPath = (selectedMenu == SelectedMenu::TRASH) ? trashPath : savePath;
 
     auto fileButton = [&] (size_t i, bool isList, const Vector2f& iconSize) {
-        std::filesystem::path filePath = folderPath / (fileList[i].fileName + World::DOT_FILE_EXTENSION);
+        std::filesystem::path filePath = folderPath / (fileList[i].fileName + fileList[i].fileExtension);
         gui.element<SelectableButton>("file button", SelectableButton::Data{
             .isSelected = editMode && fileList[i].selected,
             .onClick = [&, filePath, i] {

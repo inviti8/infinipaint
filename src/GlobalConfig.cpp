@@ -182,7 +182,7 @@ void GlobalConfig::load_licenses() {
     std::sort(thirdPartyLicenses.begin(), thirdPartyLicenses.end(), [](const auto& a1, const auto& a2) {
         return std::lexicographical_compare(a1.first.begin(), a1.first.end(), a2.first.begin(), a2.first.end());
     });
-    ownLicenseText = "InfiniPaint v" + VersionConstants::CURRENT_VERSION_STRING;
+    ownLicenseText = "Inkternity v" + VersionConstants::CURRENT_VERSION_STRING;
     ownLicenseText +=
 R"(
 

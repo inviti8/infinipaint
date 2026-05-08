@@ -28,8 +28,10 @@ struct WorldScreenshotInfo;
 
 class World {
     public:
-        static constexpr std::string DOT_FILE_EXTENSION = ".infpnt";
-        static constexpr std::string FILE_EXTENSION = "infpnt";
+        static constexpr std::string DOT_FILE_EXTENSION = ".inkternity";
+        static constexpr std::string FILE_EXTENSION = "inkternity";
+        // Pre-rebrand extension; readable for backward compat, never written.
+        static constexpr std::string LEGACY_DOT_FILE_EXTENSION = ".infpnt";
         static constexpr size_t CHAT_SIZE = 10;
 
         World(MainProgram& initMain, const CustomEvents::OpenInfiniPaintFileEvent& worldInfo);

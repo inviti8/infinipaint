@@ -196,7 +196,7 @@ void get_refresh_rate(MainStruct& mS) {
 }
 
 void initialize_sdl(MainStruct& mS, int wWidth, int wHeight) {
-    SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_NAME_STRING, "InfiniPaint");
+    SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_NAME_STRING, "Inkternity");
     SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_VERSION_STRING, VersionConstants::CURRENT_VERSION_STRING.c_str());
     SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_IDENTIFIER_STRING, "com.infinipaint.infinipaint");
     SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_CREATOR_STRING, "Yousef Khadadeh (ErrorAtLine0)");
@@ -204,7 +204,7 @@ void initialize_sdl(MainStruct& mS, int wWidth, int wHeight) {
     SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_URL_STRING, "https://infinipaint.com/");
     SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_TYPE_STRING, "application");
 
-    SDL_SetHint(SDL_HINT_APP_NAME, "InfiniPaint");
+    SDL_SetHint(SDL_HINT_APP_NAME, "Inkternity");
     SDL_SetHint(SDL_HINT_PEN_MOUSE_EVENTS, "0");
     SDL_SetHint(SDL_HINT_MOUSE_TOUCH_EVENTS, "0");
     SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, "0");
@@ -241,7 +241,7 @@ void initialize_sdl(MainStruct& mS, int wWidth, int wHeight) {
     SDL_GL_SetAttribute(SDL_GL_ACCELERATED_VISUAL, 1);
 #endif
 
-    mS.window = SDL_CreateWindow("InfiniPaint", wWidth, wHeight, window_flags);
+    mS.window = SDL_CreateWindow("Inkternity", wWidth, wHeight, window_flags);
     if(mS.window == nullptr)
         throw std::runtime_error("[SDL_CreateWindow] " + std::string(SDL_GetError()));
 

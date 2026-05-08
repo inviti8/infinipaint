@@ -32,6 +32,10 @@ class FileSelectScreen : public Screen {
 
         struct FileInfo {
             std::string fileName;
+            // Extension stored as found on disk (e.g. ".inkternity" or
+            // legacy ".infpnt"); operations that touch the file must
+            // append this rather than the canonical DOT_FILE_EXTENSION.
+            std::string fileExtension;
             SDL_Time lastModifyTime;
             std::string lastModifyDate;
             bool selected = false;

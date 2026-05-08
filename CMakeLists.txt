@@ -252,7 +252,7 @@ else()
 endif()
 
 if(NOT ANDROID)
-    set_target_properties(main PROPERTIES OUTPUT_NAME "infinipaint")
+    set_target_properties(main PROPERTIES OUTPUT_NAME "inkternity")
 endif()
 
 if(WIN32)
