@@ -1,78 +1,62 @@
 <div align="center">
-	<img alt="InfiniPaint Logo" src="https://raw.githubusercontent.com/ErrorAtLine0/infinipaint/refs/heads/main/logo.svg" width=150/>
-	<h3>Infinite Space, Infinite Zoom, Collaborative Drawing</h3>
+	<img alt="Inkternity Logo" src="logo.svg" width=150/>
+	<h3>Comics on an infinite, infinitely zoomable canvas</h3>
 	<p>
-		<a href="https://infinipaint.com">🔗 Website</a> -
-		<a href="https://infinipaint.com/try.html">🌐 Try in Browser</a> -
-		<a href="https://github.com/ErrorAtLine0/infinipaint/blob/main/docs/MANUAL.md">📕 Usage Manual</a> -
-		<a href="https://github.com/ErrorAtLine0/infinipaint/blob/main/docs/BUILDING.md">⚒️ Build Manual</a>
+		<a href="docs/MANUAL.md">📕 Usage Manual</a> -
+		<a href="docs/BUILDING.md">⚒️ Build Manual</a> -
+		<a href="docs/design/PHASE1.md">🗺️ Phase 1 Design</a>
 	</p>
 	<p>
 		<a href="https://opensource.org/license/mit"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-blue"/></a>
-		<a href="https://github.com/ErrorAtLine0/infinipaint/releases/latest"><img alt="Release" src="https://img.shields.io/github/release/erroratline0/infinipaint.svg"/></a>
-		<a href="https://x.com/ErrorAtLine0"><img alt="X (Twitter) follow" src="https://img.shields.io/twitter/follow/ErrorAtLine0"/></a>
-		<a href="https://github.com/ErrorAtLine0/infinipaint"><img alt="Github Stars" src="https://img.shields.io/github/stars/erroratline0/infinipaint"/></a>
 	</p>
 </div>
 
-## InfiniPaint
+## Inkternity
 
-InfiniPaint is a **collaborative, infinite** canvas note-taking/drawing app. Unlike many other infinite canvas apps, **there is no zoom-in or zoom-out limit** (at least up until the point your computer runs out of memory). This means that this app is very good at things such as drawing sketches of the solar system to scale, or just drawing any massive objects with tiny details. Of course, even though this is a feature, this app is also perfectly well suited for use as a normal canvas.
+Inkternity is an infinite-canvas app for **producing and reading comics**. The canvas has no zoom-in or zoom-out limit, so a comic can range from a wide map of an entire story down to per-panel ink detail without crossing a tile boundary or losing context.
 
-You can try the web version of this app at [infinipaint.com](https://infinipaint.com) (requires a WebGL2 capable browser). The web version was compiled from C++ to Javascript using Emscripten, and may contain some bugs, so if possible, please consider downloading the native version for a better experience.
+On top of that canvas Inkternity adds a directed *waypoint graph* that captures reading order: each waypoint is a named camera + framing snapshot, and edges between waypoints define the path a reader follows. Branching panels give multiple outgoing edges, which the reader navigates through skinnable per-waypoint nav buttons.
 
-This app was inspired by [Lorien](https://github.com/mbrlabs/Lorien), another great infinite canvas program.
+### A fork of InfiniPaint
+
+Inkternity is a fork of [ErrorAtLine0/infinipaint](https://github.com/ErrorAtLine0/infinipaint) — the infinite-canvas drawing app it inherits everything else from. The canvas, the rendering pipeline, layers, collaboration, the file format, the existing tool set: all of it is InfiniPaint's work. Inkternity layers a comic-production workflow on top, and stays MIT just like upstream.
+
+Files saved by Inkternity use the `.inkternity` extension; existing `.infpnt` files from InfiniPaint load read-only-on-disk, and the next save migrates them to `.inkternity` (the original `.infpnt` is left in place — no destructive auto-rename).
+
+## What Inkternity adds on top of InfiniPaint
+
+- **Waypoints** — droppable canvas markers that capture camera state, panel framing, and a position in a directed reading graph
+- **Tree-view editor** — collapsible side panel for connecting waypoints into a reading order with optional branches; bidirectional sync with the canvas
+- **Reader mode** — chrome-free presentation that follows the waypoint graph; arrow-key navigation; per-branch choice UI
+- **Waypoint skins** — capture a rectangle of the canvas (`ButtonSelectTool`) as a waypoint's skin, used as the artwork for nav buttons in reader mode and as node visuals in the tree view
+- **libmypaint ink/marker brushes** — curated brush set built on [libmypaint](https://github.com/mypaint/libmypaint) (technical pen, fine inker, brush pen, fine/broad markers, wet ink) with persistent tile data per layer
+
+## Inherited from InfiniPaint
+
+- Infinite canvas, infinite zoom (no zoom limit until memory)
+- Online collaborative lobbies — text chat, see-each-other-draw, jump-to-player
+- Graphics tablet support with pressure sensitivity
+- Layers with blend modes
+- Saveable color palettes; right-click quick menu (color swap, canvas rotate)
+- Undo / redo
+- PNG / JPG / WEBP / SVG export of canvas regions
+- Transform (move, scale, rotate) selections (rectangle / lasso select)
+- Embed images and animated GIFs on the canvas
+- Hide UI with Tab; remappable keybinds; custom UI themes
+- Square grids on the canvas as drawing guides
+- Rich-text textboxes (bold, italics, underline, fonts, color, alignment, direction)
+- Other tools: rectangle, ellipse, line, eye-dropper, edit cursor
+- Copy/paste between canvases and tabs
+- Drop arbitrary files onto the canvas
 
 ## Installation
-- **Windows:** Available in [Releases](https://github.com/erroratline0/infinipaint/releases/latest) page. There are two versions:
-  	- Installer version. Recommended, since it automatically associates .infpnt files with InfiniPaint
-  	- Portable version, which is a zip file containing the executable and data files, and stores configuration files next to the executable. Not recommended unless you are specifically looking for a portable version
-- **macOS:** Available in [Releases](https://github.com/erroratline0/infinipaint/releases/latest) page. Only for Apple Silicon
-- **Linux:** It is recommended that you download from [Flathub](https://flathub.org/en/apps/com.infinipaint.infinipaint) to stay updated. Otherwise, there are flatpak bundles available for download on the [Releases](https://github.com/erroratline0/infinipaint/releases/latest) page for both x86_64 and arm64
 
-## Screenshots/GIFs
-
-<img alt="Zoom Forever Showcase" src="https://github.com/ErrorAtLine0/infinipaint/blob/main/docs/showcase/zoomforever.png?raw=true" width="100%"/>
-<img alt="Sketches Showcase" src="https://github.com/ErrorAtLine0/infinipaint/blob/main/docs/showcase/sketches.png?raw=true" width="100%"/>
-<img alt="Online Collaboration Showcase" src="https://github.com/ErrorAtLine0/infinipaint/blob/main/docs/showcase/collaboration.png?raw=true" width="100%"/>
-<img alt="Images Showcase" src="https://github.com/ErrorAtLine0/infinipaint/blob/main/docs/showcase/pictures.png?raw=true" width="100%"/>
-<img alt="Layers Showcase" src="https://github.com/ErrorAtLine0/infinipaint/blob/main/docs/showcase/layers.png?raw=true" width="100%"/>
-<img alt="Right Click Menu Showcase" src="https://github.com/ErrorAtLine0/infinipaint/blob/main/docs/showcase/rotate.png?raw=true" width="100%"/>
-<img alt="Bookmark Showcase" src="https://github.com/ErrorAtLine0/infinipaint/blob/main/docs/showcase/bookmarks.png?raw=true" width="100%"/>
-<img alt="Textbox Showcase" src="https://github.com/ErrorAtLine0/infinipaint/blob/main/docs/showcase/textbox.png?raw=true" width="100%"/>
-<img alt="Zoom Showcase" src="https://github.com/ErrorAtLine0/infinipaint/blob/main/docs/showcase/zoom.gif?raw=true" width="100%"/>
-
-## Features
-
-- Infinite canvas, with infinite zoom
-- Open online lobbies for collaboration
-	- Text chat with others in the lobby
-	- Jump to the location of other players through the player list
-	- See other members draw in real time
-	- Although this is a feature, this app can also be used offline
-- Graphics tablet support (Pressure sensitive brush and eraser detection)
-- Layers with blend modes
-- Saveable color palettes
-- Quick menu usable by right clicking on the canvas, which can be used to:
-	- Quickly change brush colors using the currently selected color palette
-	- Rotate the canvas
-- Place bookmarks on the canvas to jump to later
-- Undo/Redo
-- PNG, JPG, WEBP export of specific parts of the canvas at any resolution (Screenshot)
-- SVG export of specific parts of the canvas (Screenshot)
-- Transform (Move, Scale, Rotate) any object on the canvas (Rectangle Select Tool/Lasso Select Tool)
-- Display Images and animated GIFs on the canvas
-	- Note: May take a lot of memory to store and display images compared to other objects, especially GIFs
-- Hide (or unhide) the UI by pressing Tab
-- Remappable keybinds
-- Create custom UI themes
-- Place infinite square grids on the canvas as guides for drawing
-    - Grids come with various properties, including changing color, and displaying coordinate axes.
-- Textbox tool with formatting support (Bold, italics, underline, strikethrough, overline, fonts, text color, highlight color, text size, paragraph alignment, text direction)
-- Other tools: Rectangle, Ellipse, Line, Eye dropper/color picker, Edit/cursor
-- Can copy/paste selected objects (Ctrl-C Ctrl-V). This can also be done between different files, as long as they're open in different tabs in the same window.
-- Any file can be placed on the canvas. Using the edit tool, you can download any file/image on the canvas to your computer. This can be used as a sort of file sharing mechanism in a collaborative canvas (should probably only use this for small files...)
+Inkternity is in active Phase 1 development. Build from source via [BUILDING.md](docs/BUILDING.md). Pre-built installers will land with the Phase 1 release.
 
 ## Contribution
 
-Currently, I won't be accepting most pull requests. The program is at a stage where large parts of the code are constantly being rewritten, so unless it's something small and doesn't interfere with code I'm currently working on, I probably won't be merging it. Any issue reports (bug reports, feature requests, etc.) are welcome though!
+Issue reports (bugs and feature requests) welcome. For pull requests of any meaningful scope, please open an issue first to align — Phase 1 is moving fast and large parts of the code are still being shaped.
+
+## License
+
+Inkternity is MIT licensed, matching InfiniPaint upstream. Third-party components retain their respective licenses; see the `About` menu in-app for the full list.

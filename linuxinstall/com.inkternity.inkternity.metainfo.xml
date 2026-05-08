@@ -37,23 +37,30 @@
     
     <description>
         <p>
-            InfiniPaint is a collaborative, infinite space, infinite zoom, canvas note-taking/drawing app. Unlike many other infinite canvas apps, there is no zoom in or zoom out limit. This means that this app is very good at things such as drawing sketches of the solar system to scale, or just drawing any massive objects with tiny details. Of course, this app is also perfectly well suited for use as a normal canvas.
+            Inkternity is an infinite-canvas app for producing and reading comics, built as a fork of InfiniPaint. The canvas has no zoom-in or zoom-out limit, so a comic can range from a wide map of an entire story down to per-panel ink detail without losing context. On top of that canvas Inkternity adds a directed waypoint graph that captures reading order: each waypoint is a named camera + framing snapshot, and edges between waypoints define the path a reader follows.
         </p>
-        <p>Features:</p>
+        <p>Inkternity-specific features:</p>
+        <ul>
+            <li>Waypoints — droppable camera + framing markers connected into a directed reading graph</li>
+            <li>Tree-view editor side panel for arranging the waypoint reading order, with bidirectional canvas sync</li>
+            <li>Reader mode that hides editor chrome and follows the graph; skinnable per-waypoint nav buttons for branching choices</li>
+            <li>Waypoint skins captured from a rectangle of the canvas (ButtonSelectTool)</li>
+            <li>libmypaint ink/marker brush set (technical pen, fine inker, brush pen, fine/broad markers, wet ink) with persistent tile data</li>
+        </ul>
+        <p>Inherited from InfiniPaint:</p>
         <ul>
             <li>Infinite canvas, with infinite zoom</li>
-            <li>Open online lobbies for collaboration</li>
-            <li>Graphics tablet support (Pressure sensitive brush and eraser detection)</li>
+            <li>Online collaborative lobbies</li>
+            <li>Graphics tablet support (pressure-sensitive brush and eraser)</li>
             <li>Layers with blend modes</li>
             <li>Saveable color palettes</li>
-            <li>Right click to open a quick menu</li>
-            <li>Place bookmarks on the canvas to jump to later</li>
-            <li>Undo/Redo</li>
-            <li>Screenshot to export parts of the canvas to a picture (can export to raster formats or SVG)</li>
-            <li>Place text boxes with formatting</li>
-            <li>Other tools such as: Rectangle select tool, Lasso select tool, Color picker tool, Grid tool, Rectangle tool, Ellipse tool, Line tool</li>
-            <li>Copy and paste objects on the canvas, and between different canvases</li>
-            <li>Insert images and files on the canvas</li>
+            <li>Right-click quick menu</li>
+            <li>Undo / redo</li>
+            <li>PNG / JPG / WEBP / SVG export of canvas regions</li>
+            <li>Rich-text textboxes</li>
+            <li>Other tools: rectangle / lasso select, color picker, grid, rectangle, ellipse, line</li>
+            <li>Copy and paste between canvases</li>
+            <li>Embed images and arbitrary files on the canvas</li>
         </ul>
     </description>
     

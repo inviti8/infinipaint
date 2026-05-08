@@ -11,7 +11,7 @@ cmake ../.. -DCMAKE_TOOLCHAIN_FILE=generators/conan_toolchain.cmake -DCMAKE_BUIL
 cmake --build .
 source generators/deactivate_conanbuild.sh
 ```
-After building the project, you should place the `data` folder located in the root of the repository next to the `infinipaint` executable before running it. What I usually do is create a symbolic link of the data folder and place it in the build directory.
+After building the project, you should place the `data` folder located in the root of the repository next to the `inkternity` executable before running it. What I usually do is create a symbolic link of the data folder and place it in the build directory.
 
 You can also build in Debug mode by setting the `build_type` in the `conan install` command to `Debug`, and also by setting `CMAKE_BUILD_TYPE=Debug` when running CMake.
 ## macOS
@@ -52,7 +52,7 @@ translation units (notably `src/Toolbar.cpp`) hit C1060 "compiler is out
 of heap space" on the default 32-bit `cl.exe`.
 
 After building the project, the repo's `assets/data/` folder must be
-reachable as `data/` next to `infinipaint.exe` — either copy it or, more
+reachable as `data/` next to `inkternity.exe` — either copy it or, more
 conveniently, create a directory junction:
 ```
 mklink /J build\Release\data assets\data
@@ -82,7 +82,7 @@ cmake ../.. -DCMAKE_TOOLCHAIN_FILE=generators/conan_toolchain.cmake -DCMAKE_BUIL
 cmake --build .
 source generators/deactivate_conanbuild.sh
 ```
-These commands will generate a javascript file containing the entire program. An example of a website that can run and display this program can be found in `emscripteninstall/index.html`. To try this out, place `infinipaint.js`, `emscripteninstall/index.html`, and `emscripteninstall/loading.gif` in a folder, and host a webserver from that folder. The server must set these two HTTP headers:
+These commands will generate a javascript file containing the entire program. An example of a website that can run and display this program can be found in `emscripteninstall/index.html`. To try this out, place `inkternity.js`, `emscripteninstall/index.html`, and `emscripteninstall/loading.gif` in a folder, and host a webserver from that folder. The server must set these two HTTP headers:
 ```
 Cross-Origin-Opener-Policy: same-origin
 Cross-Origin-Embedder-Policy: require-corp
