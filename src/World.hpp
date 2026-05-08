@@ -7,6 +7,7 @@
 #include "WorldUndoManager.hpp"
 #include "Bookmarks/BookmarkManager.hpp"
 #include "Waypoints/WaypointGraph.hpp"
+#include "Waypoints/TreeView.hpp"
 #include "ResourceManager.hpp"
 #include "DrawingProgram/DrawingProgram.hpp"
 #include "Toolbar.hpp"
@@ -45,6 +46,7 @@ class World {
         DrawingProgram drawProg;
         BookmarkManager bMan;
         WaypointGraph wpGraph;
+        TreeView treeView;
         GridManager gridMan;
 
         std::deque<Toolbar::ChatMessage> chatMessages;

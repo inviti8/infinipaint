@@ -1,5 +1,6 @@
 #include "PhoneDrawingProgramScreen.hpp"
 #include "../MainProgram.hpp"
+#include "../Waypoints/TreeView.hpp"
 #include "DrawingProgramScreen.hpp"
 #include "Helpers/ConvertVec.hpp"
 #include "../GUIStuff/Elements/GridScrollArea.hpp"
@@ -38,9 +39,19 @@ void PhoneDrawingProgramScreen::main_display() {
         },
     }) {
         top_toolbar();
+        // Horizontal split between the canvas-occupies-this-space stretch
+        // and the optional tree-view side panel on the right.
         CLAY_AUTO_ID({
-            .layout = {.sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_GROW(0)}}
-        }) {}
+            .layout = {
+                .sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_GROW(0)},
+                .layoutDirection = CLAY_LEFT_TO_RIGHT
+            }
+        }) {
+            CLAY_AUTO_ID({
+                .layout = {.sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_GROW(0)}}
+            }) {}
+            main.world->treeView.gui(main.g.gui);
+        }
         bottom_toolbar();
     }
 }
@@ -542,6 +553,13 @@ void PhoneDrawingProgramScreen::bottom_extra_toolbar_gui() {
         .onClick = [&] {
             settingsMenuPopup = (settingsMenuPopup == SettingsMenuPopup::BG_COLOR) ? SettingsMenuPopup::NONE : SettingsMenuPopup::BG_COLOR;
         }
+    });
+
+    // Tree-view panel toggle (M6-a). Mirrors the desktop layout's button.
+    svg_icon_button(gui, "Tree View Toggle Button", "data/icons/list.svg", {
+        .drawType = SelectableButton::DrawType::TRANSPARENT_ALL,
+        .isSelected = main.world->treeView.is_visible(),
+        .onClick = [&] { main.world->treeView.toggle(); }
     });
 }
 

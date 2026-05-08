@@ -399,6 +399,14 @@ void DrawingProgram::toolbar_gui(Toolbar& t) {
 
                 t.color_button_left("Foreground color", &world.main.toolConfig.globalConf.foregroundColor);
                 t.color_button_left("Background color", &world.main.toolConfig.globalConf.backgroundColor);
+
+                // Tree-view panel toggle (M6-a). Placeholder list.svg icon
+                // until a graph icon ships.
+                svg_icon_button(gui, "Tree View Toggle Button", "data/icons/list.svg", {
+                    .drawType = SelectableButton::DrawType::TRANSPARENT_ALL,
+                    .isSelected = world.treeView.is_visible(),
+                    .onClick = [this] { world.treeView.toggle(); }
+                });
             }
         });
     });

@@ -44,6 +44,7 @@ World::World(MainProgram& initMain, const CustomEvents::OpenInfiniPaintFileEvent
     drawProg(*this),
     bMan(*this),
     wpGraph(*this),
+    treeView(*this),
     gridMan(*this),
     canvasTheme(*this)
 {

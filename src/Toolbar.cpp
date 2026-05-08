@@ -1179,6 +1179,7 @@ void Toolbar::drawing_program_gui() {
             color_picker_window("Drawing program gui color picker right", &colorRight, colorRightButton, colorRightData);
 
         main.world->drawProg.tool_options_gui(*this);
+        main.world->treeView.gui(main.g.gui);
     }
 }
 
