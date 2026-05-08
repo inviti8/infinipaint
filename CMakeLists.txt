@@ -481,9 +481,8 @@ if(APPLE OR WIN32)
     set(CPACK_PACKAGE_VERSION_MAJOR "0")
     set(CPACK_PACKAGE_VERSION_MINOR "4")
     set(CPACK_PACKAGE_VERSION_PATCH "1")
-    # NOTE: VENDOR + CONTACT carry upstream attribution; update to your
-    # own values before publishing Phase 1 installers.
-    set(CPACK_PACKAGE_VENDOR "ErrorAtLine0")
+    set(CPACK_PACKAGE_VENDOR "HEAVYMETA LCA")
+    # TODO: set CONTACT to a HEAVYMETA-owned email before publishing.
     set(CPACK_PACKAGE_CONTACT "erroratline0@gmail.com")
     set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_SOURCE_DIR}/LICENSE")
 endif()
@@ -503,8 +502,7 @@ elseif(WIN32)
     set(CPACK_NSIS_UNINSTALL_NAME "Inkternity Uninstall")
     set(CPACK_NSIS_WELCOME_TITLE "Welcome to Inkternity Installer")
     set(CPACK_NSIS_EXECUTABLES_DIRECTORY .)
-    # NOTE: URL_INFO_ABOUT is the upstream homepage; replace before
-    # publishing Inkternity installers.
+    # TODO: replace with Inkternity's homepage once one exists.
     set(CPACK_NSIS_URL_INFO_ABOUT "https://infinipaint.com")
     set(CPACK_NSIS_MENU_LINKS "inkternity.exe" "Inkternity")
     set(CPACK_NSIS_INSTALLED_ICON_NAME "inkternity.exe")

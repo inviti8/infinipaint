@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Copyright 2025 Yousef Khadadeh -->
+<!-- Copyright 2026 HEAVYMETA LCA; portions Copyright 2025 Yousef Khadadeh -->
 <component type="desktop-application">
     <id>com.inkternity.inkternity</id>
     <name>Inkternity</name>
@@ -11,14 +11,15 @@
         <color type="primary" scheme_preference="light">#83b9b2</color>
         <color type="primary" scheme_preference="dark">#325652</color>
     </branding>
-    
+
+    <!-- TODO: replace with Inkternity / HEAVYMETA-owned URLs once they exist.
+         Upstream InfiniPaint URLs left in as placeholders. -->
     <url type="homepage">https://infinipaint.com</url>
     <url type="vcs-browser">https://github.com/ErrorAtLine0/infinipaint</url>
     <url type="bugtracker">https://github.com/ErrorAtLine0/infinipaint/issues</url>
-    <url type="donation">https://infinipaint.com/donate.html</url>
-    
-    <developer id="com.erroratline0">
-        <name>ErrorAtLine0</name>
+
+    <developer id="com.heavymeta">
+        <name>HEAVYMETA LCA</name>
     </developer>
     
     <categories>
