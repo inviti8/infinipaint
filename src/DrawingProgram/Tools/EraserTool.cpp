@@ -2,6 +2,7 @@
 #include "../DrawingProgram.hpp"
 #include "../../MainProgram.hpp"
 #include "../../DrawData.hpp"
+#include "../../CanvasComponents/MyPaintLayerCanvasComponent.hpp"
 #include <include/core/SkBlendMode.h>
 #include <include/core/SkPathBuilder.h>
 
@@ -81,6 +82,33 @@ void EraserTool::erase_between_points(const Vector2f& start, const Vector2f& end
     SCollision::generate_wide_line(cC, start, end, width * 2.0f, true);
     auto cCWorld = drawP.world.drawData.cam.c.collider_to_world<SCollision::ColliderCollection<WorldScalar>, SCollision::ColliderCollection<float>>(cC);
 
+    // Dispatch helper: vector components are deleted whole (existing
+    // behavior); MyPaintLayer components get a destination-out dab pass on
+    // their raster surface (PHASE1.md §4 "eraser interaction"). Returns
+    // true when the component should be removed from the BVH (vector
+    // delete), false when we kept it but mutated its tiles (raster erase).
+    auto try_punch_or_mark = [&](auto c) -> bool {
+        auto& container = *c->obj;
+#ifdef HVYM_HAS_LIBMYPAINT
+        if (container.get_comp().get_type() == CanvasComponentType::MYPAINTLAYER) {
+            auto& layer = static_cast<MyPaintLayerCanvasComponent&>(container.get_comp());
+            const Vector2f localStart = container.coords.from_cam_space_to_this(drawP.world, start);
+            const Vector2f localEnd   = container.coords.from_cam_space_to_this(drawP.world, end);
+            // Camera-space radius -> component-local pixels via two-point
+            // distance, robust to rotation/scale between cam and component.
+            const Vector2f probe = container.coords.from_cam_space_to_this(drawP.world, start + Vector2f(width, 0));
+            const float localRadius = (probe - localStart).norm();
+            layer.erase_along_segment(localStart, localEnd, localRadius);
+            container.commit_update(drawP);
+            drawP.drawCache.invalidate_cache_at_optional_aabb(container.get_world_bounds());
+            return false;
+        }
+#endif
+        erasedComponents.emplace(c);
+        drawP.drawCache.invalidate_cache_at_optional_aabb(container.get_world_bounds());
+        return true;
+    };
+
     drawP.drawCache.traverse_bvh_run_function(cCWorld.bounds, [&](const auto& bvhNode) {
         if(bvhNode &&
            SCollision::collide(cC, drawP.world.drawData.cam.c.to_space(bvhNode->bounds.min)) &&
@@ -90,10 +118,8 @@ void EraserTool::erase_between_points(const Vector2f& start, const Vector2f& end
             drawP.drawCache.invalidate_cache_at_aabb(bvhNode->bounds);
             drawP.drawCache.traverse_bvh_run_function_starting_at_node_no_collision_check(bvhNode, [&](const auto& bvhNodeChild) {
                 drawP.drawCache.node_loop_erase_if_components(bvhNodeChild, [&](auto c) {
-                    if(drawP.layerMan.component_passes_layer_selector(c, drawP.controls.layerSelector)) {
-                        erasedComponents.emplace(c);
-                        return true;
-                    }
+                    if(drawP.layerMan.component_passes_layer_selector(c, drawP.controls.layerSelector))
+                        return try_punch_or_mark(c);
                     return false;
                 });
                 return true;
@@ -101,11 +127,8 @@ void EraserTool::erase_between_points(const Vector2f& start, const Vector2f& end
             return false;
         }
         drawP.drawCache.node_loop_erase_if_components(bvhNode, [&](auto c) {
-            if(drawP.layerMan.component_passes_layer_selector(c, drawP.controls.layerSelector) && c->obj->collides_with(drawP.world.drawData.cam.c, cCWorld, cC)) {
-                erasedComponents.emplace(c);
-                drawP.drawCache.invalidate_cache_at_optional_aabb(c->obj->get_world_bounds());
-                return true;
-            }
+            if(drawP.layerMan.component_passes_layer_selector(c, drawP.controls.layerSelector) && c->obj->collides_with(drawP.world.drawData.cam.c, cCWorld, cC))
+                return try_punch_or_mark(c);
             return false;
         });
         return true;

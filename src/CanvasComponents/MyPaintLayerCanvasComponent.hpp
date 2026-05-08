@@ -36,6 +36,14 @@ class MyPaintLayerCanvasComponent : public CanvasComponent {
         // Called by the tool after each end_atomic so cached drawables
         // (currently just the bounds) recompute on the next draw.
         void mark_dirty();
+
+        // Punch destination-out dabs along the segment localStart -> localEnd.
+        // localRadius is in component-local pixels (caller is responsible for
+        // converting camera-space radius via the same coord transform used
+        // for the endpoints). Used by EraserTool — see PHASE1.md §4 risks
+        // ("destination-out dab pass on the raster surface for libmypaint
+        // layers, unchanged path-erase for vector strokes").
+        void erase_along_segment(const Vector2f& localStart, const Vector2f& localEnd, float localRadius);
 #endif
 
     private:

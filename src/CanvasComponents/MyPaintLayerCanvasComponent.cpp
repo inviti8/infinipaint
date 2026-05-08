@@ -6,6 +6,14 @@
 #include <include/core/SkImageInfo.h>
 #include <include/core/SkPaint.h>
 
+#ifdef HVYM_HAS_LIBMYPAINT
+extern "C" {
+#include <mypaint-surface.h>
+}
+#include <algorithm>
+#include <cmath>
+#endif
+
 CanvasComponentType MyPaintLayerCanvasComponent::get_type() const {
     return CanvasComponentType::MYPAINTLAYER;
 }
@@ -63,10 +71,47 @@ void MyPaintLayerCanvasComponent::draw(SkCanvas* canvas, const DrawData&, const 
 void MyPaintLayerCanvasComponent::initialize_draw_data(DrawingProgram&) {
 }
 
-bool MyPaintLayerCanvasComponent::collides_within_coords(const SCollision::ColliderCollection<float>&) const {
-    // Erase-by-overlap on raster layers is M3's "eraser interaction defined"
-    // deliverable; for now the layer participates in no collisions.
-    return false;
+bool MyPaintLayerCanvasComponent::collides_within_coords(const SCollision::ColliderCollection<float>& checkAgainst) const {
+    // Coarse AABB-vs-AABB. EraserTool needs this to return true so the layer
+    // gets through to its dispatch (which then punches destination-out dabs
+    // instead of marking the whole component for delete). Per-pixel
+    // precision isn't useful here: a dab outside the actually-painted
+    // region is a no-op on the raster surface.
+    const auto bounds = get_obj_coord_bounds();
+    if (bounds.dim().x() <= 0.0f || bounds.dim().y() <= 0.0f) return false;
+    return SCollision::collide(checkAgainst.bounds, bounds);
+}
+
+void MyPaintLayerCanvasComponent::erase_along_segment(const Vector2f& localStart, const Vector2f& localEnd, float localRadius) {
+    if (localRadius <= 0.0f) return;
+    MyPaintSurface* surf = surface_->surface();
+    const Vector2f delta = localEnd - localStart;
+    const float segLen = delta.norm();
+    // ~one dab every half-radius along the segment, plus an anchor so a
+    // zero-length segment (single click) still punches one dab.
+    const float spacing = std::max(localRadius * 0.5f, 1.0f);
+    const int steps = std::max(1, static_cast<int>(std::ceil(segLen / spacing)) + 1);
+    mypaint_surface_begin_atomic(surf);
+    for (int i = 0; i < steps; ++i) {
+        const float t = (steps == 1) ? 0.0f : static_cast<float>(i) / static_cast<float>(steps - 1);
+        const Vector2f p = localStart + delta * t;
+        mypaint_surface_draw_dab(
+            surf,
+            p.x(), p.y(),
+            localRadius,
+            0.0f, 0.0f, 0.0f,  // color is irrelevant for an eraser dab (alpha_eraser=0)
+            1.0f,              // opaque
+            0.6f,              // hardness — somewhat soft eraser edge
+            0.0f,              // softness  (NOT 1.0; that's libmypaint's draw-skip kill switch)
+            0.0f,              // alpha_eraser=0 → destination-out
+            1.0f, 0.0f,        // aspect_ratio, angle
+            0.0f, 0.0f,        // lock_alpha, colorize
+            0.0f, 0.0f,        // posterize, posterize_num
+            1.0f               // paint
+        );
+    }
+    mypaint_surface_end_atomic(surf, nullptr);
+    mark_dirty();
 }
 
 SCollision::AABB<float> MyPaintLayerCanvasComponent::get_obj_coord_bounds() const {
@@ -99,5 +144,8 @@ void MyPaintLayerCanvasComponent::draw(SkCanvas*, const DrawData&, const std::sh
 void MyPaintLayerCanvasComponent::initialize_draw_data(DrawingProgram&) {}
 bool MyPaintLayerCanvasComponent::collides_within_coords(const SCollision::ColliderCollection<float>&) const { return false; }
 SCollision::AABB<float> MyPaintLayerCanvasComponent::get_obj_coord_bounds() const { return {}; }
+// No libmypaint in this build — erase has nothing to do (the layer can't
+// have any pixels in the first place).
+// (mark_dirty / surface() are gated by HVYM_HAS_LIBMYPAINT in the header.)
 
 #endif
