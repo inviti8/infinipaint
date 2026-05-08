@@ -6,5 +6,6 @@ enum class CanvasComponentType : uint8_t {
     RECTANGLE,
     ELLIPSE,
     TEXTBOX,
-    IMAGE
+    IMAGE,
+    MYPAINTLAYER
 };

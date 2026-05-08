@@ -4,6 +4,7 @@
 #include "EllipseCanvasComponent.hpp"
 #include "RectangleCanvasComponent.hpp"
 #include "TextBoxCanvasComponent.hpp"
+#include "MyPaintLayerCanvasComponent.hpp"
 
 void CanvasComponent::update(DrawingProgram& drawP) {
 }
@@ -26,6 +27,8 @@ CanvasComponent* CanvasComponent::allocate_comp(CanvasComponentType type) {
             return new TextBoxCanvasComponent;
         case CanvasComponentType::IMAGE:
             return new ImageCanvasComponent;
+        case CanvasComponentType::MYPAINTLAYER:
+            return new MyPaintLayerCanvasComponent;
     }
     return nullptr;
 }
