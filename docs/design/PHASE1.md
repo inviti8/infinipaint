@@ -263,7 +263,14 @@ Not blocking — flag and decide as Phase 1 progresses.
 - **Tree window: imnodes vs. Skia.** Spike during M6.
 - **Multi-user collaboration.** Keep InfiniPaint's lobby feature working as-is, deprecate it, or extend it to share waypoint state? Default: keep working, do not extend.
 
-## 12. Decisions log
+## 12. Local dev environment
+
+Conventions for working in this repo on the maintainer's machine. Not user-facing; record here so future contributors and the agent don't drift.
+
+- **Python tooling: use `uv`.** All Python invocations — Conan itself (it's a pip package), helper scripts, anything that would otherwise be `python …` or `pip install …` — go through `uv` (`uv run`, `uv tool install`, `uv pip`). Avoids polluting the system Python and gives reproducible per-task envs. Do not introduce raw `pip install` or bare `python` calls in docs, scripts, or CI snippets without a reason.
+- **Conan cache location: `D:\.conan2`.** Set via the user-scope `CONAN_HOME` environment variable. The repo lives on `D:\` because `C:\` was running out of space; the Conan cache (which can grow to many GB across Skia + dependency builds) must live on `D:\` for the same reason. New shells inherit this automatically; if a tool reports the cache as `C:\Users\...\.conan2`, the shell pre-dates the env var and needs to be reopened.
+
+## 13. Decisions log
 
 | Date | Decision | Rationale |
 |---|---|---|
@@ -280,3 +287,5 @@ Not blocking — flag and decide as Phase 1 progresses.
 | 2026-05-07 | File extension stays `.infpnt` until M8 rebrand | Format version bumps in M4 (so old files can load forward), but the user-visible `.hvym` rename happens with the rest of the rebrand in M8. |
 | 2026-05-07 | Reader mode is per-session, not per-document | Default; can revisit if authors want per-comic preview state. |
 | 2026-05-07 | libmypaint integrated as `deps/libmypaint` git submodule, not a Conan recipe | libmypaint is autotools-only and not on stock ConanCenter; writing an MSVC-clean Conan recipe is 4–8h of yak-shaving before any brush code runs. Matches existing `deps/clip` precedent. Krita/GIMP both vendor libmypaint for the same reason. Revisit if the spike grows into a maintenance burden. |
+| 2026-05-07 | Repo and Conan cache on `D:\` instead of `C:\` | `C:\` was running out of space; Conan cache can balloon to many GB during Skia builds. `CONAN_HOME=D:\.conan2` set as user env var. |
+| 2026-05-07 | `uv` is the only Python entrypoint | Avoids system-Python pollution and version drift; gives reproducible per-task envs. Applies to Conan, helper scripts, and anything else Python-shaped. |
