@@ -231,7 +231,7 @@ void PhoneDrawingProgramScreen::bottom_toolbar_gui() {
     };
 
     tool_button("Brush Toolbar Button", "data/icons/brush.svg", DrawingProgramToolType::BRUSH);
-    tool_button("MyPaint Brush Toolbar Button", "data/icons/brush.svg", DrawingProgramToolType::MYPAINTBRUSH);
+    tool_button("MyPaint Brush Toolbar Button", "data/icons/ink.svg", DrawingProgramToolType::MYPAINTBRUSH);
     tool_button("Waypoint Toolbar Button", "data/icons/bookmark.svg", DrawingProgramToolType::WAYPOINT);
     tool_button("Button Select Toolbar Button", "data/icons/button-select.svg", DrawingProgramToolType::BUTTONSELECT);
     tool_button("Eraser Toolbar Button", "data/icons/eraser.svg", DrawingProgramToolType::ERASER);
