@@ -245,13 +245,15 @@ Tracked as harness tasks #2 through #9 (#1 — the fork itself — is being done
 | M1 | ✅ | libmypaint plumbed | Conan dep added; "hello dab" test draws to a Skia surface |
 | M2 | ✅ | LibMyPaintSkiaSurface adapter | `MyPaintTiledSurface` implementation with lazy tile allocation; unit-tested against synthetic stroke input |
 | M3 | ✅ | MyPaintBrushTool + curated presets | New tool registered in `DrawingProgram`; brush picker shows the curated set; eraser interaction defined |
-| M4 | | Waypoint data model | `Waypoint`, `WaypointGraph`; bookmark migration; file format updated; round-trip tested |
+| M4 | ✅ | Waypoint data model | `Waypoint`, `WaypointGraph`; ~~bookmark migration~~; file format updated; round-trip tested (manual) |
 | M5 | | WaypointTool + canvas component | Drop / edit / delete waypoints on canvas; framing rect handles; author/reader chrome |
 | M6 | | Tree window | Second SDL_Window with imnodes (or Skia) graph view; bidirectional sync with canvas |
 | M7 | | Reader mode | Mode toggle, hidden chrome, camera transitions, branching choice UI |
 | M8 | | Phase 1 release | Rebrand (name, icons, splash, About, .hvym extension); installers; release notes |
 
 **M3 follow-ups deferred:** persistent tile serialization (rolls into M4 file format); real `.myb` file loading (current presets are hardcoded `apply()` functions; the public BrushPreset shape is stable across that swap); per-brush pressure-sensitivity slider in the picker (currently only diameter/hardness/opacity are user-tunable).
+
+**M4 scope cuts:** Bookmark migration and the §5 "BookmarkManager-as-compatibility-shim" are both descoped — this codebase is not promising to load anyone else's pre-0.5 InfiniPaint files. M5 can therefore remove `BookmarkManager` outright when it replaces the side-panel UI, rather than maintaining a shim.
 
 Workstreams A (brushes: M1–M3) and B+C (waypoints + tree: M4–M6) run in parallel after the fork is built clean. M7 depends on M5 + M6. M8 depends on M3 + M7.
 
