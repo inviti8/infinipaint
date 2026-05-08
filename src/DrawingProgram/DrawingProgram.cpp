@@ -407,6 +407,13 @@ void DrawingProgram::toolbar_gui(Toolbar& t) {
                     .isSelected = world.treeView.is_visible(),
                     .onClick = [this] { world.treeView.toggle(); }
                 });
+
+                // Reader-mode toggle (M7-a). Open eye = "viewing as a reader".
+                svg_icon_button(gui, "Reader Mode Toggle Button", "data/icons/eyeopen.svg", {
+                    .drawType = SelectableButton::DrawType::TRANSPARENT_ALL,
+                    .isSelected = world.readerMode.is_active(),
+                    .onClick = [this] { world.readerMode.toggle(); }
+                });
             }
         });
     });

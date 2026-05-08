@@ -343,6 +343,8 @@ TreeView::TreeView(World& w)
 
 void TreeView::gui(GUIStuff::GUIManager& gui) {
     if (!visible) return;
+    // Reader mode auto-hides the editor chrome (PHASE1.md §7).
+    if (world.readerMode.is_active()) return;
     using namespace GUIStuff;
     using namespace GUIStuff::ElementHelpers;
     auto& io = gui.io;

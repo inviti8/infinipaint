@@ -1,5 +1,8 @@
 #include "WaypointCanvasComponent.hpp"
 #include "../DrawData.hpp"
+#include "../MainProgram.hpp"
+#include "../World.hpp"
+#include "../ReaderMode/ReaderMode.hpp"
 #include <include/core/SkCanvas.h>
 #include <include/core/SkPaint.h>
 #include <include/core/SkPath.h>
@@ -42,6 +45,11 @@ void WaypointCanvasComponent::set_data_from(const CanvasComponent& other) {
 }
 
 void WaypointCanvasComponent::draw(SkCanvas* canvas, const DrawData& drawData, const std::shared_ptr<void>&) const {
+    // Reader mode hides editor chrome (PHASE1.md §7); the marker is
+    // editor chrome.
+    if (drawData.main && drawData.main->world && drawData.main->world->readerMode.is_active())
+        return;
+
     // Marker visual: filled gold disc with a dark outline. Gold (~#E0B040)
     // because it doesn't compete with brush-stroke colors and reads as a
     // "navigation marker" rather than "drawn content".

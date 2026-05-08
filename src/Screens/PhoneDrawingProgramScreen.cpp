@@ -561,6 +561,13 @@ void PhoneDrawingProgramScreen::bottom_extra_toolbar_gui() {
         .isSelected = main.world->treeView.is_visible(),
         .onClick = [&] { main.world->treeView.toggle(); }
     });
+
+    // Reader-mode toggle (M7-a).
+    svg_icon_button(gui, "Reader Mode Toggle Button", "data/icons/eyeopen.svg", {
+        .drawType = SelectableButton::DrawType::TRANSPARENT_ALL,
+        .isSelected = main.world->readerMode.is_active(),
+        .onClick = [&] { main.world->readerMode.toggle(); }
+    });
 }
 
 void PhoneDrawingProgramScreen::input_global_back_button_callback() {
