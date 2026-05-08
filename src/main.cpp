@@ -823,8 +823,14 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
                     mS.m->input_open_infinipaint_file_callback(*CustomEvents::get_event<CustomEvents::OpenInfiniPaintFileEvent>());
                 else if(event->type == CustomEvents::AddFileToCanvasEvent::EVENT_NUM)
                     mS.m->input_add_file_to_canvas_callback(*CustomEvents::get_event<CustomEvents::AddFileToCanvasEvent>());
-                else if(event->type == CustomEvents::RefreshTextBoxInputEvent::EVENT_NUM)
+                else if(event->type == CustomEvents::RefreshTextBoxInputEvent::EVENT_NUM) {
+                    // Must pop eventDataQueue to stay aligned with SDL's queue —
+                    // emit_event always pushes both queues, so any handler that
+                    // skips get_event<T>() leaks an entry and causes the next
+                    // custom event to type-confuse.
+                    CustomEvents::get_event<CustomEvents::RefreshTextBoxInputEvent>();
                     mS.m->input.refresh_receiving_text_box_input();
+                }
                 break;
             }
         }

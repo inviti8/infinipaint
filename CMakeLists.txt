@@ -336,6 +336,14 @@ if(NOT WIN32)
     endif()
 endif()
 
+if(MSVC)
+    # Emit PDB symbols for all configs so post-mortem .dmp files decode to
+    # named functions + line numbers. /OPT:REF and /OPT:ICF preserve the
+    # usual Release size/speed savings; /DEBUG just adds a sibling .pdb.
+    target_compile_options(main PRIVATE /Zi)
+    target_link_options(main PRIVATE /DEBUG /OPT:REF /OPT:ICF)
+endif()
+
 target_include_directories(main PRIVATE "include")
 if(ANDROID)
     target_include_directories(main PRIVATE "android-project/SDL/include")
