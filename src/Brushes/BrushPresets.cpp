@@ -78,7 +78,10 @@ void apply_brush_pen(MyPaintBrush* b) {
     mypaint_brush_set_base_value(b, MYPAINT_BRUSH_SETTING_OPAQUE, 1.0f);
     mypaint_brush_set_base_value(b, MYPAINT_BRUSH_SETTING_DABS_PER_BASIC_RADIUS, 4.0f);
     mypaint_brush_set_base_value(b, MYPAINT_BRUSH_SETTING_DABS_PER_ACTUAL_RADIUS, 4.0f);
-    set_linear_pressure_mapping(b, MYPAINT_BRUSH_SETTING_RADIUS_LOGARITHMIC, -1.5f, 0.8f);
+    // Extreme radius pressure response — log-radius range of 5.3 means
+    // ~40x diameter variance from lightest tap to full pressure. Lightest
+    // touches are sub-pixel hairlines, heavy presses go fat-brush.
+    set_linear_pressure_mapping(b, MYPAINT_BRUSH_SETTING_RADIUS_LOGARITHMIC, -3.5f, 1.8f);
 }
 
 void apply_fine_marker(MyPaintBrush* b) {
