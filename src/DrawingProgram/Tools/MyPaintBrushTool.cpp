@@ -19,6 +19,32 @@ extern "C" {
 #include <mypaint-brush-settings.h>
 #include <mypaint-surface.h>
 }
+
+namespace {
+// libmypaint takes color as HSV base values, but the InfiniPaint palette
+// hands us RGBA. Standard piecewise RGB->HSV; alpha is ignored (the brush
+// preset's OPAQUE/OPAQUE_MULTIPLY already controls per-dab transparency).
+void apply_foreground_color_to_brush(MyPaintBrush* brush, const Vector4f& rgba) {
+    const float r = rgba.x();
+    const float g = rgba.y();
+    const float b = rgba.z();
+    const float maxC = std::max({r, g, b});
+    const float minC = std::min({r, g, b});
+    const float delta = maxC - minC;
+    float h = 0.0f;
+    if (delta > 1e-6f) {
+        if (maxC == r)      h = std::fmod(((g - b) / delta) + 6.0f, 6.0f);
+        else if (maxC == g) h = ((b - r) / delta) + 2.0f;
+        else                h = ((r - g) / delta) + 4.0f;
+        h /= 6.0f;  // 0..1
+    }
+    const float s = (maxC > 1e-6f) ? (delta / maxC) : 0.0f;
+    const float v = maxC;
+    mypaint_brush_set_base_value(brush, MYPAINT_BRUSH_SETTING_COLOR_H, h);
+    mypaint_brush_set_base_value(brush, MYPAINT_BRUSH_SETTING_COLOR_S, s);
+    mypaint_brush_set_base_value(brush, MYPAINT_BRUSH_SETTING_COLOR_V, v);
+}
+}  // namespace
 #endif
 
 MyPaintBrushTool::MyPaintBrushTool(DrawingProgram& initDrawP)
@@ -153,8 +179,11 @@ void MyPaintBrushTool::begin_stroke(const Vector2f& canvasPos, float pressure) {
     // dab position, painting a connecting line across canvas gaps.
     // Re-apply the current preset before each stroke so a picker change
     // between strokes takes effect even if the picker callback didn't run
-    // (e.g. config loaded from disk, multi-window edits).
+    // (e.g. config loaded from disk, multi-window edits). Palette color
+    // overrides the preset's COLOR_H/S/V so the user's chosen foreground
+    // wins regardless of which preset is active.
     HVYM::Brushes::apply_preset(brush_, drawP.world.main.toolConfig.myPaintBrush.activePresetIndex);
+    apply_foreground_color_to_brush(brush_, drawP.world.main.toolConfig.globalConf.foregroundColor);
 
     mypaint_brush_reset(brush_);
     mypaint_brush_new_stroke(brush_);
