@@ -42,6 +42,11 @@ class ToolConfiguration {
             NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(LineDrawToolConfig, hasRoundCaps, relativeWidth)
         } lineDraw;
 
+        struct MyPaintBrushToolConfig {
+            int activePresetIndex = 0;  // index into HVYM::Brushes::curated_presets()
+            NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(MyPaintBrushToolConfig, activePresetIndex)
+        } myPaintBrush;
+
         struct ScreenshotToolConfig {
             int setDimensionSize = 1000;
             bool setDimensionIsX = true;
@@ -70,5 +75,5 @@ class ToolConfiguration {
         void print_relative_width_fail_message(RelativeWidthFailCode failCode);
         void relative_width_gui(DrawingProgram& drawP, const char* label);
 
-        NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ToolConfiguration, brush, eraser, ellipseDraw, rectDraw, eyeDropper, lineDraw, screenshot, globalConf)
+        NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ToolConfiguration, brush, eraser, ellipseDraw, rectDraw, eyeDropper, lineDraw, myPaintBrush, screenshot, globalConf)
 };

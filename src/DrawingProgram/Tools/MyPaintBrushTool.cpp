@@ -6,11 +6,15 @@
 #include "../../CanvasComponents/CanvasComponentContainer.hpp"
 #include "Helpers/NetworkingObjects/NetObjTemporaryPtr.decl.hpp"
 
+#include "../../GUIStuff/ElementHelpers/TextLabelHelpers.hpp"
+#include "../../GUIStuff/ElementHelpers/RadioButtonHelpers.hpp"
+
 #include <include/core/SkCanvas.h>
 #include <include/core/SkPaint.h>
 #include <include/core/SkPath.h>
 
 #ifdef HVYM_HAS_LIBMYPAINT
+#include "../../Brushes/BrushPresets.hpp"
 extern "C" {
 #include <mypaint-brush-settings.h>
 #include <mypaint-surface.h>
@@ -21,19 +25,11 @@ MyPaintBrushTool::MyPaintBrushTool(DrawingProgram& initDrawP)
     : DrawingProgramToolBase(initDrawP) {
 #ifdef HVYM_HAS_LIBMYPAINT
     brush_ = mypaint_brush_new();
-    // M3 minimum: hardcoded ink-pen-ish settings instead of loading a .myb
-    // preset. Curated preset registry + .myb loading + palette-color hookup
-    // land with the brush picker UI in the next M3 commit.
-    mypaint_brush_set_base_value(brush_, MYPAINT_BRUSH_SETTING_RADIUS_LOGARITHMIC, 2.5f);
-    mypaint_brush_set_base_value(brush_, MYPAINT_BRUSH_SETTING_HARDNESS, 0.85f);
-    mypaint_brush_set_base_value(brush_, MYPAINT_BRUSH_SETTING_OPAQUE, 1.0f);
-    mypaint_brush_set_base_value(brush_, MYPAINT_BRUSH_SETTING_OPAQUE_LINEARIZE, 0.9f);
-    mypaint_brush_set_base_value(brush_, MYPAINT_BRUSH_SETTING_OPAQUE_MULTIPLY, 1.0f);
-    mypaint_brush_set_base_value(brush_, MYPAINT_BRUSH_SETTING_DABS_PER_BASIC_RADIUS, 4.0f);
-    mypaint_brush_set_base_value(brush_, MYPAINT_BRUSH_SETTING_DABS_PER_ACTUAL_RADIUS, 4.0f);
-    mypaint_brush_set_base_value(brush_, MYPAINT_BRUSH_SETTING_COLOR_H, 0.0f);
-    mypaint_brush_set_base_value(brush_, MYPAINT_BRUSH_SETTING_COLOR_S, 0.0f);
-    mypaint_brush_set_base_value(brush_, MYPAINT_BRUSH_SETTING_COLOR_V, 0.0f);
+    // Apply the persisted preset choice immediately so the tool is usable
+    // before the first stroke (e.g. cursor-radius preview pulls from the
+    // brush state). begin_stroke re-applies in case the user picks a
+    // different preset between strokes.
+    HVYM::Brushes::apply_preset(brush_, drawP.world.main.toolConfig.myPaintBrush.activePresetIndex);
 #endif
 }
 
@@ -79,8 +75,45 @@ void MyPaintBrushTool::draw(SkCanvas* canvas, const DrawData& drawData) {
     canvas->drawPath(SkPath::Circle(pos.x(), pos.y(), screenRadius - 1.0f), linePaint);
 }
 
-void MyPaintBrushTool::gui_toolbox(Toolbar&) {}
-void MyPaintBrushTool::gui_phone_toolbox(PhoneDrawingProgramScreen&) {}
+void MyPaintBrushTool::gui_toolbox(Toolbar&) {
+#ifdef HVYM_HAS_LIBMYPAINT
+    using namespace GUIStuff;
+    using namespace ElementHelpers;
+    auto& gui = drawP.world.main.g.gui;
+    auto& cfg = drawP.world.main.toolConfig.myPaintBrush;
+
+    gui.new_id("mypaint brush tool", [&] {
+        text_label_centered(gui, "MyPaint Brush");
+        std::vector<std::pair<std::string_view, int>> options;
+        const auto& presets = HVYM::Brushes::curated_presets();
+        options.reserve(presets.size());
+        for (int i = 0; i < static_cast<int>(presets.size()); ++i)
+            options.emplace_back(std::string_view(presets[i].name), i);
+        radio_button_selector<int>(gui, "preset", &cfg.activePresetIndex, options, [this, &cfg] {
+            HVYM::Brushes::apply_preset(brush_, cfg.activePresetIndex);
+        });
+    });
+#endif
+}
+void MyPaintBrushTool::gui_phone_toolbox(PhoneDrawingProgramScreen&) {
+#ifdef HVYM_HAS_LIBMYPAINT
+    using namespace GUIStuff;
+    using namespace ElementHelpers;
+    auto& gui = drawP.world.main.g.gui;
+    auto& cfg = drawP.world.main.toolConfig.myPaintBrush;
+
+    gui.new_id("mypaint brush tool phone", [&] {
+        std::vector<std::pair<std::string_view, int>> options;
+        const auto& presets = HVYM::Brushes::curated_presets();
+        options.reserve(presets.size());
+        for (int i = 0; i < static_cast<int>(presets.size()); ++i)
+            options.emplace_back(std::string_view(presets[i].name), i);
+        radio_button_selector<int>(gui, "preset", &cfg.activePresetIndex, options, [this, &cfg] {
+            HVYM::Brushes::apply_preset(brush_, cfg.activePresetIndex);
+        });
+    });
+#endif
+}
 void MyPaintBrushTool::right_click_popup_gui(Toolbar&, Vector2f) {}
 bool MyPaintBrushTool::prevent_undo_or_redo() { return objInfoBeingEdited != nullptr; }
 
@@ -118,6 +151,11 @@ void MyPaintBrushTool::begin_stroke(const Vector2f& canvasPos, float pressure) {
     // mypaint_brush_new_stroke clears stroke-local timers. Without _reset,
     // a new stroke linearly interpolates from the previous stroke's last
     // dab position, painting a connecting line across canvas gaps.
+    // Re-apply the current preset before each stroke so a picker change
+    // between strokes takes effect even if the picker callback didn't run
+    // (e.g. config loaded from disk, multi-window edits).
+    HVYM::Brushes::apply_preset(brush_, drawP.world.main.toolConfig.myPaintBrush.activePresetIndex);
+
     mypaint_brush_reset(brush_);
     mypaint_brush_new_stroke(brush_);
 
