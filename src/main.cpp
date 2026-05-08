@@ -100,6 +100,7 @@
 #include "SwitchCWD.hpp"
 #include "CustomEvents.hpp"
 #include "Brushes/LibMyPaintBridgeTest.hpp"
+#include "Brushes/LibMyPaintStrokeTest.hpp"
 
 // Use dedicated graphics card on Windows
 #ifdef _WIN32
@@ -376,12 +377,20 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv) {
     std::scoped_lock a{AndroidJNICalls::globalCallMutex};
 #endif
 
-    // M1 spike (PHASE1.md §4): --mypaint-hello-dab <out.png> drives a single
-    // libmypaint dab onto a Skia raster surface and exits. Bypasses normal app
-    // startup, so it must run before icu/SDL/MainProgram init.
+    // M1/M2 brush bridge tests (PHASE1.md §10): drive synthetic libmypaint
+    // operations and exit. Bypass normal app startup, so they must run before
+    // icu/SDL/MainProgram init.
+    //   --mypaint-hello-dab   <out.png>  one dab on MyPaintFixedTiledSurface
+    //   --mypaint-stroke-test <out.png>  multi-dab stroke on LibMyPaintSkiaSurface (M2)
     for (int i = 1; i + 1 < argc; ++i) {
-        if (std::string_view(argv[i]) == "--mypaint-hello-dab") {
+        const std::string_view flag(argv[i]);
+        if (flag == "--mypaint-hello-dab") {
             const bool ok = HVYM::Brushes::run_libmypaint_hello_dab(
+                std::filesystem::path(argv[i + 1]));
+            return ok ? SDL_APP_SUCCESS : SDL_APP_FAILURE;
+        }
+        if (flag == "--mypaint-stroke-test") {
+            const bool ok = HVYM::Brushes::run_libmypaint_stroke_test(
                 std::filesystem::path(argv[i + 1]));
             return ok ? SDL_APP_SUCCESS : SDL_APP_FAILURE;
         }
