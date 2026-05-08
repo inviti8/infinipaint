@@ -58,6 +58,7 @@ src/
   DrawingProgram/Tools/
     MyPaintBrushTool.{cpp,hpp}
     WaypointTool.{cpp,hpp}
+    ButtonSelectTool.{cpp,hpp}          # rect-drag captures canvas pixels into a Waypoint skin
   CanvasComponents/
     MyPaintLayerCanvasComponent.{cpp,hpp}
     WaypointCanvasComponent.{cpp,hpp}
@@ -66,14 +67,14 @@ src/
     BrushPresets.{cpp,hpp}              # curated ink/marker preset registry
     presets/*.myb                       # bundled brush preset files
   Waypoints/
-    Waypoint.{cpp,hpp}                  # data model
-    WaypointGraph.{cpp,hpp}             # nodes + edges, layout state
-  TreeWindow/
-    TreeWindow.{cpp,hpp}                # second SDL_Window; owns its own Skia surface
-    GraphView.{cpp,hpp}                 # node-graph rendering and interaction
+    Waypoint.{cpp,hpp}                  # data model (incl. optional skin SkImage)
+    WaypointGraph.{cpp,hpp}             # nodes + edges, layout state, selection
+    TreeView.{cpp,hpp}                  # collapsible side panel (Skia-rendered graph view)
   ReaderMode/
     ReaderMode.{cpp,hpp}                # mode toggle, navigation, transitions
 ```
+
+(Originally §3 listed `TreeWindow/{TreeWindow,GraphView}.{cpp,hpp}` as a real second OS window. M6 shipped as a side panel inside the main window instead — same graph editor, no multi-window plumbing — so the layout above reflects the as-shipped code.)
 
 ## 4. Workstream A — Brushes (libmypaint, scoped to ink + markers)
 
@@ -119,13 +120,15 @@ Waypoints extend (and replace, on disk) InfiniPaint's existing bookmarks. The ex
 
 ```cpp
 struct Waypoint {
-    NetObjID         id;
-    std::string      label;
-    CoordSpaceHelper coords;        // camera position/zoom/rotation, full WorldScalar precision
-    Vector<int32_t,2> windowSize;   // matches BookmarkData; framing rect derives from this + coords
-    std::optional<SkImage> thumbnail;  // small raster, regenerated lazily
+    NetObjID                  id;
+    std::string               label;
+    CoordSpaceHelper          coords;       // camera position/zoom/rotation, full WorldScalar precision
+    Vector<int32_t,2>         windowSize;   // matches BookmarkData; framing rect derives from this + coords
+    std::optional<sk_sp<SkImage>> skin;     // artist-drawn navigation-button image (see §5a)
 };
 ```
+
+(The `thumbnail` field originally listed here — a lazily regenerated raster of the framing rect — is descoped. Skins replace it as the per-waypoint visual identity.)
 
 A `WaypointGraph` owns:
 
@@ -161,7 +164,24 @@ The existing `BookmarkManager` and its side-panel UI (`setup_list_gui`) are remo
 
 ### `WaypointCanvasComponent`
 
-Mirror the structure of `BrushStrokeCanvasComponent`. Renders the marker, framing handles, and edge previews when selected.
+Mirror the structure of `BrushStrokeCanvasComponent`. Renders the marker, framing handles, and edge previews when selected. Marker color shifts when the waypoint has a skin assigned, signalling "this destination has artwork".
+
+### 5a. Workstream B' — Skins (artist-drawn navigation buttons)
+
+Each waypoint can optionally carry a `skin` — an artist-drawn raster image captured from the canvas. Skins are the visual identity of "the place you go to": tree-view nodes show them, and the reader-mode branch-choice overlay uses the *target* waypoint's skin as the clickable button. Drawing one nice button image per destination is enough to make the reading experience feel like part of the artwork instead of generic UI.
+
+**Capture flow.** A new `ButtonSelectTool` (`data/icons/button-select.svg`) does a rect-drag on the canvas. On release: snapshot the rect to an `SkImage`, assign it to the currently-selected waypoint via `Waypoint::set_skin`. The original canvas pixels are *not* removed — the artist may erase them by hand if they don't want the button image to also be part of the comic page. (Removing on capture would be irreversible without a fragile undo-of-erase path.)
+
+**Resolution.** Skins capped at 512×512 — keeps file sizes sane while staying crisp at typical reader-mode button scales.
+
+**Persistence.** PNG-encoded bytes per waypoint in the file format. Bumps the format version (this happens with the M-skin commit, alongside the schema change).
+
+### File layout
+
+- `Waypoint::skin` — `std::optional<sk_sp<SkImage>>`, set via `ButtonSelectTool`.
+- `ButtonSelectTool` lives next to the other drawing tools.
+- Tree-view nodes render the skin instead of the gold rounded rect when present.
+- Canvas marker stays a gold dot when no skin; tints differently (e.g. brighter / accent color) when a skin is set.
 
 ## 6. Workstream C — Tree/graph window
 
@@ -205,10 +225,10 @@ Default to a one-day **imnodes** spike. If it lands cleanly and looks acceptable
 
 A toggle (menu + keyboard shortcut) that:
 
-- Hides editor chrome: toolbar minimized, waypoint markers hidden, tree window hides edge editing affordances (or auto-hides itself entirely — flip a coin during build, default to auto-hide)
+- Hides editor chrome: toolbar minimized, waypoint markers hidden, tree-view panel auto-hides
 - Anchors camera to the current waypoint's framing rect
 - Forward/back keys (or pen-tap zones) traverse the graph
-- Branch waypoints (multiple outgoing edges) surface a small choice UI overlay using the edge labels
+- Branch waypoints (multiple outgoing edges) surface a row of skinned buttons at the bottom of the screen — each button uses the *target* waypoint's `skin` (from §5a) as the clickable image. Edge `label` (when set) shows below as accessible alt text. Waypoints lacking a skin fall back to a generic button drawn with the edge label.
 - Smooth camera transitions between connected waypoints — pan + zoom interpolation, ~400ms default, configurable
 
 Cycles and dead-ends are both legal: cycles let comics loop; dead-ends show a "the end" affordance. No editor warning either way — author's intent.
@@ -217,8 +237,9 @@ Cycles and dead-ends are both legal: cycles let comics loop; dead-ends show a "t
 
 Extend InfiniPaint's existing format:
 
-- New top-level `waypoints` array (replaces `bookmarks`; old files migrated on load)
-- New `waypoint_graph` object: `{ edges: [...], layout: {...} }`
+- New top-level `waypoints` array (replaces `bookmarks`; ~~old files migrated on load~~ — migration descoped, see §10 M4 notes)
+- New `waypoint_graph` object: `{ edges: [...], layout: {...}, selectedId? }`
+- Each waypoint stores its `skin` (optional) as PNG-encoded bytes. Capped 512×512 on capture.
 - Per-stroke `brush_kind`: `"skia_path"` | `"mypaint"` (with embedded brush preset name + libmypaint settings hash)
 - libmypaint layers serialized as compressed PNG tiles indexed by tile coordinate, alongside the existing vector strokes
 - File format version bump. Old files load forward; new files do not load in upstream InfiniPaint (and we do not promise backward write compatibility).
@@ -248,14 +269,15 @@ Tracked as harness tasks #2 through #9 (#1 — the fork itself — is being done
 | M4 | ✅ | Waypoint data model | `Waypoint`, `WaypointGraph`; ~~bookmark migration~~; file format updated; round-trip tested (manual) |
 | M5 | ✅ | WaypointTool + canvas component | Drop / edit / delete waypoints on canvas; ~~framing rect handles~~ (deferred); author chrome (label, framing outline, edge previews); reader chrome with M7 |
 | M6 | ✅ | Tree window | ~~Second SDL_Window with imnodes~~ (descoped to side panel for ship-speed); Skia-rendered graph view as a collapsible right-side panel in the main window; bidirectional sync with canvas |
-| M7 | | Reader mode | Mode toggle, hidden chrome, camera transitions, branching choice UI |
+| M7 | | Reader mode | Mode toggle, hidden chrome, camera transitions, branching choice UI (skinned where available) |
+| M-skin | | ButtonSelectTool + Waypoint skins | Rect-drag captures canvas pixels into `Waypoint::skin`; tree nodes render the skin; canvas marker tints; format bump for skin payload |
 | M8 | | Phase 1 release | Rebrand (name, icons, splash, About, .hvym extension); installers; release notes |
 
 **M3 follow-ups deferred:** persistent tile serialization (rolls into M4 file format); real `.myb` file loading (current presets are hardcoded `apply()` functions; the public BrushPreset shape is stable across that swap); per-brush pressure-sensitivity slider in the picker (currently only diameter/hardness/opacity are user-tunable).
 
 **M4 scope cuts:** Bookmark migration and the §5 "BookmarkManager-as-compatibility-shim" are both descoped — this codebase is not promising to load anyone else's pre-0.5 InfiniPaint files. M5 can therefore remove `BookmarkManager` outright when it replaces the side-panel UI, rather than maintaining a shim.
 
-Workstreams A (brushes: M1–M3) and B+C (waypoints + tree: M4–M6) run in parallel after the fork is built clean. M7 depends on M5 + M6. M8 depends on M3 + M7.
+Workstreams A (brushes: M1–M3) and B+C (waypoints + tree: M4–M6) run in parallel after the fork is built clean. M7 depends on M5 + M6. M-skin slots between M7-b and M7-c (the branch-choice UI consumes skins). M8 depends on M3 + M7 + M-skin.
 
 ## 11. Open product questions
 
