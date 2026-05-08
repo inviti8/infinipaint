@@ -167,36 +167,65 @@ class TreeViewGraphElement : public GUIStuff::Element {
 
             for (const auto& nb : nodeBoxes) {
                 const Vector2f topLeft = panelOrigin + nb.topLeft;
-                SkRect r = SkRect::MakeXYWH(topLeft.x(), topLeft.y(), NODE_W, NODE_H);
-                SkRRect rr = SkRRect::MakeRectXY(r, 6.0f, 6.0f);
-
                 const bool selected = selectedOpt.has_value() && selectedOpt.value() == nb.id;
-                SkPaint fill;
-                fill.setAntiAlias(skiaAA);
-                fill.setColor4f(selected
-                    ? SkColor4f{0.30f, 0.26f, 0.18f, 1.0f}    // brighter, gold-tinged
-                    : SkColor4f{0.20f, 0.20f, 0.24f, 1.0f});
-                canvas->drawRRect(rr, fill);
-
-                SkPaint outline;
-                outline.setAntiAlias(skiaAA);
-                outline.setStyle(SkPaint::kStroke_Style);
-                outline.setStrokeWidth(selected ? 2.0f : 1.5f);
-                outline.setColor4f({0.88f, 0.69f, 0.25f, 1.0f});
-                canvas->drawRRect(rr, outline);
-
                 auto wpRef = world->netObjMan.get_obj_temporary_ref_from_id<Waypoint>(nb.id);
-                std::string display = "(unnamed)";
-                if (wpRef) {
-                    const std::string& label = wpRef->get_label();
-                    if (!label.empty()) display = label;
+                const bool hasSkin = wpRef && wpRef->has_skin();
+
+                if (hasSkin) {
+                    // Skinned: draw only the skin, preserving aspect ratio
+                    // (fit-contain inside the node footprint). No rect, no
+                    // label. A selection highlight outline still draws so
+                    // the user knows which is selected.
+                    sk_sp<SkImage> img = wpRef->get_skin();
+                    const float imgW = static_cast<float>(img->width());
+                    const float imgH = static_cast<float>(img->height());
+                    const float scale = std::min(NODE_W / imgW, NODE_H / imgH);
+                    const float drawW = imgW * scale;
+                    const float drawH = imgH * scale;
+                    const float dx = topLeft.x() + (NODE_W - drawW) * 0.5f;
+                    const float dy = topLeft.y() + (NODE_H - drawH) * 0.5f;
+                    SkPaint imgPaint;
+                    imgPaint.setAntiAlias(skiaAA);
+                    canvas->drawImageRect(img.get(),
+                                          SkRect::MakeXYWH(dx, dy, drawW, drawH),
+                                          SkSamplingOptions{SkFilterMode::kLinear}, &imgPaint);
+                    if (selected) {
+                        SkPaint sel;
+                        sel.setAntiAlias(skiaAA);
+                        sel.setStyle(SkPaint::kStroke_Style);
+                        sel.setStrokeWidth(2.0f);
+                        sel.setColor4f({0.92f, 0.40f, 0.62f, 1.0f});  // accent pink (matches canvas)
+                        canvas->drawRect(SkRect::MakeXYWH(dx, dy, drawW, drawH), sel);
+                    }
+                } else {
+                    // Plain: rounded rect + label.
+                    SkRect r = SkRect::MakeXYWH(topLeft.x(), topLeft.y(), NODE_W, NODE_H);
+                    SkRRect rr = SkRRect::MakeRectXY(r, 6.0f, 6.0f);
+                    SkPaint fill;
+                    fill.setAntiAlias(skiaAA);
+                    fill.setColor4f(selected
+                        ? SkColor4f{0.30f, 0.26f, 0.18f, 1.0f}
+                        : SkColor4f{0.20f, 0.20f, 0.24f, 1.0f});
+                    canvas->drawRRect(rr, fill);
+                    SkPaint outline;
+                    outline.setAntiAlias(skiaAA);
+                    outline.setStyle(SkPaint::kStroke_Style);
+                    outline.setStrokeWidth(selected ? 2.0f : 1.5f);
+                    outline.setColor4f({0.88f, 0.69f, 0.25f, 1.0f});
+                    canvas->drawRRect(rr, outline);
+
+                    std::string display = "(unnamed)";
+                    if (wpRef) {
+                        const std::string& label = wpRef->get_label();
+                        if (!label.empty()) display = label;
+                    }
+                    SkPaint textPaint;
+                    textPaint.setAntiAlias(skiaAA);
+                    textPaint.setColor4f({0.95f, 0.95f, 0.95f, 1.0f});
+                    canvas->drawSimpleText(display.data(), display.size(), SkTextEncoding::kUTF8,
+                                           topLeft.x() + 12.0f, topLeft.y() + NODE_H * 0.5f + 5.0f,
+                                           font, textPaint);
                 }
-                SkPaint textPaint;
-                textPaint.setAntiAlias(skiaAA);
-                textPaint.setColor4f({0.95f, 0.95f, 0.95f, 1.0f});
-                canvas->drawSimpleText(display.data(), display.size(), SkTextEncoding::kUTF8,
-                                       topLeft.x() + 12.0f, topLeft.y() + NODE_H * 0.5f + 5.0f,
-                                       font, textPaint);
 
                 // Edge port (small dot at bottom-center). Drag from this
                 // dot to another node's body to create an edge.

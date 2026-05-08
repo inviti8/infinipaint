@@ -86,7 +86,7 @@ void WaypointGraph::save_file(cereal::PortableBinaryOutputArchive& a) const {
     }
 }
 
-void WaypointGraph::load_file(cereal::PortableBinaryInputArchive& a, VersionNumber) {
+void WaypointGraph::load_file(cereal::PortableBinaryInputArchive& a, VersionNumber version) {
     nodes = world.netObjMan.make_obj<NetObjOrderedList<Waypoint>>();
     edges = world.netObjMan.make_obj<NetObjOrderedList<Edge>>();
     layout.clear();
@@ -103,6 +103,8 @@ void WaypointGraph::load_file(cereal::PortableBinaryInputArchive& a, VersionNumb
         Vector<int32_t, 2> windowSize{0, 0};
         a(label, coords, windowSize);
         auto it = nodes->emplace_back_direct(nodes, label, coords, windowSize);
+        if (version >= VersionNumber(0, 6, 0))
+            it->obj->load_skin_from_archive(a, version);
         idsByIndex.push_back(it->obj.get_net_id());
     }
 

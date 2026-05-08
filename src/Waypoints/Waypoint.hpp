@@ -3,6 +3,8 @@
 #include <Helpers/NetworkingObjects/NetObjOrderedList.hpp>
 #include <Helpers/VersionNumber.hpp>
 #include <cereal/archives/portable_binary.hpp>
+#include <include/core/SkImage.h>
+#include <include/core/SkRefCnt.h>
 #include <string>
 #include "../CoordSpaceHelper.hpp"
 
@@ -39,12 +41,26 @@ class Waypoint {
         const CoordSpaceHelper& get_coords() const { return coords; }
         const Vector<int32_t, 2>& get_window_size() const { return windowSize; }
 
+        // PHASE1.md §5a — artist-drawn navigation-button image. Captured
+        // by ButtonSelectTool. Persisted as PNG bytes in the file format
+        // (no NetObj sync for the moment — large payloads through NetObj
+        // messages are their own scoping problem and this fork is
+        // single-user anyway).
+        bool has_skin() const             { return skin != nullptr; }
+        sk_sp<SkImage> get_skin() const   { return skin; }
+        void set_skin(sk_sp<SkImage> img) { skin = std::move(img); }
+        void clear_skin()                 { skin.reset(); }
+
         void scale_up(const WorldScalar& scaleUpAmount);
 
         void save_file(cereal::PortableBinaryOutputArchive& a) const;
-        // No load_file: WaypointGraph reads the payload from disk and
-        // hands the values to the constructor via emplace_back_direct,
-        // which keeps NetObjID assignment owned by the manager.
+        // Reads the skin payload (PNG bytes) from `a` and assigns it to
+        // this waypoint. Called by WaypointGraph::load_file after the
+        // waypoint has been constructed via emplace_back_direct (which
+        // takes label/coords/windowSize). Only meaningful for files at
+        // version >= 0.6.0; pre-0.6 files don't have the payload, so
+        // the caller skips this call.
+        void load_skin_from_archive(cereal::PortableBinaryInputArchive& a, VersionNumber version);
 
         static void register_class(World& w);
 
@@ -54,4 +70,5 @@ class Waypoint {
         std::string label;
         CoordSpaceHelper coords;
         Vector<int32_t, 2> windowSize{0, 0};
+        sk_sp<SkImage> skin;
 };

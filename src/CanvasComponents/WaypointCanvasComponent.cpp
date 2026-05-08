@@ -3,6 +3,9 @@
 #include "../MainProgram.hpp"
 #include "../World.hpp"
 #include "../ReaderMode/ReaderMode.hpp"
+#include "../Waypoints/Waypoint.hpp"
+#include "../Waypoints/WaypointGraph.hpp"
+#include <Helpers/NetworkingObjects/NetObjTemporaryPtr.decl.hpp>
 #include <include/core/SkCanvas.h>
 #include <include/core/SkPaint.h>
 #include <include/core/SkPath.h>
@@ -52,14 +55,24 @@ void WaypointCanvasComponent::draw(SkCanvas* canvas, const DrawData& drawData, c
 
     // Marker visual: filled gold disc with a dark outline. Gold (~#E0B040)
     // because it doesn't compete with brush-stroke colors and reads as a
-    // "navigation marker" rather than "drawn content".
+    // "navigation marker" rather than "drawn content". When the waypoint
+    // has a skin assigned (PHASE1.md §5a), tint the marker accent-pink
+    // so the artist can see at a glance which destinations have artwork.
     const SkScalar cx = static_cast<SkScalar>(d.markerPos.x());
     const SkScalar cy = static_cast<SkScalar>(d.markerPos.y());
     const SkScalar r = static_cast<SkScalar>(MARKER_RADIUS_PX);
 
+    bool hasSkin = false;
+    if (drawData.main && drawData.main->world) {
+        auto wpRef = drawData.main->world->netObjMan.get_obj_temporary_ref_from_id<Waypoint>(d.waypointId);
+        if (wpRef) hasSkin = wpRef->has_skin();
+    }
+
     SkPaint fill;
     fill.setAntiAlias(drawData.skiaAA);
-    fill.setColor4f({0.88f, 0.69f, 0.25f, 1.0f});
+    fill.setColor4f(hasSkin
+        ? SkColor4f{0.92f, 0.40f, 0.62f, 1.0f}   // accent pink for skinned
+        : SkColor4f{0.88f, 0.69f, 0.25f, 1.0f}); // gold for plain
     fill.setStyle(SkPaint::kFill_Style);
     canvas->drawCircle(cx, cy, r, fill);
 

@@ -52,7 +52,11 @@ void PhoneDrawingProgramScreen::main_display() {
             }) {}
             main.world->treeView.gui(main.g.gui);
         }
-        bottom_toolbar();
+        // Editor toolbar disappears in reader mode (PHASE1.md §7
+        // "toolbar minimized"). The top toolbar stays so the eye-icon
+        // toggle remains reachable.
+        if (!main.world->readerMode.is_active())
+            bottom_toolbar();
     }
 }
 
@@ -86,6 +90,18 @@ void PhoneDrawingProgramScreen::top_toolbar() {
                         }
                     });
                     text_label(gui, main.world->name);
+                    // Spacer that pushes the reader-mode toggle to the right edge.
+                    CLAY_AUTO_ID({
+                        .layout = {.sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_GROW(0)}}
+                    }) {}
+                    // Reader-mode toggle: lives in the top toolbar (never
+                    // hidden) so the user can exit reader mode after the
+                    // bottom editor toolbar disappears.
+                    svg_icon_button(gui, "Reader Mode Toggle Button (top)", "data/icons/eyeopen.svg", {
+                        .drawType = SelectableButton::DrawType::TRANSPARENT_ALL,
+                        .isSelected = main.world->readerMode.is_active(),
+                        .onClick = [&] { main.world->readerMode.toggle(); }
+                    });
                 }
             });
         }
@@ -211,6 +227,7 @@ void PhoneDrawingProgramScreen::bottom_toolbar_gui() {
     tool_button("Brush Toolbar Button", "data/icons/brush.svg", DrawingProgramToolType::BRUSH);
     tool_button("MyPaint Brush Toolbar Button", "data/icons/brush.svg", DrawingProgramToolType::MYPAINTBRUSH);
     tool_button("Waypoint Toolbar Button", "data/icons/bookmark.svg", DrawingProgramToolType::WAYPOINT);
+    tool_button("Button Select Toolbar Button", "data/icons/button-select.svg", DrawingProgramToolType::BUTTONSELECT);
     tool_button("Eraser Toolbar Button", "data/icons/eraser.svg", DrawingProgramToolType::ERASER);
     tool_button("Line Toolbar Button", "data/icons/line.svg", DrawingProgramToolType::LINE);
     tool_button("Text Toolbar Button", "data/icons/text.svg", DrawingProgramToolType::TEXTBOX);
@@ -562,12 +579,8 @@ void PhoneDrawingProgramScreen::bottom_extra_toolbar_gui() {
         .onClick = [&] { main.world->treeView.toggle(); }
     });
 
-    // Reader-mode toggle (M7-a).
-    svg_icon_button(gui, "Reader Mode Toggle Button", "data/icons/eyeopen.svg", {
-        .drawType = SelectableButton::DrawType::TRANSPARENT_ALL,
-        .isSelected = main.world->readerMode.is_active(),
-        .onClick = [&] { main.world->readerMode.toggle(); }
-    });
+    // (Reader-mode toggle moved to the top toolbar so it survives the
+    // bottom-toolbar hide that reader mode triggers.)
 }
 
 void PhoneDrawingProgramScreen::input_global_back_button_callback() {
