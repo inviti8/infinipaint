@@ -246,7 +246,7 @@ Tracked as harness tasks #2 through #9 (#1 — the fork itself — is being done
 | M2 | ✅ | LibMyPaintSkiaSurface adapter | `MyPaintTiledSurface` implementation with lazy tile allocation; unit-tested against synthetic stroke input |
 | M3 | ✅ | MyPaintBrushTool + curated presets | New tool registered in `DrawingProgram`; brush picker shows the curated set; eraser interaction defined |
 | M4 | ✅ | Waypoint data model | `Waypoint`, `WaypointGraph`; ~~bookmark migration~~; file format updated; round-trip tested (manual) |
-| M5 | | WaypointTool + canvas component | Drop / edit / delete waypoints on canvas; framing rect handles; author/reader chrome |
+| M5 | ✅ | WaypointTool + canvas component | Drop / edit / delete waypoints on canvas; ~~framing rect handles~~ (deferred); author chrome (label, framing outline, edge previews); reader chrome with M7 |
 | M6 | | Tree window | Second SDL_Window with imnodes (or Skia) graph view; bidirectional sync with canvas |
 | M7 | | Reader mode | Mode toggle, hidden chrome, camera transitions, branching choice UI |
 | M8 | | Phase 1 release | Rebrand (name, icons, splash, About, .hvym extension); installers; release notes |
