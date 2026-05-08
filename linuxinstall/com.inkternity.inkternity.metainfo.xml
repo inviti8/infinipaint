@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Copyright 2025 Yousef Khadadeh -->
 <component type="desktop-application">
-    <id>com.infinipaint.infinipaint</id>
-    <name>Infinipaint</name>
-    <summary>Draw on a big canvas</summary>
+    <id>com.inkternity.inkternity</id>
+    <name>Inkternity</name>
+    <summary>Comic creation on an infinite canvas</summary>
     <metadata_license>CC0-1.0</metadata_license>
     <project_license>MIT</project_license>
 
@@ -57,7 +57,7 @@
         </ul>
     </description>
     
-    <launchable type="desktop-id">com.infinipaint.infinipaint.desktop</launchable>
+    <launchable type="desktop-id">com.inkternity.inkternity.desktop</launchable>
 
     <releases>
         <release version="0.4.1" date="2026-02-09">

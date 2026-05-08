@@ -1,0 +1,14 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+
+Name=Inkternity
+Comment=Comic creation on an infinite canvas
+Categories=Graphics;VectorGraphics;
+Keywords=comic;paint;whiteboard;notes;drawing;draw;painting;infinite;canvas;graphics;zoom;waypoint
+
+Icon=com.inkternity.inkternity
+Exec=inkternity %F
+Terminal=false
+
+MimeType=application/x-com.inkternity.inkternity.inkternity

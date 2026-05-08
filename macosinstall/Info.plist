@@ -5,13 +5,13 @@
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.productivity</string>
 	<key>CFBundleIdentifier</key>
-	<string>com.erroratline0.infinipaint</string>
+	<string>com.inkternity.inkternity</string>
 	<key>CFBundleName</key>
-	<string>InfiniPaint</string>
+	<string>Inkternity</string>
 	<key>CFBundleDisplayName</key>
-	<string>InfiniPaint</string>
+	<string>Inkternity</string>
 	<key>CFBundleSpokenName</key>
-	<string>InfiniPaint</string>
+	<string>Inkternity</string>
 	<key>CFBundleVersion</key>
 	<string>0.4.1</string>
 	<key>CFBundleShortVersionString</key>
@@ -23,21 +23,21 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en-US</string>
 	<key>CFBundleExecutable</key>
-	<string>infinipaint</string>
+	<string>inkternity</string>
 	<key>CFBundleIconFile</key>
 	<string>appicon</string>
 	<key>CFBundleDocumentTypes</key>
 	<array>
 		<dict>
 			<key>CFBundleTypeName</key>
-			<string>InfiniPaint Canvas</string>
+			<string>Inkternity Canvas</string>
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
 			<key>LSHandlerRank</key>
 			<string>Default</string>
 			<key>LSItemContentTypes</key>
 			<array>
-				<string>com.erroratline0.infpnt</string>
+				<string>com.inkternity.inkternity</string>
 			</array>
 		</dict>
 	</array>
@@ -51,14 +51,14 @@
 				<string>public.data</string>
 			</array>
 			<key>UTTypeIdentifier</key>
-			<string>com.erroratline0.infpnt</string>
+			<string>com.inkternity.inkternity</string>
 			<key>UTTypeDescription</key>
-			<string>InfiniPaint Canvas</string>
+			<string>Inkternity Canvas</string>
 			<key>UTTypeTagSpecification</key>
 			<dict>
 				<key>public.filename-extension</key>
 				<array>
-					<string>infpnt</string>
+					<string>inkternity</string>
 				</array>
 			</dict>
 		</dict>

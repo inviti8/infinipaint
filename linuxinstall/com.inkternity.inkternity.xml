@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
+    <mime-type type="application/x-com.inkternity.inkternity.inkternity">
+        <comment>Inkternity Canvas</comment>
+        <glob pattern="*.inkternity"/>
+        <icon name="com.inkternity.inkternity-application-inkternity"/>
+    </mime-type>
+    <!-- Pre-rebrand extension; load-only compat. -->
+    <mime-type type="application/x-com.inkternity.inkternity.infpnt">
+        <comment>InfiniPaint Canvas (legacy)</comment>
+        <glob pattern="*.infpnt"/>
+        <icon name="com.inkternity.inkternity-application-inkternity"/>
+    </mime-type>
+</mime-info>

@@ -195,7 +195,7 @@ endif()
 if(WIN32)
     list(APPEND sources 
         "src/WindowsFontData/CustomFontSetManager.cpp"
-        "windowsinstall/infinipaint.manifest"
+        "windowsinstall/inkternity.manifest"
         "windowsinstall/app.rc")
 endif()
 
@@ -263,8 +263,8 @@ elseif(APPLE)
         set_target_properties(main PROPERTIES MACOSX_BUNDLE TRUE)
         set_target_properties(main PROPERTIES
             BUNDLE True
-            MACOSX_BUNDLE_GUI_IDENTIFIER com.infinipaint.infinipaint
-            MACOSX_BUNDLE_BUNDLE_NAME infinipaint
+            MACOSX_BUNDLE_GUI_IDENTIFIER com.inkternity.inkternity
+            MACOSX_BUNDLE_BUNDLE_NAME inkternity
             MACOSX_BUNDLE_BUNDLE_VERSION "0.4.1"
             MACOSX_BUNDLE_SHORT_VERSION_STRING "0.4.1"
             MACOSX_BUNDLE_INFO_PLIST ${CMAKE_SOURCE_DIR}/macosinstall/Info.plist
@@ -283,7 +283,7 @@ elseif(APPLE)
 endif()
 
 if(EMSCRIPTEN)
-    set(SDL_EMSCRIPTEN_PERSISTENT_PATH "/infinipaint" CACHE STRING "SDL emscripten persistent path")
+    set(SDL_EMSCRIPTEN_PERSISTENT_PATH "/inkternity" CACHE STRING "SDL emscripten persistent path")
 
     if(CMAKE_BUILD_TYPE STREQUAL Debug)
         target_compile_options(main PRIVATE -g3)
@@ -477,10 +477,12 @@ endif()
 if(APPLE OR WIN32)
     install(TARGETS main DESTINATION .)
 
-    set(CPACK_PACKAGE_NAME "infinipaint")
+    set(CPACK_PACKAGE_NAME "inkternity")
     set(CPACK_PACKAGE_VERSION_MAJOR "0")
     set(CPACK_PACKAGE_VERSION_MINOR "4")
     set(CPACK_PACKAGE_VERSION_PATCH "1")
+    # NOTE: VENDOR + CONTACT carry upstream attribution; update to your
+    # own values before publishing Phase 1 installers.
     set(CPACK_PACKAGE_VENDOR "ErrorAtLine0")
     set(CPACK_PACKAGE_CONTACT "erroratline0@gmail.com")
     set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_SOURCE_DIR}/LICENSE")
@@ -496,43 +498,45 @@ elseif(WIN32)
 	install(PROGRAMS ${CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS} DESTINATION .)
 
     set(CPACK_NSIS_ENABLE_UNINSTALL_BEFORE_INSTALL ON)
-    set(CPACK_NSIS_DISPLAY_NAME "InfiniPaint")
-    set(CPACK_NSIS_PACKAGE_NAME "InfiniPaint")
-    set(CPACK_NSIS_UNINSTALL_NAME "InfiniPaint Uninstall")
-    set(CPACK_NSIS_WELCOME_TITLE "Welcome to InfiniPaint Installer")
+    set(CPACK_NSIS_DISPLAY_NAME "Inkternity")
+    set(CPACK_NSIS_PACKAGE_NAME "Inkternity")
+    set(CPACK_NSIS_UNINSTALL_NAME "Inkternity Uninstall")
+    set(CPACK_NSIS_WELCOME_TITLE "Welcome to Inkternity Installer")
     set(CPACK_NSIS_EXECUTABLES_DIRECTORY .)
+    # NOTE: URL_INFO_ABOUT is the upstream homepage; replace before
+    # publishing Inkternity installers.
     set(CPACK_NSIS_URL_INFO_ABOUT "https://infinipaint.com")
-    set(CPACK_NSIS_MENU_LINKS "infinipaint.exe" "InfiniPaint")
-    set(CPACK_NSIS_INSTALLED_ICON_NAME "infinipaint.exe")
+    set(CPACK_NSIS_MENU_LINKS "inkternity.exe" "Inkternity")
+    set(CPACK_NSIS_INSTALLED_ICON_NAME "inkternity.exe")
     set(CPACK_NSIS_MUI_ICON "${CMAKE_SOURCE_DIR}/windowsinstall/icon.ico")
     set(CPACK_NSIS_MUI_UNIICON "${CMAKE_SOURCE_DIR}/windowsinstall/icon.ico")
     # A backslash character uses 4 backslashes, since we have to escape twice
     # Double quote uses 3 backslashes, since we have to escape the backslash (two slashes), and escape the double quote (one slash)
 	set(CPACK_NSIS_EXTRA_INSTALL_COMMANDS "
-	     WriteRegStr HKCR '.infpnt' '' 'InfiniPaintCanvas'
-         WriteRegStr HKCR 'InfiniPaintCanvas' '' 'InfiniPaint Canvas File'
-         WriteRegStr HKCR 'InfiniPaintCanvas\\\\shell' '' 'open'
-         WriteRegStr HKCR 'InfiniPaintCanvas\\\\DefaultIcon' '' '\\\"$INSTDIR\\\\infinipaint.exe\\\",0'
-         WriteRegStr HKCR 'InfiniPaintCanvas\\\\shell\\\\open\\\\command' '' '\\\"$INSTDIR\\\\infinipaint.exe\\\" \\\"%1\\\"'
-         WriteRegStr HKCR 'InfiniPaintCanvas\\\\shell\\\\edit' '' 'Edit InfiniPaint Canvas File'
-         WriteRegStr HKCR 'InfiniPaintCanvas\\\\shell\\\\edit\\\\command' '' '\\\"$INSTDIR\\\\infinipaint.exe\\\" \\\"%1\\\"'
+	     WriteRegStr HKCR '.inkternity' '' 'InkternityCanvas'
+         WriteRegStr HKCR 'InkternityCanvas' '' 'Inkternity Canvas File'
+         WriteRegStr HKCR 'InkternityCanvas\\\\shell' '' 'open'
+         WriteRegStr HKCR 'InkternityCanvas\\\\DefaultIcon' '' '\\\"$INSTDIR\\\\inkternity.exe\\\",0'
+         WriteRegStr HKCR 'InkternityCanvas\\\\shell\\\\open\\\\command' '' '\\\"$INSTDIR\\\\inkternity.exe\\\" \\\"%1\\\"'
+         WriteRegStr HKCR 'InkternityCanvas\\\\shell\\\\edit' '' 'Edit Inkternity Canvas File'
+         WriteRegStr HKCR 'InkternityCanvas\\\\shell\\\\edit\\\\command' '' '\\\"$INSTDIR\\\\inkternity.exe\\\" \\\"%1\\\"'
          System::Call 'Shell32::SHChangeNotify(i 0x8000000, i 0, i 0, i 0)'
 	")
-	
+
 	set(CPACK_NSIS_EXTRA_UNINSTALL_COMMANDS "
-	     DeleteRegKey HKCR '.infpnt'
-         DeleteRegKey HKCR 'InfiniPaintCanvas'
+	     DeleteRegKey HKCR '.inkternity'
+         DeleteRegKey HKCR 'InkternityCanvas'
      ")
 
-     set(CPACK_PACKAGE_INSTALL_DIRECTORY "infinipaint")
+     set(CPACK_PACKAGE_INSTALL_DIRECTORY "inkternity")
 else()
     install(DIRECTORY assets/data DESTINATION bin)
     install(TARGETS main DESTINATION bin)
-    install(FILES linuxinstall/com.infinipaint.infinipaint.desktop DESTINATION share/applications)
-    install(FILES logo.svg DESTINATION share/icons/hicolor/scalable/apps RENAME com.infinipaint.infinipaint.svg)
-    install(FILES logo.svg DESTINATION share/icons/hicolor/scalable/mimetypes RENAME com.infinipaint.infinipaint-application-infpnt.svg)
-    install(FILES linuxinstall/com.infinipaint.infinipaint.metainfo.xml DESTINATION share/metainfo)
-    install(FILES linuxinstall/com.infinipaint.infinipaint.xml DESTINATION share/mime/packages)
+    install(FILES linuxinstall/com.inkternity.inkternity.desktop DESTINATION share/applications)
+    install(FILES logo.svg DESTINATION share/icons/hicolor/scalable/apps RENAME com.inkternity.inkternity.svg)
+    install(FILES logo.svg DESTINATION share/icons/hicolor/scalable/mimetypes RENAME com.inkternity.inkternity-application-inkternity.svg)
+    install(FILES linuxinstall/com.inkternity.inkternity.metainfo.xml DESTINATION share/metainfo)
+    install(FILES linuxinstall/com.inkternity.inkternity.xml DESTINATION share/mime/packages)
 endif()
 
 if(APPLE OR WIN32)
