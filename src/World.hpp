@@ -6,6 +6,7 @@
 #include "Helpers/NetworkingObjects/NetObjUnorderedSet.hpp"
 #include "WorldUndoManager.hpp"
 #include "Bookmarks/BookmarkManager.hpp"
+#include "Waypoints/WaypointGraph.hpp"
 #include "ResourceManager.hpp"
 #include "DrawingProgram/DrawingProgram.hpp"
 #include "Toolbar.hpp"
@@ -43,6 +44,7 @@ class World {
         ResourceManager rMan;
         DrawingProgram drawProg;
         BookmarkManager bMan;
+        WaypointGraph wpGraph;
         GridManager gridMan;
 
         std::deque<Toolbar::ChatMessage> chatMessages;

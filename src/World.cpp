@@ -43,6 +43,7 @@ World::World(MainProgram& initMain, const CustomEvents::OpenInfiniPaintFileEvent
     rMan(*this),
     drawProg(*this),
     bMan(*this),
+    wpGraph(*this),
     gridMan(*this),
     canvasTheme(*this)
 {
@@ -105,6 +106,7 @@ void World::init_client_data_list_callbacks() {
 
 void World::init_net_obj_type_list() {
     BookmarkListItem::register_class(*this);
+    WaypointGraph::register_class(*this);
     WorldGrid::register_class(*this);
     NetworkingObjects::register_ordered_list_class<WorldGrid>(netObjMan);
     CanvasComponentAllocator::register_class(*this);
@@ -139,6 +141,7 @@ void World::init_client(const std::string& serverFullID) {
         message(fileDisplayName, clientDataObjID);
         set_name(fileDisplayName);
         bMan.read_create_message(message);
+        wpGraph.read_create_message(message);
         gridMan.read_create_message(message);
         drawProg.read_components_client(message);
         canvasTheme.read_create_message(message);
@@ -410,6 +413,7 @@ void World::start_hosting(const std::string& initNetSource, const std::string& s
             cereal::PortableBinaryOutputArchive a(*ss);
             a(CLIENT_INITIAL_DATA, name, clientDataObjPtr.get_net_id());
             bMan.bookmarkListRoot.write_create_message(a);
+            wpGraph.write_create_message(a);
             gridMan.grids.write_create_message(a);
             drawProg.write_components_server(a);
             canvasTheme.write_create_message(a);
@@ -510,6 +514,7 @@ void World::save_to_file(const std::filesystem::path& filePathToSaveAt, bool dis
 void World::load_empty_canvas(const std::optional<std::filesystem::path>& filePathEmptyAutoSaveDir) {
     gridMan.server_init_no_file();
     bMan.server_init_no_file();
+    wpGraph.server_init_no_file();
     drawProg.server_init_no_file();
     canvasTheme.server_init_no_file();
 
@@ -559,6 +564,7 @@ void World::save_file(cereal::PortableBinaryOutputArchive& a) const {
     canvasTheme.save_file(a);
     drawProg.save_file(a);
     bMan.save_file(a);
+    wpGraph.save_file(a);
     gridMan.save_file(a);
     rMan.save_file(a);
 }
@@ -568,6 +574,10 @@ void World::load_file(cereal::PortableBinaryInputArchive& a, VersionNumber versi
     canvasTheme.load_file(a, version);
     drawProg.load_file(a, version);
     bMan.load_file(a, version);
+    if (version >= VersionNumber(0, 5, 0))
+        wpGraph.load_file(a, version);
+    else
+        wpGraph.server_init_no_file();  // M4-b will migrate from bMan instead
     gridMan.load_file(a, version);
     rMan.load_file(a, version);
 }
@@ -595,6 +605,7 @@ void World::scale_up_step() {
 void World::scale_up(const WorldScalar& scaleUpAmount) {
     Logger::get().log("USERINFO", "Canvas scaled up");
     bMan.scale_up(scaleUpAmount);
+    wpGraph.scale_up(scaleUpAmount);
     gridMan.scale_up(scaleUpAmount);
     drawData.cam.scale_up(*this, scaleUpAmount);
     // drawProg will be sending info on committed objects/modified grids. These objects will be scaled up already.
