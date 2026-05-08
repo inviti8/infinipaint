@@ -15,6 +15,7 @@
 #include "ZoomCanvasTool.hpp"
 #include "LineDrawTool.hpp"
 #include "MyPaintBrushTool.hpp"
+#include "WaypointTool.hpp"
 
 DrawingProgramToolBase::DrawingProgramToolBase(DrawingProgram& initDrawP):
     drawP(initDrawP)
@@ -54,6 +55,8 @@ std::unique_ptr<DrawingProgramToolBase> DrawingProgramToolBase::allocate_tool_ty
             return std::make_unique<LineDrawTool>(drawP);
         case DrawingProgramToolType::MYPAINTBRUSH:
             return std::make_unique<MyPaintBrushTool>(drawP);
+        case DrawingProgramToolType::WAYPOINT:
+            return std::make_unique<WaypointTool>(drawP);
     }
     return nullptr;
 }

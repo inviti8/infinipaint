@@ -24,7 +24,8 @@ enum class DrawingProgramToolType : int {
     ZOOM,
     PAN,
     LINE,
-    MYPAINTBRUSH
+    MYPAINTBRUSH,
+    WAYPOINT
 };
 
 class DrawingProgramToolBase {

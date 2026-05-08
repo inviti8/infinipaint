@@ -1,0 +1,82 @@
+#include "WaypointCanvasComponent.hpp"
+#include "../DrawData.hpp"
+#include <include/core/SkCanvas.h>
+#include <include/core/SkPaint.h>
+#include <include/core/SkPath.h>
+
+CanvasComponentType WaypointCanvasComponent::get_type() const {
+    return CanvasComponentType::WAYPOINT;
+}
+
+WaypointCanvasComponent::WaypointCanvasComponent() {}
+
+void WaypointCanvasComponent::set_data(NetworkingObjects::NetObjID waypointId, const Vector2f& markerPos) {
+    d.waypointId = waypointId;
+    d.markerPos = markerPos;
+}
+
+void WaypointCanvasComponent::save(cereal::PortableBinaryOutputArchive& a) const {
+    a(d);
+}
+
+void WaypointCanvasComponent::load(cereal::PortableBinaryInputArchive& a) {
+    a(d);
+}
+
+void WaypointCanvasComponent::save_file(cereal::PortableBinaryOutputArchive& a) const {
+    a(d);
+}
+
+void WaypointCanvasComponent::load_file(cereal::PortableBinaryInputArchive& a, VersionNumber) {
+    a(d);
+}
+
+std::unique_ptr<CanvasComponent> WaypointCanvasComponent::get_data_copy() const {
+    auto toRet = std::make_unique<WaypointCanvasComponent>();
+    toRet->d = d;
+    return toRet;
+}
+
+void WaypointCanvasComponent::set_data_from(const CanvasComponent& other) {
+    d = static_cast<const WaypointCanvasComponent&>(other).d;
+}
+
+void WaypointCanvasComponent::draw(SkCanvas* canvas, const DrawData& drawData, const std::shared_ptr<void>&) const {
+    // Marker visual: filled gold disc with a dark outline. Gold (~#E0B040)
+    // because it doesn't compete with brush-stroke colors and reads as a
+    // "navigation marker" rather than "drawn content".
+    const SkScalar cx = static_cast<SkScalar>(d.markerPos.x());
+    const SkScalar cy = static_cast<SkScalar>(d.markerPos.y());
+    const SkScalar r = static_cast<SkScalar>(MARKER_RADIUS_PX);
+
+    SkPaint fill;
+    fill.setAntiAlias(drawData.skiaAA);
+    fill.setColor4f({0.88f, 0.69f, 0.25f, 1.0f});
+    fill.setStyle(SkPaint::kFill_Style);
+    canvas->drawCircle(cx, cy, r, fill);
+
+    SkPaint outline;
+    outline.setAntiAlias(drawData.skiaAA);
+    outline.setColor4f({0.15f, 0.10f, 0.05f, 1.0f});
+    outline.setStyle(SkPaint::kStroke_Style);
+    outline.setStrokeWidth(0.0f);
+    canvas->drawCircle(cx, cy, r, outline);
+}
+
+void WaypointCanvasComponent::initialize_draw_data(DrawingProgram&) {
+}
+
+bool WaypointCanvasComponent::collides_within_coords(const SCollision::ColliderCollection<float>& checkAgainst) const {
+    // AABB-vs-AABB hit test against the marker's bounding box. M5-a click-
+    // detection uses the eraser-style wide-line collider, so an AABB hit
+    // is good enough — fine-grained circle hit-test would need a custom
+    // collide() overload.
+    return SCollision::collide(checkAgainst.bounds, get_obj_coord_bounds());
+}
+
+SCollision::AABB<float> WaypointCanvasComponent::get_obj_coord_bounds() const {
+    SCollision::AABB<float> bounds;
+    bounds.min = Vector2f(d.markerPos.x() - MARKER_RADIUS_PX, d.markerPos.y() - MARKER_RADIUS_PX);
+    bounds.max = Vector2f(d.markerPos.x() + MARKER_RADIUS_PX, d.markerPos.y() + MARKER_RADIUS_PX);
+    return bounds;
+}

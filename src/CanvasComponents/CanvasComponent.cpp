@@ -5,6 +5,7 @@
 #include "RectangleCanvasComponent.hpp"
 #include "TextBoxCanvasComponent.hpp"
 #include "MyPaintLayerCanvasComponent.hpp"
+#include "WaypointCanvasComponent.hpp"
 
 void CanvasComponent::update(DrawingProgram& drawP) {
 }
@@ -29,6 +30,8 @@ CanvasComponent* CanvasComponent::allocate_comp(CanvasComponentType type) {
             return new ImageCanvasComponent;
         case CanvasComponentType::MYPAINTLAYER:
             return new MyPaintLayerCanvasComponent;
+        case CanvasComponentType::WAYPOINT:
+            return new WaypointCanvasComponent;
     }
     return nullptr;
 }
