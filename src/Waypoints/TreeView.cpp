@@ -24,15 +24,38 @@
 #include <algorithm>
 #include <cmath>
 #include <unordered_map>
+#include <vector>
 
-// Custom Element that draws the WaypointGraph using Skia inside the
-// tree-view panel. Uses the same ".custom = {this}" layout mechanism
-// ColorRectangleDisplay uses, so it slots into Clay's layout naturally
-// and gets a clay_draw call with the panel's bounding box.
-//
-// M6-b is read-only: render nodes (rounded rect + label) and edges
-// (line with arrowhead). M6-c will add input callbacks for drag,
-// edge creation, and double-click to focus.
+namespace {
+
+// Visual constants — kept here so the drawing code and the input hit-
+// testing code agree.
+constexpr float NODE_W = 220.0f;
+constexpr float NODE_H = 40.0f;
+constexpr float NODE_PAD_Y = 14.0f;
+constexpr float STACK_TOP = 40.0f;
+constexpr float PORT_RADIUS = 5.0f;            // visible port dot radius
+constexpr float PORT_HIT_RADIUS = 9.0f;        // generous hit radius for port-drag start
+constexpr float EDGE_HIT_RADIUS = 6.0f;        // distance threshold for edge hit-test
+constexpr float ARROW_LEN = 8.0f;
+constexpr float ARROW_HALF = 5.0f;
+
+// Squared distance from point p to segment ab.
+inline float dist_sq_point_to_segment(const Vector2f& p, const Vector2f& a, const Vector2f& b) {
+    const Vector2f ab = b - a;
+    const float lenSq = ab.squaredNorm();
+    if (lenSq < 1e-6f) return (p - a).squaredNorm();
+    const float t = std::clamp((p - a).dot(ab) / lenSq, 0.0f, 1.0f);
+    const Vector2f proj = a + ab * t;
+    return (p - proj).squaredNorm();
+}
+
+}  // namespace
+
+// Custom Element that draws + edits the WaypointGraph in the tree-view
+// panel. clay_draw renders nodes/edges and caches their panel-local
+// rects; the input callbacks consult those caches to hit-test and
+// drive the interaction state machine.
 class TreeViewGraphElement : public GUIStuff::Element {
     public:
         explicit TreeViewGraphElement(GUIStuff::GUIManager& g) : Element(g) {}
@@ -54,61 +77,57 @@ class TreeViewGraphElement : public GUIStuff::Element {
             canvas->save();
             canvas->clipRect(SkRect::MakeLTRB(bb.min.x(), bb.min.y(), bb.max.x(), bb.max.y()), skiaAA);
 
-            // Subtle backing fill behind the graph area so nodes/edges
-            // don't visually merge into the panel chrome.
             SkPaint bgPaint;
             bgPaint.setColor4f({0.10f, 0.10f, 0.12f, 1.0f});
             canvas->drawRect(SkRect::MakeLTRB(bb.min.x(), bb.min.y(), bb.max.x(), bb.max.y()), bgPaint);
 
-            // Auto-place any node missing a layout entry. Single-column
-            // stack inside the panel; positions get persisted into
-            // WaypointGraph::layout so later frames are stable.
             auto& nodes = world->wpGraph.get_nodes();
             auto& layout = world->wpGraph.mutable_layout();
             if (!nodes) { canvas->restore(); return; }
 
-            constexpr float NODE_W = 220.0f;
-            constexpr float NODE_H = 40.0f;
-            constexpr float NODE_PAD_Y = 14.0f;
-            constexpr float STACK_TOP = 40.0f;
+            // Auto-place + cache panel-local positions.
             const float stackX = (panelSize.x() - NODE_W) * 0.5f;
-
             int autoIndex = 0;
-            std::unordered_map<NetworkingObjects::NetObjID, Vector2f> currentPositions;
+            nodeBoxes.clear();
             for (auto& info : *nodes) {
                 const auto id = info.obj.get_net_id();
                 auto it = layout.find(id);
+                Vector2f topLeft;
                 if (it == layout.end()) {
-                    Vector2f autoPos(stackX, STACK_TOP + autoIndex * (NODE_H + NODE_PAD_Y));
-                    layout.emplace(id, autoPos);
-                    currentPositions.emplace(id, autoPos);
+                    topLeft = Vector2f(stackX, STACK_TOP + autoIndex * (NODE_H + NODE_PAD_Y));
+                    layout.emplace(id, topLeft);
                 } else {
-                    currentPositions.emplace(id, it->second);
+                    topLeft = it->second;
                 }
+                nodeBoxes.push_back({id, topLeft});
                 ++autoIndex;
             }
 
-            // Render edges first so nodes draw on top.
+            // Edges first (under nodes). Cache their from/to panel-local
+            // positions so right-click hit-test can find them later.
             auto& edges = world->wpGraph.get_edges();
+            edgeSegments.clear();
             if (edges) {
                 SkPaint edgePaint;
                 edgePaint.setAntiAlias(skiaAA);
                 edgePaint.setStyle(SkPaint::kStroke_Style);
                 edgePaint.setStrokeWidth(2.0f);
-                edgePaint.setColor4f({0.88f, 0.69f, 0.25f, 0.80f});  // muted gold (matches canvas markers)
+                edgePaint.setColor4f({0.88f, 0.69f, 0.25f, 0.80f});
                 for (auto& einfo : *edges) {
-                    auto fromIt = currentPositions.find(einfo.obj->get_from());
-                    auto toIt = currentPositions.find(einfo.obj->get_to());
-                    if (fromIt == currentPositions.end() || toIt == currentPositions.end()) continue;
-                    const Vector2f from = panelOrigin + fromIt->second + Vector2f(NODE_W * 0.5f, NODE_H);
-                    const Vector2f to   = panelOrigin + toIt->second   + Vector2f(NODE_W * 0.5f, 0.0f);
-                    canvas->drawLine(from.x(), from.y(), to.x(), to.y(), edgePaint);
+                    const auto fromId = einfo.obj->get_from();
+                    const auto toId = einfo.obj->get_to();
+                    auto fromBox = find_node_box(fromId);
+                    auto toBox = find_node_box(toId);
+                    if (!fromBox || !toBox) continue;
+                    const Vector2f fromPanel = fromBox->topLeft + Vector2f(NODE_W * 0.5f, NODE_H);
+                    const Vector2f toPanel = toBox->topLeft + Vector2f(NODE_W * 0.5f, 0.0f);
+                    edgeSegments.push_back({einfo.obj.get_net_id(), fromPanel, toPanel});
 
-                    // Tiny arrowhead at the destination end.
+                    const Vector2f from = panelOrigin + fromPanel;
+                    const Vector2f to = panelOrigin + toPanel;
+                    canvas->drawLine(from.x(), from.y(), to.x(), to.y(), edgePaint);
                     const Vector2f dir = (to - from).normalized();
                     const Vector2f perp(-dir.y(), dir.x());
-                    constexpr float ARROW_LEN = 8.0f;
-                    constexpr float ARROW_HALF = 5.0f;
                     const Vector2f a1 = to - dir * ARROW_LEN + perp * ARROW_HALF;
                     const Vector2f a2 = to - dir * ARROW_LEN - perp * ARROW_HALF;
                     SkPathBuilder pb;
@@ -119,10 +138,22 @@ class TreeViewGraphElement : public GUIStuff::Element {
                 }
             }
 
-            // Render nodes. Each waypoint is a rounded rect with its label
-            // (or "(unnamed)" if empty) centered inside. Pull Roboto from
-            // the shared FontData — using a default-constructed SkFont
-            // gets you an empty typeface and silently no glyphs.
+            // Edge-create preview line — drawn while dragging from a port.
+            if (dragMode == DragMode::EDGE_CREATE) {
+                auto srcBox = find_node_box(dragSourceId);
+                if (srcBox) {
+                    const Vector2f src = panelOrigin + srcBox->topLeft + Vector2f(NODE_W * 0.5f, NODE_H);
+                    const Vector2f dst = panelOrigin + dragCurrentPanel;
+                    SkPaint preview;
+                    preview.setAntiAlias(skiaAA);
+                    preview.setStyle(SkPaint::kStroke_Style);
+                    preview.setStrokeWidth(2.0f);
+                    preview.setColor4f({0.95f, 0.85f, 0.45f, 0.85f});
+                    canvas->drawLine(src.x(), src.y(), dst.x(), dst.y(), preview);
+                }
+            }
+
+            // Nodes.
             SkFont font;
             font.setSize(14.0f);
             if (world->main.fonts) {
@@ -130,40 +161,181 @@ class TreeViewGraphElement : public GUIStuff::Element {
                 if (it != world->main.fonts->map.end()) font.setTypeface(it->second);
             }
 
-            SkPaint nodeFill;
-            nodeFill.setAntiAlias(skiaAA);
-            nodeFill.setColor4f({0.20f, 0.20f, 0.24f, 1.0f});
-            SkPaint nodeOutline;
-            nodeOutline.setAntiAlias(skiaAA);
-            nodeOutline.setStyle(SkPaint::kStroke_Style);
-            nodeOutline.setStrokeWidth(1.5f);
-            nodeOutline.setColor4f({0.88f, 0.69f, 0.25f, 1.0f});
-            SkPaint textPaint;
-            textPaint.setAntiAlias(skiaAA);
-            textPaint.setColor4f({0.95f, 0.95f, 0.95f, 1.0f});
+            const auto selectedOpt = world->wpGraph.has_selection()
+                ? std::optional<NetworkingObjects::NetObjID>(world->wpGraph.get_selected())
+                : std::nullopt;
 
-            for (auto& info : *nodes) {
-                const auto id = info.obj.get_net_id();
-                auto it = currentPositions.find(id);
-                if (it == currentPositions.end()) continue;
-                const Vector2f topLeft = panelOrigin + it->second;
+            for (const auto& nb : nodeBoxes) {
+                const Vector2f topLeft = panelOrigin + nb.topLeft;
                 SkRect r = SkRect::MakeXYWH(topLeft.x(), topLeft.y(), NODE_W, NODE_H);
                 SkRRect rr = SkRRect::MakeRectXY(r, 6.0f, 6.0f);
-                canvas->drawRRect(rr, nodeFill);
-                canvas->drawRRect(rr, nodeOutline);
 
-                const std::string& label = info.obj->get_label();
-                const std::string display = label.empty() ? std::string("(unnamed)") : label;
+                const bool selected = selectedOpt.has_value() && selectedOpt.value() == nb.id;
+                SkPaint fill;
+                fill.setAntiAlias(skiaAA);
+                fill.setColor4f(selected
+                    ? SkColor4f{0.30f, 0.26f, 0.18f, 1.0f}    // brighter, gold-tinged
+                    : SkColor4f{0.20f, 0.20f, 0.24f, 1.0f});
+                canvas->drawRRect(rr, fill);
+
+                SkPaint outline;
+                outline.setAntiAlias(skiaAA);
+                outline.setStyle(SkPaint::kStroke_Style);
+                outline.setStrokeWidth(selected ? 2.0f : 1.5f);
+                outline.setColor4f({0.88f, 0.69f, 0.25f, 1.0f});
+                canvas->drawRRect(rr, outline);
+
+                auto wpRef = world->netObjMan.get_obj_temporary_ref_from_id<Waypoint>(nb.id);
+                std::string display = "(unnamed)";
+                if (wpRef) {
+                    const std::string& label = wpRef->get_label();
+                    if (!label.empty()) display = label;
+                }
+                SkPaint textPaint;
+                textPaint.setAntiAlias(skiaAA);
+                textPaint.setColor4f({0.95f, 0.95f, 0.95f, 1.0f});
                 canvas->drawSimpleText(display.data(), display.size(), SkTextEncoding::kUTF8,
                                        topLeft.x() + 12.0f, topLeft.y() + NODE_H * 0.5f + 5.0f,
                                        font, textPaint);
+
+                // Edge port (small dot at bottom-center). Drag from this
+                // dot to another node's body to create an edge.
+                const Vector2f port = topLeft + Vector2f(NODE_W * 0.5f, NODE_H);
+                SkPaint portPaint;
+                portPaint.setAntiAlias(skiaAA);
+                portPaint.setColor4f({0.88f, 0.69f, 0.25f, 1.0f});
+                canvas->drawCircle(port.x(), port.y(), PORT_RADIUS, portPaint);
             }
 
             canvas->restore();
         }
 
+        void input_mouse_button_callback(const InputManager::MouseButtonCallbackArgs& button) override {
+            if (!boundingBox.has_value() || !world) return;
+            const Vector2f panelLocal = button.pos - boundingBox.value().min;
+
+            if (button.button == InputManager::MouseButton::LEFT) {
+                if (button.down) {
+                    if (!mouseHovering) return;
+                    // Port hit test first — has priority over node-body
+                    // because port overlaps the node's bottom edge.
+                    if (auto portHit = hit_test_port(panelLocal)) {
+                        dragMode = DragMode::EDGE_CREATE;
+                        dragSourceId = portHit.value();
+                        dragCurrentPanel = panelLocal;
+                        gui.invalidate_draw_element(this);
+                        return;
+                    }
+                    if (auto nodeHit = hit_test_node(panelLocal)) {
+                        world->wpGraph.select(nodeHit.value().id);
+                        // Double-click → focus canvas on the waypoint's framing.
+                        if (button.clicks >= 2) {
+                            auto wpRef = world->netObjMan.get_obj_temporary_ref_from_id<Waypoint>(nodeHit.value().id);
+                            if (wpRef) {
+                                world->drawData.cam.smooth_move_to(*world, wpRef->get_coords(), wpRef->get_window_size().cast<float>());
+                            }
+                            return;
+                        }
+                        // Otherwise begin REPOSITION drag.
+                        dragMode = DragMode::REPOSITION;
+                        dragSourceId = nodeHit.value().id;
+                        dragOffset = panelLocal - nodeHit.value().topLeft;
+                        gui.invalidate_draw_element(this);
+                        return;
+                    }
+                } else {
+                    // Mouse-up — finalize whatever was in progress.
+                    if (dragMode == DragMode::EDGE_CREATE) {
+                        if (auto nodeHit = hit_test_node(panelLocal)) {
+                            if (nodeHit.value().id != dragSourceId) {
+                                auto& edges = world->wpGraph.get_edges();
+                                edges->emplace_back_direct(edges, dragSourceId, nodeHit.value().id, std::optional<std::string>{});
+                            }
+                        }
+                    }
+                    dragMode = DragMode::NONE;
+                    gui.invalidate_draw_element(this);
+                }
+                return;
+            }
+
+            if (button.button == InputManager::MouseButton::RIGHT && button.down && mouseHovering) {
+                // Right-click on an edge deletes it. Label-edit UI for
+                // edges is a follow-up.
+                if (auto edgeHitId = hit_test_edge(panelLocal)) {
+                    auto& edges = world->wpGraph.get_edges();
+                    auto it = edges->get(edgeHitId.value());
+                    if (it != edges->end())
+                        edges->erase(edges, it);
+                    gui.invalidate_draw_element(this);
+                }
+            }
+        }
+
+        void input_mouse_motion_callback(const InputManager::MouseMotionCallbackArgs& motion) override {
+            if (!boundingBox.has_value() || !world) return;
+            const Vector2f panelLocal = motion.pos - boundingBox.value().min;
+            if (dragMode == DragMode::REPOSITION) {
+                world->wpGraph.mutable_layout()[dragSourceId] = panelLocal - dragOffset;
+                gui.invalidate_draw_element(this);
+            } else if (dragMode == DragMode::EDGE_CREATE) {
+                dragCurrentPanel = panelLocal;
+                gui.invalidate_draw_element(this);
+            }
+        }
+
     private:
+        struct NodeBox {
+            NetworkingObjects::NetObjID id;
+            Vector2f topLeft;
+        };
+        struct EdgeSegment {
+            NetworkingObjects::NetObjID id;
+            Vector2f from;  // panel-local
+            Vector2f to;    // panel-local
+        };
+
+        const NodeBox* find_node_box(NetworkingObjects::NetObjID id) const {
+            for (const auto& nb : nodeBoxes) if (nb.id == id) return &nb;
+            return nullptr;
+        }
+
+        std::optional<NetworkingObjects::NetObjID> hit_test_port(const Vector2f& panelLocal) const {
+            const float r2 = PORT_HIT_RADIUS * PORT_HIT_RADIUS;
+            for (const auto& nb : nodeBoxes) {
+                const Vector2f port = nb.topLeft + Vector2f(NODE_W * 0.5f, NODE_H);
+                if ((panelLocal - port).squaredNorm() <= r2) return nb.id;
+            }
+            return std::nullopt;
+        }
+
+        std::optional<NodeBox> hit_test_node(const Vector2f& panelLocal) const {
+            for (const auto& nb : nodeBoxes) {
+                if (panelLocal.x() >= nb.topLeft.x() && panelLocal.x() <= nb.topLeft.x() + NODE_W &&
+                    panelLocal.y() >= nb.topLeft.y() && panelLocal.y() <= nb.topLeft.y() + NODE_H) {
+                    return nb;
+                }
+            }
+            return std::nullopt;
+        }
+
+        std::optional<NetworkingObjects::NetObjID> hit_test_edge(const Vector2f& panelLocal) const {
+            const float r2 = EDGE_HIT_RADIUS * EDGE_HIT_RADIUS;
+            for (const auto& es : edgeSegments) {
+                if (dist_sq_point_to_segment(panelLocal, es.from, es.to) <= r2) return es.id;
+            }
+            return std::nullopt;
+        }
+
         World* world = nullptr;
+        std::vector<NodeBox> nodeBoxes;       // cached during clay_draw
+        std::vector<EdgeSegment> edgeSegments; // cached during clay_draw
+
+        enum class DragMode { NONE, REPOSITION, EDGE_CREATE };
+        DragMode dragMode = DragMode::NONE;
+        NetworkingObjects::NetObjID dragSourceId{};
+        Vector2f dragOffset{0, 0};        // REPOSITION: cursor offset from node top-left
+        Vector2f dragCurrentPanel{0, 0};  // EDGE_CREATE: current cursor in panel-local
 };
 
 TreeView::TreeView(World& w)
@@ -175,9 +347,6 @@ void TreeView::gui(GUIStuff::GUIManager& gui) {
     using namespace GUIStuff::ElementHelpers;
     auto& io = gui.io;
 
-    // Panel is a fixed-width column on the right side of the canvas.
-    // Width chosen empirically — wide enough to read short labels and
-    // see a few nodes without overwhelming the canvas.
     constexpr float PANEL_WIDTH = 360.0f;
 
     gui.element<LayoutElement>("tree view panel", [&] (LayoutElement*, const Clay_ElementId& lId) {

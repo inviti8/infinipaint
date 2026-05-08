@@ -6,6 +6,7 @@
 #include <Helpers/VersionNumber.hpp>
 #include <Eigen/Core>
 #include <cereal/archives/portable_binary.hpp>
+#include <optional>
 #include <unordered_map>
 
 class World;
@@ -40,10 +41,20 @@ class WaypointGraph {
         const std::unordered_map<NetworkingObjects::NetObjID, Vector2f>& get_layout() const { return layout; }
         std::unordered_map<NetworkingObjects::NetObjID, Vector2f>& mutable_layout() { return layout; }
 
+        // UI selection — shared between WaypointTool (canvas) and
+        // TreeView (graph panel) so a click in either updates the
+        // other's chrome. Local-only state (not NetObj-synced or
+        // persisted), since selection is per-user-session.
+        bool has_selection() const                         { return selectedId.has_value(); }
+        NetworkingObjects::NetObjID get_selected() const   { return selectedId.value_or(NetworkingObjects::NetObjID{}); }
+        void select(NetworkingObjects::NetObjID id)        { selectedId = id; }
+        void clear_selection()                             { selectedId.reset(); }
+
     private:
         World& world;
 
         NetworkingObjects::NetObjOwnerPtr<NetworkingObjects::NetObjOrderedList<Waypoint>> nodes;
         NetworkingObjects::NetObjOwnerPtr<NetworkingObjects::NetObjOrderedList<Edge>> edges;
         std::unordered_map<NetworkingObjects::NetObjID, Vector2f> layout;
+        std::optional<NetworkingObjects::NetObjID> selectedId;
 };

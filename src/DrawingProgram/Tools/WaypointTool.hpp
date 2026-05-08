@@ -48,9 +48,7 @@ class WaypointTool : public DrawingProgramToolBase {
         // to the clicked one. Returns true if an edge was created.
         bool try_create_edge_to_clicked(const Vector2f& clickPos);
 
-        // Selection state — most-recently-clicked or dropped waypoint.
-        // Drives gui_toolbox's label editor and draw()'s framing-rect
-        // outline. Cleared when the tool is switched away from.
-        NetworkingObjects::NetObjID selectedWaypointId{};
-        bool hasSelection = false;
+        // Selection state lives on WaypointGraph as the single source of
+        // truth shared between this tool and the TreeView panel — a
+        // click in either updates the other's chrome.
 };

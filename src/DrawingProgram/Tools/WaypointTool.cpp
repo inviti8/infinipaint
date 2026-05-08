@@ -27,7 +27,7 @@ DrawingProgramToolType WaypointTool::get_type() {
 }
 
 void WaypointTool::switch_tool(DrawingProgramToolType) {
-    hasSelection = false;
+    drawP.world.wpGraph.clear_selection();
 }
 
 void WaypointTool::erase_component(CanvasComponentContainer::ObjInfo*) {
@@ -70,8 +70,8 @@ void WaypointTool::draw(SkCanvas* canvas, const DrawData& drawData) {
     }
 
     // Selected waypoint's framing-rect outline.
-    if (!hasSelection) return;
-    auto wpRef = drawP.world.netObjMan.get_obj_temporary_ref_from_id<Waypoint>(selectedWaypointId);
+    if (!drawP.world.wpGraph.has_selection()) return;
+    auto wpRef = drawP.world.netObjMan.get_obj_temporary_ref_from_id<Waypoint>(drawP.world.wpGraph.get_selected());
     if (!wpRef) return;
     const auto& coords = wpRef->get_coords();
     const Vector<int32_t, 2> ws = wpRef->get_window_size();
@@ -103,8 +103,8 @@ void WaypointTool::gui_toolbox(Toolbar&) {
     auto& gui = drawP.world.main.g.gui;
     gui.new_id("waypoint tool", [&] {
         text_label_centered(gui, "Waypoint");
-        if (hasSelection) {
-            auto wpRef = drawP.world.netObjMan.get_obj_temporary_ref_from_id<Waypoint>(selectedWaypointId);
+        if (drawP.world.wpGraph.has_selection()) {
+            auto wpRef = drawP.world.netObjMan.get_obj_temporary_ref_from_id<Waypoint>(drawP.world.wpGraph.get_selected());
             if (wpRef) {
                 input_text_field(gui, "label", "Label", &wpRef->mutable_label());
                 return;
@@ -119,8 +119,8 @@ void WaypointTool::gui_phone_toolbox(PhoneDrawingProgramScreen&) {
     using namespace ElementHelpers;
     auto& gui = drawP.world.main.g.gui;
     gui.new_id("waypoint tool phone", [&] {
-        if (hasSelection) {
-            auto wpRef = drawP.world.netObjMan.get_obj_temporary_ref_from_id<Waypoint>(selectedWaypointId);
+        if (drawP.world.wpGraph.has_selection()) {
+            auto wpRef = drawP.world.netObjMan.get_obj_temporary_ref_from_id<Waypoint>(drawP.world.wpGraph.get_selected());
             if (wpRef)
                 input_text_field(gui, "label", "Label", &wpRef->mutable_label());
         }
@@ -140,7 +140,7 @@ void WaypointTool::input_mouse_button_on_canvas_callback(const InputManager::Mou
     // waypoint to the clicked one. Provides a way to test edges before M6
     // lands the tree-window edge editor; remains a useful shortcut after.
     const bool shiftHeld = (SDL_GetModState() & SDL_KMOD_SHIFT) != 0;
-    if (shiftHeld && hasSelection) {
+    if (shiftHeld && drawP.world.wpGraph.has_selection()) {
         if (try_create_edge_to_clicked(button.pos)) return;
     }
 
@@ -179,8 +179,7 @@ bool WaypointTool::try_focus_existing_waypoint(const Vector2f& clickPos) {
     auto wpRef = drawP.world.netObjMan.get_obj_temporary_ref_from_id<Waypoint>(hitId);
     if (!wpRef) return false;  // dangling ref — treat as miss
     drawP.world.drawData.cam.smooth_move_to(drawP.world, wpRef->get_coords(), wpRef->get_window_size().cast<float>());
-    selectedWaypointId = hitId;
-    hasSelection = true;
+    drawP.world.wpGraph.select(hitId);
     return true;
 }
 
@@ -206,10 +205,11 @@ bool WaypointTool::try_create_edge_to_clicked(const Vector2f& clickPos) {
         return !hit;
     });
     if (!hit) return false;
-    if (hitId == selectedWaypointId) return false;  // self-edge: skip
+    const auto sel = drawP.world.wpGraph.get_selected();
+    if (hitId == sel) return false;  // self-edge: skip
 
     auto& edges = drawP.world.wpGraph.get_edges();
-    edges->emplace_back_direct(edges, selectedWaypointId, hitId, std::optional<std::string>{});
+    edges->emplace_back_direct(edges, sel, hitId, std::optional<std::string>{});
     return true;
 }
 
@@ -239,6 +239,5 @@ void WaypointTool::drop_waypoint(const Vector2f& clickPos) {
     if (container->get_world_bounds().has_value())
         drawP.layerMan.add_undo_place_component(objInfo);
 
-    selectedWaypointId = newWaypointId;
-    hasSelection = true;
+    drawP.world.wpGraph.select(newWaypointId);
 }
