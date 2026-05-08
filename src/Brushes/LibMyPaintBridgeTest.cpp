@@ -88,7 +88,7 @@ bool run_libmypaint_hello_dab(const std::filesystem::path& outputPng) {
         0.0f, 0.0f, 0.0f,                // color RGB (black)
         1.0f,                            // opaque
         0.8f,                            // hardness
-        1.0f,                            // softness
+        0.0f,                            // softness  (libmypaint early-outs at softness==1.0)
         1.0f,                            // alpha_eraser
         1.0f, 0.0f,                      // aspect_ratio, angle
         0.0f,                            // lock_alpha
