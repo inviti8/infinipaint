@@ -42,9 +42,23 @@ class ToolConfiguration {
             NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(LineDrawToolConfig, hasRoundCaps, relativeWidth)
         } lineDraw;
 
+        // Per-preset, user-tunable overrides surfaced as sliders in the
+        // brush picker (diameter/hardness/opacity). Initial values come
+        // from BrushPresetDefaults; once the user moves a slider the
+        // edited value sticks across app restarts. A separate "reset to
+        // defaults" action would refill from the preset defaults — not
+        // wired yet (see follow-up).
+        struct MyPaintBrushPresetOverrides {
+            float diameter = 1.5f;
+            float hardness = 0.85f;
+            float opacity = 1.0f;
+            NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(MyPaintBrushPresetOverrides, diameter, hardness, opacity)
+        };
+
         struct MyPaintBrushToolConfig {
             int activePresetIndex = 0;  // index into HVYM::Brushes::curated_presets()
-            NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(MyPaintBrushToolConfig, activePresetIndex)
+            std::vector<MyPaintBrushPresetOverrides> overrides;  // sized to match preset count on first use
+            NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(MyPaintBrushToolConfig, activePresetIndex, overrides)
         } myPaintBrush;
 
         struct ScreenshotToolConfig {

@@ -8,6 +8,8 @@
 
 #include "../../GUIStuff/ElementHelpers/TextLabelHelpers.hpp"
 #include "../../GUIStuff/ElementHelpers/RadioButtonHelpers.hpp"
+#include "../../GUIStuff/ElementHelpers/ButtonHelpers.hpp"
+#include "../../GUIStuff/ElementHelpers/NumberSliderHelpers.hpp"
 
 #include <include/core/SkCanvas.h>
 #include <include/core/SkPaint.h>
@@ -44,6 +46,35 @@ void apply_foreground_color_to_brush(MyPaintBrush* brush, const Vector4f& rgba) 
     mypaint_brush_set_base_value(brush, MYPAINT_BRUSH_SETTING_COLOR_S, s);
     mypaint_brush_set_base_value(brush, MYPAINT_BRUSH_SETTING_COLOR_V, v);
 }
+
+// Make sure cfg.overrides has one entry per curated preset, seeded with the
+// preset's default tunables. Called everywhere we read overrides so that
+// older configs (or fresh-install configs without a saved overrides array)
+// gracefully fill in.
+void ensure_overrides_initialized(ToolConfiguration::MyPaintBrushToolConfig& cfg) {
+    const auto& presets = HVYM::Brushes::curated_presets();
+    const size_t need = presets.size();
+    if (cfg.overrides.size() < need) {
+        const size_t oldSize = cfg.overrides.size();
+        cfg.overrides.resize(need);
+        for (size_t i = oldSize; i < need; ++i) {
+            cfg.overrides[i].diameter = presets[i].defaults.diameter;
+            cfg.overrides[i].hardness = presets[i].defaults.hardness;
+            cfg.overrides[i].opacity  = presets[i].defaults.opacity;
+        }
+    } else if (cfg.overrides.size() > need) {
+        cfg.overrides.resize(need);
+    }
+}
+
+void apply_active_preset_with_overrides(MyPaintBrush* brush, ToolConfiguration::MyPaintBrushToolConfig& cfg) {
+    ensure_overrides_initialized(cfg);
+    const int idx = (cfg.activePresetIndex >= 0 && cfg.activePresetIndex < static_cast<int>(cfg.overrides.size()))
+                  ? cfg.activePresetIndex : 0;
+    HVYM::Brushes::apply_preset(brush, idx);
+    const auto& ov = cfg.overrides[idx];
+    HVYM::Brushes::apply_tunable_overrides(brush, ov.diameter, ov.hardness, ov.opacity);
+}
 }  // namespace
 #endif
 
@@ -51,11 +82,11 @@ MyPaintBrushTool::MyPaintBrushTool(DrawingProgram& initDrawP)
     : DrawingProgramToolBase(initDrawP) {
 #ifdef HVYM_HAS_LIBMYPAINT
     brush_ = mypaint_brush_new();
-    // Apply the persisted preset choice immediately so the tool is usable
-    // before the first stroke (e.g. cursor-radius preview pulls from the
-    // brush state). begin_stroke re-applies in case the user picks a
-    // different preset between strokes.
-    HVYM::Brushes::apply_preset(brush_, drawP.world.main.toolConfig.myPaintBrush.activePresetIndex);
+    // Apply the persisted preset (with the user's per-preset slider
+    // overrides on top) immediately so the tool is usable before the
+    // first stroke. begin_stroke re-applies in case the user picks a
+    // different preset or moves a slider between strokes.
+    apply_active_preset_with_overrides(brush_, drawP.world.main.toolConfig.myPaintBrush);
 #endif
 }
 
@@ -101,6 +132,62 @@ void MyPaintBrushTool::draw(SkCanvas* canvas, const DrawData& drawData) {
     canvas->drawPath(SkPath::Circle(pos.x(), pos.y(), screenRadius - 1.0f), linePaint);
 }
 
+#ifdef HVYM_HAS_LIBMYPAINT
+namespace {
+// Render the curated presets as a horizontal row of svg_icon_buttons. The
+// active preset is shown selected; clicking an icon updates the persisted
+// index and re-applies the preset to the live MyPaintBrush so the next
+// stroke uses it. Shared by both desktop and phone tool-options paths.
+void render_brush_picker_row(GUIStuff::GUIManager& gui,
+                             ToolConfiguration::MyPaintBrushToolConfig& cfg,
+                             MyPaintBrush* brush) {
+    using namespace GUIStuff;
+    using namespace GUIStuff::ElementHelpers;
+    ensure_overrides_initialized(cfg);
+    CLAY_AUTO_ID({
+        .layout = {
+            .sizing = { .width = CLAY_SIZING_FIT(0), .height = CLAY_SIZING_FIT(0) },
+            .childGap = 4,
+            .layoutDirection = CLAY_LEFT_TO_RIGHT
+        }
+    }) {
+        const auto& presets = HVYM::Brushes::curated_presets();
+        for (int i = 0; i < static_cast<int>(presets.size()); ++i) {
+            const auto& preset = presets[i];
+            svg_icon_button(gui, preset.name.c_str(), preset.iconPath, {
+                .drawType = SelectableButton::DrawType::TRANSPARENT_ALL,
+                .isSelected = (cfg.activePresetIndex == i),
+                .size = SMALL_BUTTON_SIZE + 4,
+                .onClick = [brush, &cfg, i] {
+                    cfg.activePresetIndex = i;
+                    apply_active_preset_with_overrides(brush, cfg);
+                }
+            });
+        }
+    }
+}
+
+void render_brush_tunable_sliders(GUIStuff::GUIManager& gui,
+                                  ToolConfiguration::MyPaintBrushToolConfig& cfg,
+                                  MyPaintBrush* brush) {
+    using namespace GUIStuff;
+    using namespace GUIStuff::ElementHelpers;
+    ensure_overrides_initialized(cfg);
+    const int idx = (cfg.activePresetIndex >= 0 && cfg.activePresetIndex < static_cast<int>(cfg.overrides.size()))
+                  ? cfg.activePresetIndex : 0;
+    auto& ov = cfg.overrides[idx];
+    auto onEdit = [brush, &cfg] {
+        apply_active_preset_with_overrides(brush, cfg);
+    };
+    // Diameter is libmypaint's RADIUS_LOGARITHMIC (log2 of pixel radius);
+    // -2..5 covers ~0.25 to ~32 pixel radius which spans every preset.
+    slider_scalar_field<float>(gui, "diameter", "Diameter", &ov.diameter, -2.0f, 5.0f, { .onEdit = onEdit });
+    slider_scalar_field<float>(gui, "hardness", "Hardness", &ov.hardness, 0.0f, 1.0f, { .onEdit = onEdit });
+    slider_scalar_field<float>(gui, "opacity",  "Opacity",  &ov.opacity,  0.0f, 1.0f, { .onEdit = onEdit });
+}
+}  // namespace
+#endif
+
 void MyPaintBrushTool::gui_toolbox(Toolbar&) {
 #ifdef HVYM_HAS_LIBMYPAINT
     using namespace GUIStuff;
@@ -110,17 +197,12 @@ void MyPaintBrushTool::gui_toolbox(Toolbar&) {
 
     gui.new_id("mypaint brush tool", [&] {
         text_label_centered(gui, "MyPaint Brush");
-        std::vector<std::pair<std::string_view, int>> options;
-        const auto& presets = HVYM::Brushes::curated_presets();
-        options.reserve(presets.size());
-        for (int i = 0; i < static_cast<int>(presets.size()); ++i)
-            options.emplace_back(std::string_view(presets[i].name), i);
-        radio_button_selector<int>(gui, "preset", &cfg.activePresetIndex, options, [this, &cfg] {
-            HVYM::Brushes::apply_preset(brush_, cfg.activePresetIndex);
-        });
+        render_brush_picker_row(gui, cfg, brush_);
+        render_brush_tunable_sliders(gui, cfg, brush_);
     });
 #endif
 }
+
 void MyPaintBrushTool::gui_phone_toolbox(PhoneDrawingProgramScreen&) {
 #ifdef HVYM_HAS_LIBMYPAINT
     using namespace GUIStuff;
@@ -129,14 +211,8 @@ void MyPaintBrushTool::gui_phone_toolbox(PhoneDrawingProgramScreen&) {
     auto& cfg = drawP.world.main.toolConfig.myPaintBrush;
 
     gui.new_id("mypaint brush tool phone", [&] {
-        std::vector<std::pair<std::string_view, int>> options;
-        const auto& presets = HVYM::Brushes::curated_presets();
-        options.reserve(presets.size());
-        for (int i = 0; i < static_cast<int>(presets.size()); ++i)
-            options.emplace_back(std::string_view(presets[i].name), i);
-        radio_button_selector<int>(gui, "preset", &cfg.activePresetIndex, options, [this, &cfg] {
-            HVYM::Brushes::apply_preset(brush_, cfg.activePresetIndex);
-        });
+        render_brush_picker_row(gui, cfg, brush_);
+        render_brush_tunable_sliders(gui, cfg, brush_);
     });
 #endif
 }
@@ -177,12 +253,13 @@ void MyPaintBrushTool::begin_stroke(const Vector2f& canvasPos, float pressure) {
     // mypaint_brush_new_stroke clears stroke-local timers. Without _reset,
     // a new stroke linearly interpolates from the previous stroke's last
     // dab position, painting a connecting line across canvas gaps.
-    // Re-apply the current preset before each stroke so a picker change
-    // between strokes takes effect even if the picker callback didn't run
-    // (e.g. config loaded from disk, multi-window edits). Palette color
-    // overrides the preset's COLOR_H/S/V so the user's chosen foreground
-    // wins regardless of which preset is active.
-    HVYM::Brushes::apply_preset(brush_, drawP.world.main.toolConfig.myPaintBrush.activePresetIndex);
+    // Re-apply the current preset (canonical defaults + per-preset slider
+    // overrides) before each stroke so any picker/slider change between
+    // strokes takes effect even if its onEdit callback didn't run (e.g.
+    // config loaded from disk). Palette color overrides preset COLOR_H/S/V
+    // so the user's chosen foreground wins regardless of which preset is
+    // active.
+    apply_active_preset_with_overrides(brush_, drawP.world.main.toolConfig.myPaintBrush);
     apply_foreground_color_to_brush(brush_, drawP.world.main.toolConfig.globalConf.foregroundColor);
 
     mypaint_brush_reset(brush_);

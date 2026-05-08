@@ -20,8 +20,20 @@ namespace HVYM::Brushes {
 // configurations from external .myb JSON files is a follow-up — the public
 // shape (BrushPreset list with name + apply function) is stable across
 // that swap.
+// User-tunable subset of MyPaintBrush settings, surfaced as sliders in the
+// brush picker. Each preset declares its canonical defaults; the tool layer
+// stores per-preset overrides separately and writes them on top of apply()
+// at stroke start (see MyPaintBrushTool::begin_stroke).
+struct BrushPresetDefaults {
+    float diameter;  // MYPAINT_BRUSH_SETTING_RADIUS_LOGARITHMIC
+    float hardness;  // MYPAINT_BRUSH_SETTING_HARDNESS
+    float opacity;   // MYPAINT_BRUSH_SETTING_OPAQUE
+};
+
 struct BrushPreset {
     std::string name;
+    std::string iconPath;  // svg under data/icons/, e.g. "data/icons/technical-pen.svg"
+    BrushPresetDefaults defaults;
     void (*apply)(MyPaintBrush*);
 };
 
@@ -29,6 +41,11 @@ const std::vector<BrushPreset>& curated_presets();
 
 // Apply preset at presetIndex. Out-of-range index falls back to preset 0.
 void apply_preset(MyPaintBrush* brush, int presetIndex);
+
+// Write the three tunable values onto an already-apply()'d brush. Used by
+// the tool to layer per-preset slider overrides on top of canonical
+// defaults at stroke start.
+void apply_tunable_overrides(MyPaintBrush* brush, float diameter, float hardness, float opacity);
 
 }  // namespace HVYM::Brushes
 

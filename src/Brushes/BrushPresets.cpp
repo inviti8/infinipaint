@@ -42,12 +42,15 @@ void set_linear_pressure_mapping(MyPaintBrush* b, MyPaintBrushSetting setting,
 
 void apply_technical_pen(MyPaintBrush* b) {
     reset_base_values(b);
-    // Uniform width, hard edges. No pressure variance.
+    // Hard edges with very slight pressure variance — much subtler than
+    // Fine inker (-0.3..+0.2) or Brush pen (-1.5..+0.8). Just enough to
+    // give the line some life without losing the technical-pen feel.
     mypaint_brush_set_base_value(b, MYPAINT_BRUSH_SETTING_RADIUS_LOGARITHMIC, 1.0f);
     mypaint_brush_set_base_value(b, MYPAINT_BRUSH_SETTING_HARDNESS, 1.0f);
     mypaint_brush_set_base_value(b, MYPAINT_BRUSH_SETTING_OPAQUE, 1.0f);
     mypaint_brush_set_base_value(b, MYPAINT_BRUSH_SETTING_DABS_PER_BASIC_RADIUS, 6.0f);
     mypaint_brush_set_base_value(b, MYPAINT_BRUSH_SETTING_DABS_PER_ACTUAL_RADIUS, 6.0f);
+    set_linear_pressure_mapping(b, MYPAINT_BRUSH_SETTING_RADIUS_LOGARITHMIC, -2.0f, 1.0f);
 }
 
 void apply_fine_inker(MyPaintBrush* b) {
@@ -98,13 +101,15 @@ void apply_reserved(MyPaintBrush* b) {
     apply_fine_inker(b);
 }
 
+// defaults must mirror the values set by each apply_* function below; the
+// slider UI uses these to seed the per-preset overrides on first use.
 const std::vector<BrushPreset> kPresets = {
-    { "Technical pen", apply_technical_pen },
-    { "Fine inker",    apply_fine_inker    },
-    { "Brush pen",     apply_brush_pen     },
-    { "Fine marker",   apply_fine_marker   },
-    { "Broad marker",  apply_broad_marker  },
-    { "Reserved",      apply_reserved      },
+    { "Technical pen", "data/icons/technical-pen.svg", { 1.0f, 1.00f, 1.0f }, apply_technical_pen },
+    { "Fine inker",    "data/icons/fine-inker.svg",    { 1.5f, 0.95f, 1.0f }, apply_fine_inker    },
+    { "Brush pen",     "data/icons/brush-pen.svg",     { 2.0f, 0.85f, 1.0f }, apply_brush_pen     },
+    { "Fine marker",   "data/icons/fine-marker.svg",   { 1.6f, 0.60f, 0.5f }, apply_fine_marker   },
+    { "Broad marker",  "data/icons/broad-marker.svg",  { 3.0f, 0.35f, 0.4f }, apply_broad_marker  },
+    { "Reserved",      "data/icons/reserved.svg",      { 1.5f, 0.95f, 1.0f }, apply_reserved      },
 };
 
 }  // namespace
@@ -119,6 +124,13 @@ void apply_preset(MyPaintBrush* brush, int presetIndex) {
     if (list.empty()) return;
     const int safe = (presetIndex >= 0 && presetIndex < static_cast<int>(list.size())) ? presetIndex : 0;
     list[safe].apply(brush);
+}
+
+void apply_tunable_overrides(MyPaintBrush* brush, float diameter, float hardness, float opacity) {
+    if (!brush) return;
+    mypaint_brush_set_base_value(brush, MYPAINT_BRUSH_SETTING_RADIUS_LOGARITHMIC, diameter);
+    mypaint_brush_set_base_value(brush, MYPAINT_BRUSH_SETTING_HARDNESS, hardness);
+    mypaint_brush_set_base_value(brush, MYPAINT_BRUSH_SETTING_OPAQUE, opacity);
 }
 
 }  // namespace HVYM::Brushes
