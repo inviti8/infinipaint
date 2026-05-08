@@ -43,6 +43,11 @@ class WaypointTool : public DrawingProgramToolBase {
         // into the active layer. Selects the new waypoint.
         void drop_waypoint(const Vector2f& clickPos);
 
+        // Shift+click handler: if the click hit an existing waypoint and
+        // a different waypoint is selected, append an Edge from selection
+        // to the clicked one. Returns true if an edge was created.
+        bool try_create_edge_to_clicked(const Vector2f& clickPos);
+
         // Selection state — most-recently-clicked or dropped waypoint.
         // Drives gui_toolbox's label editor and draw()'s framing-rect
         // outline. Cleared when the tool is switched away from.

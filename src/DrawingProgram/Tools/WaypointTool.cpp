@@ -17,6 +17,8 @@
 #include <include/core/SkPath.h>
 #include <include/core/SkPathBuilder.h>
 
+#include <SDL3/SDL_keyboard.h>
+
 WaypointTool::WaypointTool(DrawingProgram& initDrawP)
     : DrawingProgramToolBase(initDrawP) {}
 
@@ -38,10 +40,36 @@ void WaypointTool::erase_component(CanvasComponentContainer::ObjInfo*) {
 void WaypointTool::tool_update() {}
 
 void WaypointTool::draw(SkCanvas* canvas, const DrawData& drawData) {
-    // Render the framing-rect outline for the selected waypoint, in
-    // current cam-space. The 4 corners are the waypoint viewport's
-    // (0,0)..(W,H) rectangle, transformed waypoint-local -> world ->
-    // current-cam-space via CoordSpaceHelper::from_this_to_cam_space.
+    // Anchor for an edge endpoint or a framing-rect overlay: the screen
+    // position of the waypoint's framing-rect center in current cam-space.
+    const auto wp_anchor_in_cam_space = [&](const Waypoint& wp) -> Vector2f {
+        const Vector<int32_t, 2> ws = wp.get_window_size();
+        const Vector2f localCenter(static_cast<float>(ws.x()) * 0.5f,
+                                   static_cast<float>(ws.y()) * 0.5f);
+        return wp.get_coords().from_this_to_cam_space(drawP.world, localCenter);
+    };
+
+    // Faint outgoing-edge previews — PHASE1.md §5 author-mode chrome.
+    // Drawn for every edge in the graph, not just those touching the
+    // current selection: the visual is "the directed graph as-is".
+    auto& edges = drawP.world.wpGraph.get_edges();
+    if (edges) {
+        SkPaint edgePaint;
+        edgePaint.setAntiAlias(drawData.skiaAA);
+        edgePaint.setStyle(SkPaint::kStroke_Style);
+        edgePaint.setStrokeWidth(0.0f);
+        edgePaint.setColor4f({0.88f, 0.69f, 0.25f, 0.45f});  // muted gold, semi-transparent
+        for (auto& info : *edges) {
+            auto fromRef = drawP.world.netObjMan.get_obj_temporary_ref_from_id<Waypoint>(info.obj->get_from());
+            auto toRef   = drawP.world.netObjMan.get_obj_temporary_ref_from_id<Waypoint>(info.obj->get_to());
+            if (!fromRef || !toRef) continue;
+            const Vector2f a = wp_anchor_in_cam_space(*fromRef);
+            const Vector2f b = wp_anchor_in_cam_space(*toRef);
+            canvas->drawLine(a.x(), a.y(), b.x(), b.y(), edgePaint);
+        }
+    }
+
+    // Selected waypoint's framing-rect outline.
     if (!hasSelection) return;
     auto wpRef = drawP.world.netObjMan.get_obj_temporary_ref_from_id<Waypoint>(selectedWaypointId);
     if (!wpRef) return;
@@ -108,6 +136,14 @@ void WaypointTool::input_mouse_button_on_canvas_callback(const InputManager::Mou
     if (drawP.world.main.g.gui.cursor_obstructed()) return;
     if (!drawP.layerMan.is_a_layer_being_edited()) return;
 
+    // Shift+click on a waypoint creates an edge from the currently selected
+    // waypoint to the clicked one. Provides a way to test edges before M6
+    // lands the tree-window edge editor; remains a useful shortcut after.
+    const bool shiftHeld = (SDL_GetModState() & SDL_KMOD_SHIFT) != 0;
+    if (shiftHeld && hasSelection) {
+        if (try_create_edge_to_clicked(button.pos)) return;
+    }
+
     // Hit-test first; clicking on an existing waypoint focuses the camera
     // there. Only fall through to dropping a new waypoint if the click
     // missed every existing marker.
@@ -145,6 +181,35 @@ bool WaypointTool::try_focus_existing_waypoint(const Vector2f& clickPos) {
     drawP.world.drawData.cam.smooth_move_to(drawP.world, wpRef->get_coords(), wpRef->get_window_size().cast<float>());
     selectedWaypointId = hitId;
     hasSelection = true;
+    return true;
+}
+
+bool WaypointTool::try_create_edge_to_clicked(const Vector2f& clickPos) {
+    // Reuse the focus-path's hit-test (single-point wide-line collider)
+    // but DON'T focus the camera. Just find the hit waypoint id and add
+    // an edge.
+    SCollision::ColliderCollection<float> cC;
+    SCollision::generate_wide_line(cC, clickPos, clickPos,
+                                   WaypointCanvasComponent::MARKER_RADIUS_PX * 2.0f, true);
+    const auto cCWorld = drawP.world.drawData.cam.c.collider_to_world<SCollision::ColliderCollection<WorldScalar>, SCollision::ColliderCollection<float>>(cC);
+
+    NetworkingObjects::NetObjID hitId{};
+    bool hit = false;
+    drawP.drawCache.traverse_bvh_run_function(cCWorld.bounds, [&](const auto& bvhNode) {
+        drawP.drawCache.node_loop_components(bvhNode, [&](auto c) {
+            if (hit) return;
+            if (c->obj->get_comp().get_type() != CanvasComponentType::WAYPOINT) return;
+            if (!c->obj->collides_with(drawP.world.drawData.cam.c, cCWorld, cC)) return;
+            hitId = static_cast<const WaypointCanvasComponent&>(c->obj->get_comp()).get_waypoint_id();
+            hit = true;
+        });
+        return !hit;
+    });
+    if (!hit) return false;
+    if (hitId == selectedWaypointId) return false;  // self-edge: skip
+
+    auto& edges = drawP.world.wpGraph.get_edges();
+    edges->emplace_back_direct(edges, selectedWaypointId, hitId, std::optional<std::string>{});
     return true;
 }
 
