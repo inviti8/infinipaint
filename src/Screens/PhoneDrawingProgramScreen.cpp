@@ -1,6 +1,7 @@
 #include "PhoneDrawingProgramScreen.hpp"
 #include "../MainProgram.hpp"
 #include "../Waypoints/TreeView.hpp"
+#include "../ReaderMode/ReaderMode.hpp"
 #include "DrawingProgramScreen.hpp"
 #include "Helpers/ConvertVec.hpp"
 #include "../GUIStuff/Elements/GridScrollArea.hpp"
@@ -57,6 +58,11 @@ void PhoneDrawingProgramScreen::main_display() {
         // toggle remains reachable.
         if (!main.world->readerMode.is_active())
             bottom_toolbar();
+        // Branch-choice overlay is floating (attached to the screen's
+        // bottom-center), so the canvas gets full vertical space
+        // underneath while the buttons compose on top. Self-gates on
+        // reader-mode + branch-point.
+        render_reader_branch_overlay(*main.world, main.g.gui);
     }
 }
 

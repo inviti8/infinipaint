@@ -321,6 +321,14 @@ void World::input_key_callback(const InputManager::KeyCallbackArgs& key) {
 
 void World::input_mouse_button_callback(const InputManager::MouseButtonCallbackArgs& button) {
     if(!clientStillConnecting) {
+        // In reader mode the canvas-side tools shouldn't react to mouse
+        // input — only the GUI overlay (eye toggle, branch-choice
+        // buttons) should. Otherwise a click on a floating button can
+        // also be picked up by e.g. WaypointTool's marker-focus logic
+        // and silently navigate the camera without updating ReaderMode
+        // state.
+        if(readerMode.is_active())
+            return;
         drawProg.input_mouse_button_callback(button);
         drawData.cam.input_mouse_button_on_canvas_callback(*this, button);
     }
