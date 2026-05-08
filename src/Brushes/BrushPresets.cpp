@@ -103,12 +103,21 @@ void apply_fine_marker(MyPaintBrush* b) {
 
 void apply_broad_marker(MyPaintBrush* b) {
     reset_base_values(b);
-    // Large soft brush; lower opacity for marker-style buildup.
+    // Large soft brush; lower opacity for marker-style buildup. Lighter
+    // pressure drops opacity further (real broad markers fade out under
+    // a light hand). Heavier RADIUS_BY_RANDOM than the fine marker
+    // because the bigger tip has more edge to express texture across.
     mypaint_brush_set_base_value(b, MYPAINT_BRUSH_SETTING_RADIUS_LOGARITHMIC, 3.0f);
     mypaint_brush_set_base_value(b, MYPAINT_BRUSH_SETTING_HARDNESS, 0.35f);
     mypaint_brush_set_base_value(b, MYPAINT_BRUSH_SETTING_OPAQUE, 0.4f);
     mypaint_brush_set_base_value(b, MYPAINT_BRUSH_SETTING_DABS_PER_BASIC_RADIUS, 3.5f);
     mypaint_brush_set_base_value(b, MYPAINT_BRUSH_SETTING_DABS_PER_ACTUAL_RADIUS, 3.5f);
+    set_linear_pressure_mapping(b, MYPAINT_BRUSH_SETTING_OPAQUE, -0.2f, 0.0f);
+    mypaint_brush_set_base_value(b, MYPAINT_BRUSH_SETTING_RADIUS_BY_RANDOM, 0.25f);
+    // Elongated, tilted dab — reads as a blurred chisel-tip rectangle
+    // when combined with the soft (0.35) hardness above.
+    mypaint_brush_set_base_value(b, MYPAINT_BRUSH_SETTING_ELLIPTICAL_DAB_RATIO, 2.5f);
+    mypaint_brush_set_base_value(b, MYPAINT_BRUSH_SETTING_ELLIPTICAL_DAB_ANGLE, 20.0f);
 }
 
 void apply_reserved(MyPaintBrush* b) {
