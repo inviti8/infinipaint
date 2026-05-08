@@ -513,7 +513,9 @@ void DrawingProgram::tool_options_gui(Toolbar& t) {
     GUIStuff::GUIManager& gui = world.main.g.gui;
     auto& io = gui.io;
 
-    float minGUIWidth = drawTool->get_type() == DrawingProgramToolType::SCREENSHOT ? 300 : 200;
+    const auto activeToolType = drawTool->get_type();
+    float minGUIWidth = (activeToolType == DrawingProgramToolType::SCREENSHOT
+                       || activeToolType == DrawingProgramToolType::WAYPOINT) ? 400 : 200;
     gui.element<LayoutElement>("Drawing program tool options gui", [&] (LayoutElement*, const Clay_ElementId& lId) {
         CLAY(lId, {
             .layout = {

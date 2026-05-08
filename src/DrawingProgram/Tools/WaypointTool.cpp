@@ -7,8 +7,15 @@
 #include "../../CanvasComponents/CanvasComponentContainer.hpp"
 #include "../../Waypoints/Waypoint.hpp"
 #include "../../Waypoints/WaypointGraph.hpp"
+#include "../../GUIStuff/ElementHelpers/TextLabelHelpers.hpp"
+#include "../../GUIStuff/ElementHelpers/TextBoxHelpers.hpp"
 #include "Helpers/NetworkingObjects/NetObjTemporaryPtr.decl.hpp"
 #include "Helpers/SCollision.hpp"
+
+#include <include/core/SkCanvas.h>
+#include <include/core/SkPaint.h>
+#include <include/core/SkPath.h>
+#include <include/core/SkPathBuilder.h>
 
 WaypointTool::WaypointTool(DrawingProgram& initDrawP)
     : DrawingProgramToolBase(initDrawP) {}
@@ -17,16 +24,81 @@ DrawingProgramToolType WaypointTool::get_type() {
     return DrawingProgramToolType::WAYPOINT;
 }
 
-void WaypointTool::switch_tool(DrawingProgramToolType) {}
+void WaypointTool::switch_tool(DrawingProgramToolType) {
+    hasSelection = false;
+}
 
-void WaypointTool::erase_component(CanvasComponentContainer::ObjInfo*) {}
+void WaypointTool::erase_component(CanvasComponentContainer::ObjInfo*) {
+    // The selected waypoint's marker getting erased doesn't necessarily
+    // erase the waypoint itself (the canvas component is just a visual
+    // proxy), so don't drop selection here. M5 doesn't actually wire
+    // erase to delete the Waypoint anyway — that's a follow-up.
+}
 
 void WaypointTool::tool_update() {}
 
-void WaypointTool::draw(SkCanvas*, const DrawData&) {}
+void WaypointTool::draw(SkCanvas* canvas, const DrawData& drawData) {
+    // Render the framing-rect outline for the selected waypoint, in
+    // current cam-space. The 4 corners are the waypoint viewport's
+    // (0,0)..(W,H) rectangle, transformed waypoint-local -> world ->
+    // current-cam-space via CoordSpaceHelper::from_this_to_cam_space.
+    if (!hasSelection) return;
+    auto wpRef = drawP.world.netObjMan.get_obj_temporary_ref_from_id<Waypoint>(selectedWaypointId);
+    if (!wpRef) return;
+    const auto& coords = wpRef->get_coords();
+    const Vector<int32_t, 2> ws = wpRef->get_window_size();
+    if (ws.x() <= 0 || ws.y() <= 0) return;
 
-void WaypointTool::gui_toolbox(Toolbar&) {}
-void WaypointTool::gui_phone_toolbox(PhoneDrawingProgramScreen&) {}
+    const Vector2f corners[4] = {
+        coords.from_this_to_cam_space(drawP.world, Vector2f(0.0f, 0.0f)),
+        coords.from_this_to_cam_space(drawP.world, Vector2f(static_cast<float>(ws.x()), 0.0f)),
+        coords.from_this_to_cam_space(drawP.world, Vector2f(static_cast<float>(ws.x()), static_cast<float>(ws.y()))),
+        coords.from_this_to_cam_space(drawP.world, Vector2f(0.0f, static_cast<float>(ws.y()))),
+    };
+
+    SkPathBuilder pb;
+    pb.moveTo(corners[0].x(), corners[0].y());
+    for (int i = 1; i < 4; ++i) pb.lineTo(corners[i].x(), corners[i].y());
+    pb.close();
+
+    SkPaint outline;
+    outline.setAntiAlias(drawData.skiaAA);
+    outline.setStyle(SkPaint::kStroke_Style);
+    outline.setStrokeWidth(0.0f);
+    outline.setColor4f({0.88f, 0.69f, 0.25f, 1.0f});  // matches the marker fill — same gold
+    canvas->drawPath(pb.detach(), outline);
+}
+
+void WaypointTool::gui_toolbox(Toolbar&) {
+    using namespace GUIStuff;
+    using namespace ElementHelpers;
+    auto& gui = drawP.world.main.g.gui;
+    gui.new_id("waypoint tool", [&] {
+        text_label_centered(gui, "Waypoint");
+        if (hasSelection) {
+            auto wpRef = drawP.world.netObjMan.get_obj_temporary_ref_from_id<Waypoint>(selectedWaypointId);
+            if (wpRef) {
+                input_text_field(gui, "label", "Label", &wpRef->mutable_label());
+                return;
+            }
+        }
+        text_label(gui, "Click an existing marker, or click empty canvas to drop one.");
+    });
+}
+
+void WaypointTool::gui_phone_toolbox(PhoneDrawingProgramScreen&) {
+    using namespace GUIStuff;
+    using namespace ElementHelpers;
+    auto& gui = drawP.world.main.g.gui;
+    gui.new_id("waypoint tool phone", [&] {
+        if (hasSelection) {
+            auto wpRef = drawP.world.netObjMan.get_obj_temporary_ref_from_id<Waypoint>(selectedWaypointId);
+            if (wpRef)
+                input_text_field(gui, "label", "Label", &wpRef->mutable_label());
+        }
+    });
+}
+
 void WaypointTool::right_click_popup_gui(Toolbar&, Vector2f) {}
 bool WaypointTool::prevent_undo_or_redo() { return false; }
 
@@ -71,6 +143,8 @@ bool WaypointTool::try_focus_existing_waypoint(const Vector2f& clickPos) {
     auto wpRef = drawP.world.netObjMan.get_obj_temporary_ref_from_id<Waypoint>(hitId);
     if (!wpRef) return false;  // dangling ref — treat as miss
     drawP.world.drawData.cam.smooth_move_to(drawP.world, wpRef->get_coords(), wpRef->get_window_size().cast<float>());
+    selectedWaypointId = hitId;
+    hasSelection = true;
     return true;
 }
 
@@ -99,4 +173,7 @@ void WaypointTool::drop_waypoint(const Vector2f& clickPos) {
     container->send_comp_update(drawP, true);
     if (container->get_world_bounds().has_value())
         drawP.layerMan.add_undo_place_component(objInfo);
+
+    selectedWaypointId = newWaypointId;
+    hasSelection = true;
 }

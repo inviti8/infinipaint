@@ -1,6 +1,7 @@
 #pragma once
 #include "DrawingProgramToolBase.hpp"
 #include "../../CanvasComponents/CanvasComponentContainer.hpp"
+#include <Helpers/NetworkingObjects/NetObjID.hpp>
 
 class DrawingProgram;
 struct DrawData;
@@ -34,11 +35,17 @@ class WaypointTool : public DrawingProgramToolBase {
 
     private:
         // Returns true if the click landed on an existing waypoint
-        // (and the camera was smooth-moved to it). Otherwise the caller
-        // should fall through to the drop-a-new-waypoint path.
+        // (and the camera was smooth-moved to it, and selection updated).
+        // Otherwise the caller falls through to drop-a-new-waypoint.
         bool try_focus_existing_waypoint(const Vector2f& clickPos);
 
         // Drop a new Waypoint into WaypointGraph and a WaypointCanvasComponent
-        // into the active layer.
+        // into the active layer. Selects the new waypoint.
         void drop_waypoint(const Vector2f& clickPos);
+
+        // Selection state — most-recently-clicked or dropped waypoint.
+        // Drives gui_toolbox's label editor and draw()'s framing-rect
+        // outline. Cleared when the tool is switched away from.
+        NetworkingObjects::NetObjID selectedWaypointId{};
+        bool hasSelection = false;
 };
