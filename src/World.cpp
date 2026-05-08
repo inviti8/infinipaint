@@ -265,6 +265,13 @@ void World::input_paste_callback(const CustomEvents::PasteEvent& paste) {
 }
 
 void World::input_text_key_callback(const InputManager::KeyCallbackArgs& key) {
+    // Reader-mode navigation also hijacks arrow keys when a text input
+    // happens to be focused — otherwise an editor session ending while
+    // a text box still has focus would silently swallow the arrows.
+    if(readerMode.is_active() && key.down && !key.repeat) {
+        if(key.key == InputManager::KEY_GENERIC_RIGHT) { readerMode.forward(); return; }
+        if(key.key == InputManager::KEY_GENERIC_LEFT)  { readerMode.back();    return; }
+    }
     if(!clientStillConnecting)
         drawProg.input_text_key_callback(key);
 }
@@ -286,6 +293,15 @@ void World::input_drop_text_callback(const InputManager::DropCallbackArgs& drop)
 
 void World::input_key_callback(const InputManager::KeyCallbackArgs& key) {
     if(!clientStillConnecting) {
+        // Reader-mode navigation intercepts arrow keys ahead of the rest
+        // of the input chain. Arrow keys are dispatched as the unassignable
+        // KEY_GENERIC_LEFT/RIGHT codes (InputManager.cpp special-cases
+        // them outside the keyAssignments map, so a custom
+        // KEY_READER_FORWARD enum + binding wouldn't fire).
+        if(readerMode.is_active() && key.down && !key.repeat) {
+            if(key.key == InputManager::KEY_GENERIC_RIGHT) { readerMode.forward(); return; }
+            if(key.key == InputManager::KEY_GENERIC_LEFT)  { readerMode.back();    return; }
+        }
         switch(key.key) {
             case InputManager::KEY_REDO: {
                 if(key.down)
