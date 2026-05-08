@@ -833,6 +833,12 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
 // NOTE: On Android, SDL_AppQuit is triggered by onDestroy. onDestroy may or may not be called, and even if it is, it may only be partially called. You should not rely on it.
 void SDL_AppQuit(void *appstate, SDL_AppResult result) {
 #ifndef __ANDROID__
+    // SDL3 invokes SDL_AppQuit even when SDL_AppInit returned SDL_APP_SUCCESS
+    // before populating *appstate (e.g. our --mypaint-hello-dab and
+    // --mypaint-stroke-test bridge flags exit before MainStruct is allocated).
+    // Guard against the null/garbage pointer so those exits are clean.
+    if (!appstate) return;
+
     DrawingProgramCache::delete_all_draw_cache();
 
     MainStruct& mS = *((MainStruct*)appstate);
