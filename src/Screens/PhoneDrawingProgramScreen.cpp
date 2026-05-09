@@ -96,10 +96,44 @@ void PhoneDrawingProgramScreen::top_toolbar() {
                         }
                     });
                     text_label(gui, main.world->name);
-                    // Spacer that pushes the reader-mode toggle to the right edge.
+                    // Spacer that pushes the layer dropdown + reader toggle to the right edge.
                     CLAY_AUTO_ID({
                         .layout = {.sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_GROW(0)}}
                     }) {}
+                    // PHASE2 C4: Sketch / Color / Ink layer dropdown — picks
+                    // which named layer is the active edit target. Hidden in
+                    // reader mode (no edit target meaningful with chrome off).
+                    if (!main.world->readerMode.is_active()) {
+                        // Sync the dropdown's index from whichever named
+                        // layer editingLayer currently points at. If the
+                        // user has switched to a non-named (DEFAULT) layer
+                        // via the layer-manager side panel, the index keeps
+                        // its last value.
+                        if (auto editLock = main.world->drawProg.layerMan.get_editing_layer().lock()) {
+                            switch (editLock->get_kind()) {
+                                case LayerKind::SKETCH:  layerDropdownIndex = 0; break;
+                                case LayerKind::COLOR:   layerDropdownIndex = 1; break;
+                                case LayerKind::INK:     layerDropdownIndex = 2; break;
+                                case LayerKind::DEFAULT: break;
+                            }
+                        }
+                        static const std::vector<std::string> layerNames{"Sketch", "Color", "Ink"};
+                        CLAY_AUTO_ID({
+                            .layout = {.sizing = {.width = CLAY_SIZING_FIXED(140), .height = CLAY_SIZING_FIT(0)},
+                                       .padding = {.right = 4}}
+                        }) {
+                            gui.element<DropDown<size_t>>("layer kind dropdown", &layerDropdownIndex, layerNames, DropdownOptions{
+                                .onClick = [&] {
+                                    static constexpr LayerKind indexToKind[] = {
+                                        LayerKind::SKETCH, LayerKind::COLOR, LayerKind::INK
+                                    };
+                                    auto target = main.world->drawProg.layerMan.get_named_layer(indexToKind[layerDropdownIndex]);
+                                    if (!target.expired())
+                                        main.world->drawProg.layerMan.set_editing_layer(target);
+                                }
+                            });
+                        }
+                    }
                     // Reader-mode toggle: lives in the top toolbar (never
                     // hidden) so the user can exit reader mode after the
                     // bottom editor toolbar disappears.

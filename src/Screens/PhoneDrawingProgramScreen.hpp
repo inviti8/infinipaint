@@ -25,6 +25,11 @@ class PhoneDrawingProgramScreen : public DrawingProgramScreen {
             FG_COLOR,
             BG_COLOR
         } settingsMenuPopup = SettingsMenuPopup::NONE;
+        // PHASE2 C4: top-bar layer dropdown selection index.
+        // 0=Sketch, 1=Color, 2=Ink. Synced from the active layer's
+        // kind each frame; default Ink (matches the new-world default
+        // editingLayer).
+        size_t layerDropdownIndex = 2;
         struct ColorPickerPopupData {
             enum class ScreenType {
                 NORMAL,

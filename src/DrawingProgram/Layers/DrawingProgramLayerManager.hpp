@@ -68,6 +68,11 @@ class DrawingProgramLayerManager {
         // Returns the root-level layer with the given non-DEFAULT kind,
         // or an expired weak ptr if none exists.
         NetworkingObjects::NetObjWeakPtr<DrawingProgramLayerListItem> get_named_layer(LayerKind k);
+        // External access to the current edit target. Setter is used by
+        // the top-bar layer dropdown; the layer-manager side panel
+        // continues to assign editingLayer directly via friend access.
+        NetworkingObjects::NetObjWeakPtr<DrawingProgramLayerListItem> get_editing_layer() const { return editingLayer; }
+        void set_editing_layer(NetworkingObjects::NetObjWeakPtr<DrawingProgramLayerListItem> l) { editingLayer = l; }
 
         CanvasComponentContainer::ObjInfo* add_component_to_layer_being_edited(CanvasComponentContainer* newObj);
         std::vector<CanvasComponentContainer::ObjInfoIterator> add_many_components_to_layer_being_edited(const std::vector<std::pair<CanvasComponentContainer::ObjInfoIterator, CanvasComponentContainer*>>& newObjs);
