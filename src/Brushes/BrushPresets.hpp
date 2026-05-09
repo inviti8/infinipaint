@@ -30,11 +30,25 @@ struct BrushPresetDefaults {
     float opacity;   // MYPAINT_BRUSH_SETTING_OPAQUE
 };
 
+// PHASE2 M3 follow-up: brush family. SHARP brushes (technical pen, fine
+// inker, brush pen) render as crisp, uniform-color lines and convert
+// cleanly to vector via StrokeVectorizeTool. TEXTURED brushes (fine
+// marker, broad marker, wet ink) carry the wet/blotchy/spatter look as
+// emergent properties of per-dab randomness — the vector representation
+// can't reproduce that, so recording is intentionally suppressed for
+// TEXTURED strokes (has_valid_recording stays false; vectorize tool
+// skips them).
+enum class BrushCategory : uint8_t {
+    SHARP    = 0,
+    TEXTURED = 1
+};
+
 struct BrushPreset {
     std::string name;
     std::string iconPath;  // svg under data/icons/, e.g. "data/icons/technical-pen.svg"
     BrushPresetDefaults defaults;
     void (*apply)(MyPaintBrush*);
+    BrushCategory category;
 };
 
 const std::vector<BrushPreset>& curated_presets();

@@ -144,12 +144,12 @@ void apply_wet_ink(MyPaintBrush* b) {
 // defaults must mirror the values set by each apply_* function below; the
 // slider UI uses these to seed the per-preset overrides on first use.
 const std::vector<BrushPreset> kPresets = {
-    { "Technical pen", "data/icons/technical-pen.svg", { 1.0f, 1.00f, 1.0f }, apply_technical_pen },
-    { "Fine inker",    "data/icons/fine-inker.svg",    { 1.5f, 1.00f, 1.0f }, apply_fine_inker    },
-    { "Brush pen",     "data/icons/brush-pen.svg",     { 2.0f, 0.85f, 1.0f }, apply_brush_pen     },
-    { "Fine marker",   "data/icons/fine-marker.svg",   { 1.6f, 0.60f, 0.7f }, apply_fine_marker   },
-    { "Broad marker",  "data/icons/broad-marker.svg",  { 3.0f, 0.35f, 0.4f }, apply_broad_marker  },
-    { "Wet ink",       "data/icons/wet-ink.svg",       { 1.8f, 0.55f, 1.0f }, apply_wet_ink       },
+    { "Technical pen", "data/icons/technical-pen.svg", { 1.0f, 1.00f, 1.0f }, apply_technical_pen, BrushCategory::SHARP    },
+    { "Fine inker",    "data/icons/fine-inker.svg",    { 1.5f, 1.00f, 1.0f }, apply_fine_inker,    BrushCategory::SHARP    },
+    { "Brush pen",     "data/icons/brush-pen.svg",     { 2.0f, 0.85f, 1.0f }, apply_brush_pen,     BrushCategory::SHARP    },
+    { "Fine marker",   "data/icons/fine-marker.svg",   { 1.6f, 0.60f, 0.7f }, apply_fine_marker,   BrushCategory::TEXTURED },
+    { "Broad marker",  "data/icons/broad-marker.svg",  { 3.0f, 0.35f, 0.4f }, apply_broad_marker,  BrushCategory::TEXTURED },
+    { "Wet ink",       "data/icons/wet-ink.svg",       { 1.8f, 0.55f, 1.0f }, apply_wet_ink,       BrushCategory::TEXTURED },
 };
 
 }  // namespace

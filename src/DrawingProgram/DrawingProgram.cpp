@@ -22,6 +22,7 @@
 #include <Helpers/NetworkingObjects/NetObjID.hpp>
 #include <Helpers/StringHelpers.hpp>
 #include "Tools/LassoSelectTool.hpp"
+#include "../Brushes/BrushPresets.hpp"
 #include <Helpers/Logger.hpp>
 #include <Helpers/Parallel.hpp>
 #include <cereal/types/unordered_set.hpp>
@@ -377,7 +378,41 @@ void DrawingProgram::toolbar_gui(Toolbar& t) {
                 };
 
                 tool_button("Brush Toolbar Button", "data/icons/brush.svg", DrawingProgramToolType::BRUSH);
-                tool_button("MyPaint Brush Toolbar Button", "data/icons/ink.svg", DrawingProgramToolType::MYPAINTBRUSH);
+
+                // PHASE2 M3 follow-up: split MyPaint brush into two
+                // category buttons. See PhoneDrawingProgramScreen for
+                // full rationale.
+                {
+                    const auto& presets = HVYM::Brushes::curated_presets();
+                    auto& cfg = world.main.toolConfig.myPaintBrush;
+                    const HVYM::Brushes::BrushCategory activeCat =
+                        (cfg.activePresetIndex >= 0 && cfg.activePresetIndex < static_cast<int>(presets.size()))
+                            ? presets[cfg.activePresetIndex].category
+                            : HVYM::Brushes::BrushCategory::SHARP;
+                    const bool toolIsMyPaint = drawTool->get_type() == DrawingProgramToolType::MYPAINTBRUSH;
+                    auto activate_category = [&](HVYM::Brushes::BrushCategory cat) {
+                        switch_to_tool(DrawingProgramToolType::MYPAINTBRUSH);
+                        const auto& ps = HVYM::Brushes::curated_presets();
+                        auto& c = world.main.toolConfig.myPaintBrush;
+                        if (c.activePresetIndex < 0 || c.activePresetIndex >= static_cast<int>(ps.size())
+                            || ps[c.activePresetIndex].category != cat) {
+                            for (int i = 0; i < static_cast<int>(ps.size()); ++i) {
+                                if (ps[i].category == cat) { c.activePresetIndex = i; break; }
+                            }
+                        }
+                    };
+                    svg_icon_button(gui, "Ink Brushes Toolbar Button", "data/icons/ink.svg", {
+                        .drawType = SelectableButton::DrawType::TRANSPARENT_ALL,
+                        .isSelected = toolIsMyPaint && activeCat == HVYM::Brushes::BrushCategory::SHARP,
+                        .onClick = [activate_category] { activate_category(HVYM::Brushes::BrushCategory::SHARP); }
+                    });
+                    svg_icon_button(gui, "Textured Brushes Toolbar Button", "data/icons/pencil.svg", {
+                        .drawType = SelectableButton::DrawType::TRANSPARENT_ALL,
+                        .isSelected = toolIsMyPaint && activeCat == HVYM::Brushes::BrushCategory::TEXTURED,
+                        .onClick = [activate_category] { activate_category(HVYM::Brushes::BrushCategory::TEXTURED); }
+                    });
+                }
+
                 tool_button("Waypoint Toolbar Button", "data/icons/bookmark.svg", DrawingProgramToolType::WAYPOINT);
                 tool_button("Button Select Toolbar Button", "data/icons/button-select.svg", DrawingProgramToolType::BUTTONSELECT);
                 tool_button("Stroke Vectorize Toolbar Button", "data/icons/pixel-to-vector.svg", DrawingProgramToolType::STROKEVECTORIZE);

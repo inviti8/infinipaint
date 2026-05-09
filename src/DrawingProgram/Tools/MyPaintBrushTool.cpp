@@ -152,8 +152,17 @@ void render_brush_picker_row(GUIStuff::GUIManager& gui,
         }
     }) {
         const auto& presets = HVYM::Brushes::curated_presets();
+        // PHASE2 M3 follow-up: filter the picker to presets in the
+        // currently-active brush category (driven by which top-toolbar
+        // brush button the user picked: SHARP for the ink button,
+        // TEXTURED for the marker/wet-ink button).
+        HVYM::Brushes::BrushCategory activeCat =
+            (cfg.activePresetIndex >= 0 && cfg.activePresetIndex < static_cast<int>(presets.size()))
+                ? presets[cfg.activePresetIndex].category
+                : HVYM::Brushes::BrushCategory::SHARP;
         for (int i = 0; i < static_cast<int>(presets.size()); ++i) {
             const auto& preset = presets[i];
+            if (preset.category != activeCat) continue;
             svg_icon_button(gui, preset.name.c_str(), preset.iconPath, {
                 .drawType = SelectableButton::DrawType::TRANSPARENT_ALL,
                 .isSelected = (cfg.activePresetIndex == i),
@@ -273,13 +282,29 @@ void MyPaintBrushTool::begin_stroke(const Vector2f& canvasPos, float pressure) {
     // RADIUS_LOGARITHMIC setting (libmypaint stores radius as
     // ln(radius_in_pixels)) so the M2 Schneider-fit pass can recover
     // per-sample width as baseRadius * pressure-derived factor.
+    //
+    // M3 follow-up: TEXTURED-category brushes (wet ink, markers) are
+    // intentionally NOT recorded. Their visual character is emergent
+    // from per-dab randomness; the vector representation can't reproduce
+    // it, so we'd rather have StrokeVectorize naturally skip them than
+    // produce a misleading "vectorized" output that loses the texture.
     {
-        const Vector4f& fg = drawP.world.main.toolConfig.globalConf.foregroundColor;
-        const float radiusLog = mypaint_brush_get_base_value(brush_, MYPAINT_BRUSH_SETTING_RADIUS_LOGARITHMIC);
-        layer.begin_recorded_stroke(Eigen::Vector3f{fg.x(), fg.y(), fg.z()}, std::exp(radiusLog));
-        // Container's coords were just set to the camera coords above,
-        // so canvasPos is already in component-local space at this instant.
-        layer.record_stroke_sample(canvasPos.x(), canvasPos.y(), pressure);
+        const auto& presets = HVYM::Brushes::curated_presets();
+        auto& cfg = drawP.world.main.toolConfig.myPaintBrush;
+        const HVYM::Brushes::BrushCategory cat =
+            (cfg.activePresetIndex >= 0 && cfg.activePresetIndex < static_cast<int>(presets.size()))
+                ? presets[cfg.activePresetIndex].category
+                : HVYM::Brushes::BrushCategory::SHARP;
+        if (cat == HVYM::Brushes::BrushCategory::SHARP) {
+            const Vector4f& fg = drawP.world.main.toolConfig.globalConf.foregroundColor;
+            const float radiusLog = mypaint_brush_get_base_value(brush_, MYPAINT_BRUSH_SETTING_RADIUS_LOGARITHMIC);
+            layer.begin_recorded_stroke(Eigen::Vector3f{fg.x(), fg.y(), fg.z()}, std::exp(radiusLog));
+            // Container's coords were just set to the camera coords above,
+            // so canvasPos is already in component-local space at this instant.
+            layer.record_stroke_sample(canvasPos.x(), canvasPos.y(), pressure);
+        }
+        // For TEXTURED, no begin_recorded_stroke → has_valid_recording()
+        // returns false → vectorize tool skips this stroke.
     }
 
     MyPaintSurface* surf = layer.surface().surface();
