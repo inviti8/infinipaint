@@ -254,7 +254,32 @@ void PhoneDrawingProgramScreen::bottom_toolbar_gui() {
     GUIManager& gui = main.g.gui;
     auto& drawP = main.world->drawProg;
 
+    // PHASE2 C6: vector tools that produce non-MyPaint canvas
+    // components are hidden from the toolbar when the active layer
+    // is Sketch (raster-only). Greying-with-tooltip would be the
+    // ideal UX but the SelectableButton primitive has no disabled
+    // state yet; hiding is the simplest correct behavior. The
+    // raster-friendly tools (MyPaintBrush, Eraser), the world-level
+    // tools (Waypoint, ButtonSelect), the selection/edit/inspection
+    // tools, and the camera tools all stay available.
+    bool sketchActive = false;
+    if(auto editLock = drawP.layerMan.get_editing_layer().lock())
+        sketchActive = (editLock->get_kind() == LayerKind::SKETCH);
+    auto is_vector_tool = [](DrawingProgramToolType t) {
+        switch(t) {
+            case DrawingProgramToolType::BRUSH:
+            case DrawingProgramToolType::LINE:
+            case DrawingProgramToolType::TEXTBOX:
+            case DrawingProgramToolType::ELLIPSE:
+            case DrawingProgramToolType::RECTANGLE:
+                return true;
+            default:
+                return false;
+        }
+    };
+
     auto tool_button = [&](const char* id, const std::string& svgPath, DrawingProgramToolType toolType) {
+        if(sketchActive && is_vector_tool(toolType)) return;
         svg_icon_button(gui, id, svgPath, {
             .drawType = SelectableButton::DrawType::TRANSPARENT_ALL,
             .isSelected = drawP.drawTool->get_type() == toolType,

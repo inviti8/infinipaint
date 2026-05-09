@@ -126,15 +126,20 @@ void DrawingProgramLayerManagerGUI::setup_list_gui() {
                             }
                         });
                     });
-                    gui.set_z_index_keep_clipping_region(gui.get_z_index() + 1, [&] {
-                        svg_icon_button(gui, "delete button", "data/icons/trash.svg", {
-                            .drawType = SelectableButton::DrawType::TRANSPARENT_ALL,
-                            .size = TreeListing::ENTRY_HEIGHT,
-                            .onClick = [&, objIndex] {
-                                remove_layer(objIndex);
-                            }
+                    // PHASE2 C5: hide the delete button on named layers
+                    // (Sketch / Color / Ink). They're document-level
+                    // anchors managed by the layer manager itself.
+                    if(layer->get_kind() == LayerKind::DEFAULT) {
+                        gui.set_z_index_keep_clipping_region(gui.get_z_index() + 1, [&] {
+                            svg_icon_button(gui, "delete button", "data/icons/trash.svg", {
+                                .drawType = SelectableButton::DrawType::TRANSPARENT_ALL,
+                                .size = TreeListing::ENTRY_HEIGHT,
+                                .onClick = [&, objIndex] {
+                                    remove_layer(objIndex);
+                                }
+                            });
                         });
-                    });
+                    }
                 },
                 .onDoubleClick = [&](const TreeListingObjIndexList& objIndex) {
                     layerMan.editingLayer = get_layer_from_obj_index(objIndex);
@@ -394,15 +399,27 @@ void DrawingProgramLayerManagerGUI::setup_list_gui() {
         auto editingLayerLock = editingLayer.lock();
         if(editingLayerLock) {
             text_label_centered(gui, editingLayerLock->is_folder() ? "Edit Layer Folder" : "Edit Layer");
-            input_text_field(gui, "input edit name", "Name", &nameToEdit, {
-                .onEdit = [&] {
-                    auto editingLayerLock = editingLayer.lock();
-                    if(editingLayerLock) { // This can be set to null on the way here (close layer popup when textbox is selected)
-                        editingLayerLock->set_name(world.delayedUpdateObjectManager, nameToEdit);
-                        world.main.g.gui.set_to_layout();
+            // PHASE2 C5: rename is locked for named layers (Sketch /
+            // Color / Ink) — their names carry semantic meaning and
+            // shouldn't drift. Render a static label instead of an
+            // editable field. Alpha + blend mode below stay editable.
+            if(editingLayerLock->get_kind() != LayerKind::DEFAULT) {
+                left_to_right_line_layout(gui, [&]() {
+                    text_label(gui, "Name");
+                    text_label(gui, editingLayerLock->get_name() + "  (system layer)");
+                });
+            }
+            else {
+                input_text_field(gui, "input edit name", "Name", &nameToEdit, {
+                    .onEdit = [&] {
+                        auto editingLayerLock = editingLayer.lock();
+                        if(editingLayerLock) { // This can be set to null on the way here (close layer popup when textbox is selected)
+                            editingLayerLock->set_name(world.delayedUpdateObjectManager, nameToEdit);
+                            world.main.g.gui.set_to_layout();
+                        }
                     }
-                }
-            });
+                });
+            }
             slider_scalar_field(gui, "input alpha slider", "Alpha", &alphaValToEdit, 0.0f, 1.0f, {
                 .decimalPrecision = 2,
                 .onEdit = [&] {
@@ -513,6 +530,16 @@ void DrawingProgramLayerManagerGUI::remove_layer(const GUIStuff::TreeListingObjI
     refresh_gui_data();
 
     auto& world = layerMan.drawP.world;
+    // PHASE2 C5: defensive guard. The delete button is hidden for
+    // named layers, but if any other code path ever reaches here
+    // for a named layer (bulk-delete shortcut, undo replay, etc.)
+    // we refuse — the manager's ensure_named_layers invariant
+    // depends on the three named layers persisting.
+    {
+        auto layerToCheck = get_layer_from_obj_index(objIndex);
+        if(layerToCheck && layerToCheck->get_kind() != LayerKind::DEFAULT)
+            return;
+    }
     class DeleteLayerWorldUndoAction : public WorldUndoAction {
         public:
             DeleteLayerWorldUndoAction(std::unique_ptr<DrawingProgramLayerListItemUndoData> initLayerData, uint32_t newPos, WorldUndoManager::UndoObjectID initParentUndoID, WorldUndoManager::UndoObjectID initUndoID):
