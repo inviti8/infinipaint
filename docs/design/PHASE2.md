@@ -8,11 +8,11 @@
 
 Phase 2 sharpens Inkternity into a comic-production tool that's meaningfully more useful than the sum of its Phase 1 pieces. Three additions:
 
-1. **Pixel-to-vector** — convert an ink-brush raster region (libmypaint tiles) into vector paths so artists can apply the existing transform/edit/recolor tooling on top of work originally drawn with raster brushes.
+1. **Stroke vectorization** — convert recorded libmypaint strokes inside an ink-layer region into vector paths so artists can apply the existing transform/edit/recolor tooling on top of work originally drawn with raster brushes. Per-stroke recording at draw time means the converter knows each stroke's exact color and source path; no marching-squares fidelity loss, no multi-color tracing problem.
 2. **Per-waypoint transition controls** — speed multiplier (and optionally easing curve) so the reader-mode camera transition between waypoints can feel snappy, lingering, dramatic, etc., per panel.
-3. **Sketch + production layers** — two semantically-distinct layer kinds with hard top-bar toggles, where only the production layer is visible in reader mode. Models the standard ink-over-pencils workflow.
+3. **Three-layer pipeline (Sketch → Color → Ink)** — three semantically-distinct layer kinds modelling the standard rough-color-ink production order. Sketch is hidden in reader mode (rough scratch space, raster-only); Color and Ink both render in reader mode. The active edit target is selected via a top-bar layer dropdown.
 
-Phase 2 ships under the same `.inkternity` extension; format bumps as needed for new on-disk fields.
+Phase 2 ships under the same `.inkternity` extension; format bumps as needed for new on-disk fields (stroke metadata + per-layer kind + per-waypoint transition fields).
 
 ## 2. Inheritance from Phase 1
 
@@ -27,71 +27,84 @@ Phase 1 left the following bits in shipped, working condition:
 
 Plus the `BezierEasing` + `DrawingProgramLayerManager` + `DrawingProgramSelection` machinery inherited from InfiniPaint. Phase 2 builds on this rather than replacing it.
 
-## 3. Workstream A — Pixel-to-vector
+## 3. Workstream A — Stroke vectorization
 
 ### Why
 
-libmypaint brushes produce expressive, natural-media linework — but it's stuck inside a `MyPaintLayerCanvasComponent`'s tile grid. None of Inkternity's vector tooling (RectSelect transform, EditTool color edit, layer reorder of individual strokes, Lasso, copy/paste of objects) can act on a libmypaint stroke; the whole layer is one opaque blob from the rest of the program's point of view. Pixel-to-vector cuts a chunk of raster out of that blob and replaces it with vector canvas components the rest of Inkternity already knows how to manipulate.
+libmypaint brushes produce expressive, natural-media linework — but it's stuck inside a `MyPaintLayerCanvasComponent`'s tile grid. None of Inkternity's vector tooling (RectSelect transform, EditTool color edit, layer reorder of individual strokes, Lasso, copy/paste of objects) can act on a libmypaint stroke; the whole layer is one opaque blob from the rest of the program's point of view. Stroke vectorization breaks out individual strokes and replaces them with vector canvas components the rest of Inkternity already knows how to manipulate.
 
 The user's framing: ink in raster mode for the brush feel, then convert to vector for downstream tooling.
 
+### The architectural choice: per-stroke recording, not pixel tracing
+
+The naïve approach is "pixel-trace the rendered tiles" — composite the tiles into a bitmap, run marching squares, fit Béziers, emit vectors. This works but loses fidelity at every step (corner rounding, thin-stroke breakup, color averaging) and breaks down on multi-color regions because the artist's freedom to pick any ink color makes "single-color tracing" insufficient.
+
+Phase 2 takes the better path: **record every libmypaint stroke at draw time** as an ordered list of dabs (position + radius + color + pressure-derived alpha) alongside the tiles those dabs already paint into. The tile data stays the same — that's what gets rendered for the brush feel — but a parallel stroke log preserves the *intent* of each stroke. Vectorization then walks the stroke log inside the selection and emits one vector path per recorded stroke, with that stroke's exact color and a pressure-aware variable-width spine.
+
+Concretely, this gives us:
+
+- **Perfect color preservation** per stroke; multi-color ink layers convert correctly because each stroke is by definition single-color.
+- **Perfect ordering** — strokes emit in the order they were drawn, so over-strokes layer correctly.
+- **Pressure-derived width variation** preserved as variable-width spines (cubic-Bezier polylines with per-vertex width).
+- **No marching-squares detail loss** — the source path *is* the vector, modulo a smoothing pass.
+
+The cost is real but contained: `MyPaintLayerCanvasComponent` grows a stroke log alongside its tiles; the eraser must operate on both (raster dabs *and* trim/split recorded stroke segments); the file format adds a per-layer stroke list; pre-rebrand `.infpnt` files and `.inkternity` files written before this change have no stroke log at all and so cannot be vectorized (graceful degradation: the convert tool is a no-op on those layers, with a tooltip explaining why).
+
 ### Tool surface
 
-A new `PixelToVectorTool` (`DrawingProgramToolType::PIXEL_TO_VECTOR`) — registered alongside existing tools, toolbar icon `data/icons/pixel-to-vector.svg`. UX:
+A new `StrokeVectorizeTool` (`DrawingProgramToolType::STROKE_VECTORIZE`) — registered alongside existing tools, toolbar icon `data/icons/pixel-to-vector.svg`. UX:
 
 1. User selects the tool.
 2. User drags a rectangle (mirror `RectSelectTool` / `ButtonSelectTool` interaction) over the canvas region they want to convert.
-3. On release: the tool composites every `MyPaintLayerCanvasComponent` tile **that lives on a PRODUCTION-kind layer** intersecting the rect into one bounded RGBA bitmap, runs the conversion, and inserts new vector canvas components representing the result *into the same PRODUCTION layer*. The original raster pixels in that rect are erased from the PRODUCTION layer (eraser dabs into the same MyPaint surfaces, mirroring `MyPaintLayerCanvasComponent::erase_along_segment`).
+3. On release: the tool collects every recorded libmypaint stroke on **INK-kind layers** whose dab path intersects the selection rect, emits each one as a vector canvas component into the same INK layer, and erases the source stroke (both the recorded log entry and the rasterized dabs from the tiles, via existing eraser-dab geometry along the stroke spine).
+4. A translucent **preview overlay** of the converted vectors renders above the source raster before commit; user can confirm or cancel.
 
-**Sketch-layer pixels are explicitly excluded** from both the source composite and the erasure. Sketch is a raster-only scratch surface by design (Workstream C); pixel-to-vector ignores anything painted there. If the artist drags the tool over a region with no PRODUCTION raster pixels, it's a no-op.
+**Strokes on SKETCH and COLOR layers are ignored.** Sketch is raster-only scratch by design (Workstream C); color is freely raster-or-vector but its pre-ink state is intentionally left alone. If the selection contains zero recorded strokes on an ink layer, the tool is a no-op (no error popup).
 
-Rationale for "erase the source": leaving both in place would double-render the stroke and confuse the artist about which copy is authoritative. Replacement is the correct mental model.
+Strokes that *partially* intersect the selection are converted in full, not split — the rect picks "this stroke or not", not "this fragment of a stroke." Treats a stroke as the smallest atomic unit. (Splitting strokes geometrically is doable but not Phase 2 scope.)
 
-### Conversion algorithm — Phase 2A (alpha-channel single-color)
+### Conversion pipeline (per-stroke)
 
-Scope decision: Phase 2 ships **alpha-channel-only** tracing, treating the masked region as a single-color shape. Most ink/marker work is single-color anyway; the multi-color case is dramatically more complex (color quantization + per-band tracing + overlap resolution) and slots into Phase 3.
+For each recorded stroke selected for conversion:
 
-The pipeline:
+1. **Walk the dab list.** Project each dab's center to canvas-space coords (the recorded coords are already in MyPaint surface space, which is canvas space).
+2. **Smooth the polyline.** Three-tap centered moving average to remove micro-jitter from high-rate sampling. Preserves stroke shape.
+3. **Fit cubic Béziers** along the smoothed polyline using Schneider's least-squares fit (1990) — the same algorithm Inkscape uses for path simplification. Tolerance scales with the dab radius so small details on fine pens stay sharp while broad-marker strokes simplify aggressively.
+4. **Emit a variable-width brush stroke**: the existing `BrushTool` vector format already supports per-vertex width (driven by tablet pressure on a vector brush). We populate width from the dab radius × pressure-derived alpha at each fitted control point.
+5. **Set the stroke color** from the recorded dab color (constant per stroke).
+6. **Wrap in a brush canvas component**, push to the layer's component list, register undo.
 
-1. **Composite** — render every intersecting MyPaint tile into a flat RGBA bitmap aligned to the selection rect. Produces width × height × RGBA.
-2. **Mask** — threshold the alpha channel at α ≥ 64 (configurable later). Yields a binary image.
-3. **Color sample** — compute the mean RGB of pixels above threshold, weighted by alpha. This becomes the fill color of the resulting vector shape.
-4. **Marching squares** — extract iso-contours along the binary boundary. Outputs polygonal loops (outer boundary + any holes).
-5. **Douglas–Peucker simplification** — collapse near-collinear runs. Tolerance scales with the brush size used in the source region (a future refinement; initial cut uses a fixed tolerance of ~0.75 px).
-6. **Schneider bezier fit** (Schneider 1990, the algorithm Inkscape's "Trace Bitmap" uses post-potrace) — fit cubic Béziers to the simplified polygons within an error tolerance, producing smooth `SkPath` segments.
-7. **Emit** — wrap each resulting `SkPath` + fill color in a brush canvas component (the existing `BrushTool`-flavored container that holds vector strokes), insert into the active layer, register undo.
-
-The whole pipeline is single-threaded and synchronous; for a typical selection (a few hundred pixels per side, a handful of contour loops) it should complete in tens of milliseconds.
+The whole pipeline is single-threaded and synchronous; per-stroke cost is O(dabs), and a typical ink stroke has hundreds of dabs at most. A selection containing dozens of strokes converts in single-digit milliseconds.
 
 ### Library / dependency choice
 
-**No new dependencies.** Surveyed options:
+**No new dependencies.** All work is custom in-tree:
 
-- **Potrace** — the gold standard for binary-image tracing, but GPLv2; incompatible with Inkternity's MIT license. Rule out.
-- **autotrace** — also GPL. Rule out.
-- **VTracer** (Apache-2.0) — handles multi-color but Rust-only; would force a Rust toolchain into the Conan/CMake build pipeline. Heavyweight for what Phase 2A needs.
-- **OpenCV** — `cv::findContours` + `cv::approxPolyDP` give us steps 4–5 cheaply, Apache-2.0. But OpenCV is a >100 MB dependency for what is realistically <500 lines of code.
-- **Custom in-tree implementation** — marching squares (~80 lines), Douglas-Peucker (~40 lines), Schneider bezier fit (~300 lines, well-known algorithm with reference implementations in the public domain). All fits in a single new `src/RasterToVector/` directory.
+- Stroke recording (~150 lines): hook `MyPaintBrushTool::input_pen_motion` and the begin/end_atomic boundary in `LibMyPaintSkiaSurface` to capture dabs.
+- Schneider Bezier fit (~300 lines): well-known algorithm, public-domain reference implementations exist.
+- Smoothing + projection: trivial.
 
-We go with **custom**. Phase 2 is the right time to take the dep-cost cut: tracing is core to the Inkternity workflow, not a passing feature, and the algorithms are stable and small.
+Total surface is comparable to the abandoned pixel-tracing approach, with strictly better output and no library decisions to relitigate later.
 
 ### Risks
 
-- **Raster-to-vector visual fidelity.** Cubic-bezier-fit-of-marching-squares is not pixel-perfect. Sharp inner corners get slightly rounded; very thin strokes can become disconnected dots. Mitigation: stroke-width-aware tolerance + a "preview before commit" overlay so the artist sees the trace and can cancel before erasure.
-- **Selection that crosses zero MyPaint pixels.** Tool is a no-op (do nothing, keep raster intact, no error popup).
-- **Selection that crosses a layer with mixed raster + vector components.** Vector components in the rect are left alone — only raster pixels get consumed. This is the obvious-correct behavior; just make sure we don't accidentally delete the vector components.
-- **Erasure under undo.** The erase + insert must be one undo-able action. Use the existing `add_undo_place_components` + a new undo entry for the erased tile data (probably easiest as a tile-snapshot before/after pair).
+- **Eraser handling.** Phase 1's eraser (`erase_along_segment`) only punches alpha into tiles. Now it also has to mark recorded strokes (or stroke fragments) as erased. Phase 2 ships the *simplest* correct behavior: if the eraser touches a recorded stroke, that stroke is marked fully consumed (removed from the log entirely) regardless of how much of it was actually erased. Vectorization output then doesn't include the partially-erased stroke. The visual raster still shows the partial erasure correctly. This loses some convertibility for "I just touched the edge with the eraser" cases — accept it, defer geometric stroke-splitting to a later phase.
+- **Loaded-from-old-file degradation.** Files written before Phase 2 have no stroke log. The vectorize tool detects this and is a no-op on those layers (tooltip: "No recorded stroke data — strokes drawn before Phase 2 cannot be vectorized."). New strokes drawn into those layers post-load *do* record properly, so the layer becomes partially convertible.
+- **Stroke-log file size.** Each dab is ~24–32 bytes (position, radius, pressure, color). A heavily-inked panel with hundreds of strokes × hundreds of dabs each could add a megabyte or two per layer. Acceptable. zstd-compress the log on save (cereal already supports binary_data through zstd in the existing tile path).
+- **Selection across multiple INK layers.** Convert each stroke into the layer it was originally drawn on, not the active layer. (User probably expects "convert in place," not "consolidate into active layer.") Document this clearly in the tool's tooltip.
 
 ### Subtasks
 
 | | Deliverable |
 |---|---|
-| A1 | `RasterToVector` library: marching squares + Douglas-Peucker + Schneider fit, unit tests on synthetic shapes |
-| A2 | `PixelToVectorTool` skeleton: registered in toolbar (desktop + phone), rect-drag UI, no conversion yet |
-| A3 | Tile composite extraction: walk MyPaintLayer components in selection rect, render to RGBA bitmap |
-| A4 | End-to-end conversion: composite → mask → trace → emit vector canvas components |
-| A5 | Source erasure + single-undo entry covering both insertion and erasure |
-| A6 | Preview overlay before commit (artist confirms before raster destruction) |
+| A1 | Stroke-recording infra in `LibMyPaintSkiaSurface` + `MyPaintBrushTool`: capture dabs at draw time into a per-layer log; save/load log alongside tiles |
+| A2 | Schneider bezier-fit module: `src/StrokeVectorize/SchneiderFit.{cpp,hpp}` + unit tests against synthetic dab chains |
+| A3 | `StrokeVectorizeTool` skeleton: registered in toolbar (desktop + phone), rect-drag UI, no conversion yet |
+| A4 | End-to-end conversion: walk strokes inside selection, fit, emit vector canvas components into source ink layer |
+| A5 | Source removal: erase recorded strokes from the log and the corresponding raster dabs from tiles, all inside one undo entry |
+| A6 | Eraser interaction: tile-erase still works; recorded strokes touched by eraser get fully removed from the log |
+| A7 | Preview overlay before commit (translucent vectors over source raster; commit / cancel buttons) |
+| A8 | Format integration: stroke log added to `MyPaintLayerCanvasComponent::save_file` / `load_file`; gated behind format version 0.8 |
 
 ## 4. Workstream B — Waypoint transition speed (and easing)
 
@@ -163,92 +176,105 @@ Add a `LayerKind` enum to `DrawingProgramLayerListItem` (NOT to the layer's comp
 
 ```cpp
 enum class LayerKind : uint8_t {
-    DEFAULT = 0,     // generic layer; visible in both modes
-    SKETCH = 1,      // hidden in reader mode; "rough" semantic
-    PRODUCTION = 2   // visible in both modes; "finished" semantic
+    DEFAULT = 0,   // generic layer; visible in both modes (legacy / user-added)
+    SKETCH  = 1,   // hidden in reader mode; raster-only rough
+    COLOR   = 2,   // visible in both modes; flat color fills
+    INK     = 3    // visible in both modes; line work, vectorization target
 };
 ```
 
-The `DEFAULT` value preserves backward compat: existing files (and InfiniPaint-format files we still load) get `DEFAULT` for every layer, which behaves exactly as today.
+The `DEFAULT` value preserves backward compat: existing files (and InfiniPaint-format files we still load) get `DEFAULT` for every existing layer, which behaves exactly as today.
 
-**On new world creation:** auto-create two layers instead of one — `Sketch` (kind=SKETCH) and `Production` (kind=PRODUCTION). `editingLayer` defaults to PRODUCTION.
+**Stack order, bottom to top:** SKETCH → COLOR → INK. This matches the production pipeline: rough at the bottom, color over the rough, ink lines on top to define the visible edges (and to mask any color bleed underneath, which is the trick that lets COLOR stay raster-only — the eye reads ink boundaries as the shapes' boundaries).
 
-**Render filter:** in `DrawingProgramCache::recursive_draw_layer_item_to_canvas` (or its callers), skip layers whose kind is SKETCH while reader mode is active. Other kinds render normally.
+**On new world creation:** auto-create three layers instead of one — `Sketch` (kind=SKETCH, bottom), `Color` (kind=COLOR, middle), `Ink` (kind=INK, top). `editingLayer` defaults to INK.
 
-**Top-bar UI:** two pill buttons in the top toolbar (visible only outside reader mode), labeled "Sketch" and "Production". Clicking either flips `editingLayer` to that layer. The currently-active one shows as selected. This is the artist's only interaction with these layers — the layer-manager side panel still works for other layers, but the two named layers can't be deleted/renamed.
+**Render filter:** in `DrawingProgramCache::recursive_draw_layer_item_to_canvas` (or its callers), skip layers whose kind is SKETCH while reader mode is active. COLOR and INK render normally; DEFAULT renders normally (matches Phase 1 behavior).
 
-**Constraints to enforce:**
-- Sketch + Production layers are protected from the layer manager's delete/rename UI (tooltip explains why).
-- A document always has exactly one of each (lazy-create on load if missing — handles legacy files gracefully).
-- They sit at fixed positions in the layer order: PRODUCTION on top of SKETCH (so ink appears over the rough). Other user-added layers can be inserted between them or above/below.
-- **Sketch is raster-only.** Vector canvas components (BrushTool strokes, shapes, textboxes) cannot be added to the sketch layer; the layer accepts only `MyPaintLayerCanvasComponent`s. This is enforced at the editing-layer-target check: when `editingLayer` is the sketch layer, the vector tools are visually disabled (or auto-switch the active layer to PRODUCTION on first vector-tool action — pick one and document it). Pixel-to-vector mirrors this: it doesn't read from or write to the sketch layer (see Workstream A).
+**Top-bar UI:** a single layer dropdown (visible only outside reader mode) with three entries — Sketch / Color / Ink — showing the currently-active edit target. Clicking the dropdown opens the picker; selecting an entry flips `editingLayer` to that layer. Cleaner top-bar real-estate than three pill toggles, and reads obviously as a layer selector. The layer-manager side panel still works for other (DEFAULT-kind) layers and for visibility / opacity / blend-mode adjustments on the three named layers.
+
+**Per-layer tool restrictions:**
+- **SKETCH is raster-only.** Vector canvas components (BrushTool strokes, shapes, textboxes) cannot be added; the layer accepts only `MyPaintLayerCanvasComponent`s. When `editingLayer` is sketch and the user picks a vector tool, the tool is visually disabled (greyed out with tooltip). Stroke vectorization (Workstream A) doesn't read from or write to sketch.
+- **COLOR is permissive.** Accepts both raster (libmypaint flat-fill marker, etc.) and vector (rect/ellipse fill, lasso, gradient) — the artist picks the right tool for the job. Stroke vectorization doesn't operate on color either, since color is intentionally left raster.
+- **INK is permissive but is the only vectorization target.** Recorded libmypaint strokes drawn here are eligible for stroke vectorization; vector strokes drawn here (with the regular `BrushTool`) are already vectors and pass through unchanged.
+
+**Constraints on the three named layers:**
+- Cannot be deleted or renamed via the layer manager (tooltip explains why).
+- Document always has exactly one of each (lazy-create on load if missing — handles legacy InfiniPaint files and pre-Phase-2 Inkternity files).
+- Stack positions are loosely fixed: SKETCH at bottom, INK at top. Other user-added DEFAULT-kind layers can be inserted between them.
+- Visibility / opacity / blend-mode toggles in the layer manager are NOT disabled — the artist may want a 30%-opacity sketch while inking, or a multiply-blend ink layer.
 
 ### Risks
 
-- **Existing per-layer manipulation features (visibility toggle, blend mode, opacity) shouldn't be disabled for the named layers** — the artist may want to dim the sketch to 30% opacity while inking. Just delete + rename get blocked.
-- **The top-bar toggle is "set active layer," not "set visibility."** Calling these "toggles" is overloaded — make sure UI copy makes clear that clicking switches your edit target, not the layer's display.
-- **Multi-document case.** Each World has its own LayerManager so the named layers are per-document. Top-bar UI binds to the active world's named layers. No cross-document state.
+- **The dropdown is "set active layer," not "set visibility."** UI copy must make clear that picking a layer switches the edit target, not what's displayed. Existing layer-manager visibility toggles continue to control display.
+- **DEFAULT-kind layers from legacy files.** When an InfiniPaint-format file (or pre-Phase-2 Inkternity file) loads, all its existing layers come in as DEFAULT. We then lazy-create the three named layers on top. The user sees their old layers AND the three new empty ones. Acceptable; document in the open-questions if a "promote this layer to INK" flow becomes desirable.
+- **Multi-document case.** Each World has its own LayerManager, so the three named layers are per-document. Top-bar dropdown binds to the active world's named layers. No cross-document state.
 - **NetObj sync.** LayerKind is a small POD field that reads/writes alongside existing layer constructor data; no protocol-level surprises expected.
 
 ### Subtasks
 
 | | Deliverable |
 |---|---|
-| C1 | `LayerKind` enum on `DrawingProgramLayerListItem`, with NetObj save/load + format bump |
-| C2 | New-world auto-creation of Sketch + Production layers; legacy-file lazy-create on load |
+| C1 | `LayerKind` enum (4 values) on `DrawingProgramLayerListItem`, with NetObj save/load + format bump |
+| C2 | New-world auto-creation of Sketch + Color + Ink layers in the right stack order; legacy-file lazy-create on load |
 | C3 | Render filter: hide SKETCH-kind layers in reader mode |
-| C4 | Top-bar pill toggles for active edit target |
-| C5 | Layer-manager protection: disable delete/rename for named layers |
+| C4 | Top-bar layer dropdown for active edit target (Sketch / Color / Ink) |
+| C5 | Layer-manager protection: disable delete/rename for the three named layers |
+| C6 | Tool-restriction enforcement: vector tools greyed out when editingLayer is sketch |
 
 ## 6. File format
 
 Phase 2 bumps the format header from `INFPNT000008` (v0.7) to `INFPNT000009` (v0.8). New on-disk fields:
 
 - Per-waypoint: `transitionSpeedMultiplier` (float), `easing` (Eigen::Vector4f) — read at version ≥ 0.8, default values otherwise.
-- Per-layer-list-item: `layerKind` (uint8) — read at version ≥ 0.8, defaults to `DEFAULT` otherwise. Lazy-creation logic on load handles older files that don't have explicit Sketch/Production layers.
+- Per-layer-list-item: `layerKind` (uint8) — read at version ≥ 0.8, defaults to `DEFAULT` otherwise. Lazy-creation logic on load handles older files that don't have explicit Sketch/Color/Ink layers.
+- Per `MyPaintLayerCanvasComponent`: serialized stroke log (count + per-stroke (color, dab list with position/radius/pressure)) — read at version ≥ 0.8. Pre-0.8 components have no log; the convert tool detects this and is a no-op on them. zstd-compressed on disk via the existing binary_data path.
 
-The pixel-to-vector workstream produces ordinary brush canvas components; no new on-disk type.
+The stroke vectorization workstream produces ordinary brush canvas components; no new on-disk type beyond the stroke log.
 
 ## 7. Out of scope for Phase 2
 
-- **Multi-color raster tracing.** Phase 2A traces alpha→single-color only. Full multi-color quantize-and-trace lands in a later phase if usage demand justifies it.
-- **Per-stroke trace.** Pixel-to-vector operates on rectangular regions only; no flood-fill-style "trace this connected blob" mode.
+- **Geometric stroke splitting under the eraser.** Phase 2 treats an eraser touch as removing the whole touched stroke from the recorded log (the rasterized partial erasure still shows correctly). Splitting strokes geometrically so a partially-erased stroke remains partially convertible is deferred.
+- **Multi-color raster tracing.** Phase 2 doesn't ship a pixel tracer at all — stroke recording handles all the color cases the workflow actually produces. Pre-Phase-2 raster (legacy file load) cannot be vectorized; live with that.
 - **User-editable easing curves.** Phase 2 ships a fixed set of presets. A custom-curve editor (CSS cubic-bezier visualizer) is a Phase 3 concern.
-- **More than two named layers.** Inks/pencils only; no separate "color layer" or "tones layer" kind. Artists can still create those manually as DEFAULT-kind layers.
+- **More than three named layers.** No separate "tones," "fx," or "lettering" kinds. Artists can still create extras manually as DEFAULT-kind layers; the dropdown only manages the three named ones.
+- **"Promote DEFAULT layer to INK" flow.** Legacy files get the three named layers added on top of their existing layers. Re-classifying a legacy layer as INK so its libmypaint strokes (which weren't recorded pre-Phase-2 anyway) become eligible isn't worth the complexity.
 - **Reader-mode preview of "what will the production view look like?"** while editing. Toggle reader mode on briefly is the workaround.
-- **GPU-accelerated tracing.** Custom CPU implementation is fast enough for the expected selection sizes. Optimization slot for later.
+- **GPU-accelerated stroke fitting.** CPU implementation is fast enough at expected stroke counts.
 
 ## 8. Milestones
 
 | # | Status | Milestone | Deliverable |
 |---|---|---|---|
-| M1 | | RasterToVector library | `src/RasterToVector/{MarchingSquares,DouglasPeucker,SchneiderFit}.{cpp,hpp}` + unit tests against synthetic ink shapes |
-| M2 | | PixelToVectorTool end-to-end | Toolbar entry, rect-drag selection, composite extraction, conversion, vector emission, source erasure, single-undo |
-| M3 | | Per-waypoint speed slider | Data model field, save/load, `DrawCamera` override path, `WaypointTool` settings UI |
-| M4 | | Per-waypoint easing dropdown | Optional addition layered on top of M3 — preset list, dropdown UI, applied in transitions |
-| M5 | | Sketch + Production layer kinds | `LayerKind` enum, auto-creation on new world, lazy-create on legacy load, render filter, top-bar toggles, manager-UI protection |
-| M6 | | Format bump 0.8 + migration tests | `INFPNT000009` header, version-gated load paths for new fields, manual round-trip verification of legacy and current files |
+| M1 | | Stroke recording infra | Hook `MyPaintBrushTool` + `LibMyPaintSkiaSurface` to capture per-stroke dab logs; stash on the `MyPaintLayerCanvasComponent` alongside tiles |
+| M2 | | Schneider bezier-fit module | `src/StrokeVectorize/SchneiderFit.{cpp,hpp}` + unit tests against synthetic dab chains |
+| M3 | | StrokeVectorizeTool end-to-end | Toolbar entry, rect-drag selection, walk-strokes-in-rect, fit, emit vector components into source ink layer, source removal, single-undo, preview overlay before commit |
+| M4 | | Per-waypoint speed slider | Data model field, save/load, `DrawCamera` override path, `WaypointTool` settings UI |
+| M5 | | Per-waypoint easing dropdown | Layered on M4 — preset list, dropdown UI, applied in transitions |
+| M6 | | Three-layer kinds (Sketch / Color / Ink) | `LayerKind` enum, auto-creation on new world, lazy-create on legacy load, render filter, top-bar dropdown, manager-UI protection, vector-tool greying on sketch |
+| M7 | | Format bump 0.8 + migration tests | `INFPNT000009` header, version-gated load paths for stroke logs / layer kinds / waypoint transitions, manual round-trip verification of legacy and current files |
 
-M1 + M2 are the largest workstream (Pixel-to-vector). M3 + M4 share infra and are small. M5 is medium. M6 is bookkeeping. M1-M2 and M3-M5 can run in parallel.
+M1–M3 are the largest workstream (stroke vectorization) and depend in order. M4–M5 share infra and are small. M6 is medium. M7 is bookkeeping that touches all three workstreams. M1-M3 and M4-M6 can run in parallel; M7 closes them out.
 
 ## 9. Open product questions
 
 Not blocking — flag and decide as Phase 2 progresses.
 
-- **Trace-preview UX.** Show as a translucent overlay before erasing the source? Or commit immediately and let the artist undo? Probably the former.
 - **Sketch-layer default opacity.** Should auto-created sketch layer come pre-set to a reduced opacity (~50%) so it visibly behaves "rough" out of the box, or leave at 100%?
-- **Top-bar toggle position.** Existing top toolbar is densely populated on phone layout; does the Sketch/Production pair need a dedicated row, or fit alongside the eye-toggle?
-- **Pixel-to-vector for non-MyPaint raster.** If a future raster source exists (e.g. imported PNG layer), should the same tool work on it, or stay MyPaint-tile-specific?
-- **Should Pixel-to-vector run on a worker thread** so the UI doesn't stall on large selections? Profile after M2 lands; defer until measured slowness is real.
+- **Layer dropdown placement on phone.** The phone top toolbar is densely populated. Does the dropdown live alongside the eye-toggle, or get its own slot?
+- **Stroke log retention through transformations.** If the artist rect-selects a libmypaint-painted region and translates/rotates it via the existing transform tools, the recorded dab positions become stale relative to the moved tiles. Phase 2 ships "transform invalidates the log entries for moved strokes" (they remain in the layer as raster, just no longer convertible) — flag for revisit if this hurts the workflow.
+- **Stroke vectorization as a worker thread.** CPU work per stroke is small but a 200-stroke selection could stutter the UI for a frame or two. Profile after M3 lands; defer until measured slowness is real.
 
 ## 10. Decisions log
 
 | Date | Decision | Reasoning |
 |---|---|---|
-| 2026-05-08 | Pixel-to-vector ships alpha-channel-only in Phase 2 | Multi-color tracing is 5× more complex and the ink/marker use case is dominant. Multi-color is a later phase if demand emerges. |
-| 2026-05-08 | Custom in-tree raster-to-vector library, not Potrace/VTracer/OpenCV | Potrace/autotrace are GPL (incompatible). VTracer requires Rust toolchain. OpenCV is a giant dep for ~500 lines of work. Custom keeps build clean and total LOC manageable. |
-| 2026-05-08 | Pixel-to-vector erases source raster after conversion | Keeping both copies confuses authoritative state. Replacement is the correct mental model; preview-before-commit handles the "what if I don't like it" case. |
 | 2026-05-08 | Waypoint transition controls reuse existing `BezierEasing` infra | The animation engine already supports per-call duration + easing curves; adding per-waypoint overrides is plumbing, not new infrastructure. |
-| 2026-05-08 | Sketch/Production layers are a `LayerKind` enum, not separate types | Keeps the existing layer hierarchy intact; the kind is metadata on a normal layer. `DEFAULT` value preserves backward compat for InfiniPaint-format files. |
-| 2026-05-08 | Auto-create both named layers on new world; lazy-create on legacy load | Avoids forcing the user through a setup step; legacy files just get the layers added on first open. |
-| 2026-05-08 | Sketch layer is raster-only; only Production layer is eligible for pixel-to-vector | Models the standard rough-then-ink pipeline cleanly. Sketch becomes a strict scratch surface — no vector pollution, no ambiguity about which layer the converted vectors land in (always Production). |
+| 2026-05-08 | Layer kinds are an enum on `DrawingProgramLayerListItem`, not separate types | Keeps the existing layer hierarchy intact; the kind is metadata on a normal layer. `DEFAULT` value preserves backward compat for InfiniPaint-format files. |
+| 2026-05-08 | Auto-create named layers on new world; lazy-create on legacy load | Avoids forcing the user through a setup step; legacy files just get the layers added on first open. |
+| 2026-05-08 | Sketch layer is raster-only; vector tools refuse it as edit target | Models the standard rough-then-ink pipeline cleanly. Sketch becomes a strict scratch surface — no vector pollution, no ambiguity about which layer the converted vectors land in. |
+| 2026-05-08 | Three named layers (Sketch / Color / Ink), not two | The three-stage pipeline lets ink lines visually mask color bleed underneath, which removes the multi-color color-layer tracing problem entirely. Color stays raster forever; only the ink layer is a vectorization target. |
+| 2026-05-08 | Top-bar uses a layer dropdown, not three pill toggles | A dropdown reads obviously as "pick a layer," scales if a fourth named layer ever lands, and uses much less top-bar real estate than three pills. Three pills would also crowd the phone layout. |
+| 2026-05-08 | Vectorization is per-stroke replay, not pixel-tracing | Per-stroke recording at draw time gives perfect color preservation, perfect ordering, and pressure-aware variable-width output — and trivially handles multi-color ink (which our brushes support). Pixel-tracing always loses fidelity at corners and breaks down on multi-color. The cost is real (stroke log on disk + eraser must touch the log) but contained. |
+| 2026-05-08 | Eraser fully removes touched strokes from the log | The simplest correct behavior. The rasterized partial erasure still shows correctly via tile dabs, but the convertibility of a partially-erased stroke is sacrificed. Geometric stroke splitting is deferred. |
+| 2026-05-08 | Pre-Phase-2 raster cannot be vectorized | Stroke recording is opt-in via the format bump; older files have no log. The convert tool no-ops on those layers with a tooltip. New strokes drawn into a loaded-old layer record properly, so the layer becomes partially convertible. Avoids any "retroactive trace" complexity. |
