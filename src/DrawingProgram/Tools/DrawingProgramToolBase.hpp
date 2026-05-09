@@ -26,7 +26,8 @@ enum class DrawingProgramToolType : int {
     LINE,
     MYPAINTBRUSH,
     WAYPOINT,
-    BUTTONSELECT
+    BUTTONSELECT,
+    STROKEVECTORIZE
 };
 
 class DrawingProgramToolBase {

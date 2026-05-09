@@ -76,6 +76,12 @@ class DrawingProgramLayerManager {
 
         CanvasComponentContainer::ObjInfo* add_component_to_layer_being_edited(CanvasComponentContainer* newObj);
         std::vector<CanvasComponentContainer::ObjInfoIterator> add_many_components_to_layer_being_edited(const std::vector<std::pair<CanvasComponentContainer::ObjInfoIterator, CanvasComponentContainer*>>& newObjs);
+        // PHASE2 M3: place into a layer that isn't necessarily the
+        // active edit target. Mirrors add_many_components_to_layer_being_edited
+        // but takes the destination layer as an explicit argument.
+        std::vector<CanvasComponentContainer::ObjInfoIterator> add_many_components_to_specific_layer(
+            DrawingProgramLayerListItem& destLayer,
+            const std::vector<std::pair<CanvasComponentContainer::ObjInfoIterator, CanvasComponentContainer*>>& newObjs);
         std::vector<CanvasComponentContainer::ObjInfo*> get_flattened_component_list() const;
         std::vector<DrawingProgramLayerListItem*> get_flattened_layer_list();
         void add_undo_place_component(CanvasComponentContainer::ObjInfo* objInfo);

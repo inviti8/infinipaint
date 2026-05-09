@@ -291,6 +291,16 @@ std::vector<CanvasComponentContainer::ObjInfoIterator> DrawingProgramLayerManage
     return {};
 }
 
+std::vector<CanvasComponentContainer::ObjInfoIterator> DrawingProgramLayerManager::add_many_components_to_specific_layer(
+    DrawingProgramLayerListItem& destLayer,
+    const std::vector<std::pair<CanvasComponentContainer::ObjInfoIterator, CanvasComponentContainer*>>& newObjs)
+{
+    if(newObjs.empty()) return {};
+    auto toRet = destLayer.get_layer().components->insert_sorted_list_and_send_create(destLayer.get_layer().components, newObjs);
+    add_undo_place_components(&destLayer, toRet);
+    return toRet;
+}
+
 void DrawingProgramLayerManager::disable_add_to_cache_block(const std::function<void()>& toRun) {
     addToCacheOnComponentInsert = false;
     toRun();

@@ -380,6 +380,7 @@ void DrawingProgram::toolbar_gui(Toolbar& t) {
                 tool_button("MyPaint Brush Toolbar Button", "data/icons/ink.svg", DrawingProgramToolType::MYPAINTBRUSH);
                 tool_button("Waypoint Toolbar Button", "data/icons/bookmark.svg", DrawingProgramToolType::WAYPOINT);
                 tool_button("Button Select Toolbar Button", "data/icons/button-select.svg", DrawingProgramToolType::BUTTONSELECT);
+                tool_button("Stroke Vectorize Toolbar Button", "data/icons/pixel-to-vector.svg", DrawingProgramToolType::STROKEVECTORIZE);
                 tool_button("Eraser Toolbar Button", "data/icons/eraser.svg", DrawingProgramToolType::ERASER);
                 tool_button("Line Toolbar Button", "data/icons/line.svg", DrawingProgramToolType::LINE);
                 tool_button("Text Toolbar Button", "data/icons/text.svg", DrawingProgramToolType::TEXTBOX);

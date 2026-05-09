@@ -17,6 +17,7 @@
 #include "MyPaintBrushTool.hpp"
 #include "WaypointTool.hpp"
 #include "ButtonSelectTool.hpp"
+#include "StrokeVectorizeTool.hpp"
 
 DrawingProgramToolBase::DrawingProgramToolBase(DrawingProgram& initDrawP):
     drawP(initDrawP)
@@ -60,6 +61,8 @@ std::unique_ptr<DrawingProgramToolBase> DrawingProgramToolBase::allocate_tool_ty
             return std::make_unique<WaypointTool>(drawP);
         case DrawingProgramToolType::BUTTONSELECT:
             return std::make_unique<ButtonSelectTool>(drawP);
+        case DrawingProgramToolType::STROKEVECTORIZE:
+            return std::make_unique<StrokeVectorizeTool>(drawP);
     }
     return nullptr;
 }
