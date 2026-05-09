@@ -20,7 +20,16 @@ class DrawCamera {
         SCollision::AABB<WorldScalar> viewingAreaGenerousCollider;
 
         void set_viewing_area(Vector2f viewingAreaNew);
-        void smooth_move_to(World& w, const CoordSpaceHelper& c, Vector2f windowSize, bool instantJump = false);
+        // PHASE2 M4: speedMultiplier scales the transition duration:
+        // applied duration = w.main.conf.jumpTransitionTime / speedMultiplier.
+        // Multiplier 1.0 (default) = global behavior. >1 = faster, <1 = slower.
+        // Ignored when instantJump is true. Range is callers' responsibility
+        // to validate; out-of-range values may produce odd timings but won't
+        // crash. The 0.1..2.0 range used by Waypoint is a UX choice, not
+        // a structural constraint here.
+        void smooth_move_to(World& w, const CoordSpaceHelper& c, Vector2f windowSize,
+                            bool instantJump = false,
+                            float speedMultiplier = 1.0f);
         void set_based_on_properties(World& w, const WorldVec& newPos, const WorldScalar& newZoom, double newRotate);
         void set_based_on_center(World& w, const WorldVec& newPos, const WorldScalar& newZoom, double newRotate);
         void update_main(World& main);
@@ -46,6 +55,11 @@ class DrawCamera {
             Vector2f endWindowSize;
             bool occurring = false;
             float moveTime;
+            // PHASE2 M4: total duration for this transition. Snapshot at
+            // smooth_move_to time as (jumpTransitionTime / speedMultiplier).
+            // update_main reads this rather than the live config so a
+            // mid-transition config change doesn't slow/speed an active move.
+            float targetDuration = 0.0f;
         } smoothMove;
 
         WorldScalar startZoomVal;

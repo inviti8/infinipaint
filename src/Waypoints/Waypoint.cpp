@@ -58,12 +58,22 @@ void Waypoint::save_file(cereal::PortableBinaryOutputArchive& a) const {
     a(label, coords, windowSize);
     std::vector<uint8_t> skinBytes = encode_skin_png(skin);
     a(skinBytes);
+    // PHASE2 M4: per-waypoint reader-mode transition controls. Always
+    // written from format v0.9 onward; the load path gates its read
+    // on file version >= 0.9 so older files don't try to consume bytes
+    // that aren't there.
+    a(transitionSpeedMultiplier);
 }
 
 void Waypoint::load_skin_from_archive(cereal::PortableBinaryInputArchive& a, VersionNumber) {
     std::vector<uint8_t> skinBytes;
     a(skinBytes);
     skin = decode_skin_png(skinBytes);
+}
+
+void Waypoint::load_transition_data_from_archive(cereal::PortableBinaryInputArchive& a, VersionNumber) {
+    a(transitionSpeedMultiplier);
+    transitionSpeedMultiplier = std::clamp(transitionSpeedMultiplier, TRANSITION_SPEED_MIN, TRANSITION_SPEED_MAX);
 }
 
 void Waypoint::write_constructor_data(const NetObjTemporaryPtr<Waypoint>& o, cereal::PortableBinaryOutputArchive& a) {

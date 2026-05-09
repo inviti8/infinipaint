@@ -105,6 +105,8 @@ void WaypointGraph::load_file(cereal::PortableBinaryInputArchive& a, VersionNumb
         auto it = nodes->emplace_back_direct(nodes, label, coords, windowSize);
         if (version >= VersionNumber(0, 6, 0))
             it->obj->load_skin_from_archive(a, version);
+        if (version >= VersionNumber(0, 9, 0))
+            it->obj->load_transition_data_from_archive(a, version);
         idsByIndex.push_back(it->obj.get_net_id());
     }
 

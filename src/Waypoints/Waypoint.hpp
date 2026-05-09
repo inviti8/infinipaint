@@ -5,6 +5,7 @@
 #include <cereal/archives/portable_binary.hpp>
 #include <include/core/SkImage.h>
 #include <include/core/SkRefCnt.h>
+#include <algorithm>
 #include <string>
 #include "../CoordSpaceHelper.hpp"
 
@@ -51,6 +52,22 @@ class Waypoint {
         void set_skin(sk_sp<SkImage> img) { skin = std::move(img); }
         void clear_skin()                 { skin.reset(); }
 
+        // PHASE2 M4: per-waypoint speed multiplier for the reader-mode
+        // camera transition INTO this waypoint. Range 0.1 .. 2.0. The
+        // applied transition duration is globalDuration / multiplier,
+        // so 2.0 plays the transition twice as fast and 0.5 plays it
+        // half-speed. Default 1.0 leaves the global behavior unchanged.
+        static constexpr float TRANSITION_SPEED_MIN = 0.1f;
+        static constexpr float TRANSITION_SPEED_MAX = 2.0f;
+        static constexpr float TRANSITION_SPEED_DEFAULT = 1.0f;
+        float get_transition_speed_multiplier() const { return transitionSpeedMultiplier; }
+        void set_transition_speed_multiplier(float v) { transitionSpeedMultiplier = std::clamp(v, TRANSITION_SPEED_MIN, TRANSITION_SPEED_MAX); }
+        // Direct mutable reference for the WaypointTool slider; the slider
+        // widget enforces the min/max range so external clamping isn't
+        // strictly required, but set_transition_speed_multiplier still
+        // clamps when callers come through that path.
+        float& mutable_transition_speed_multiplier() { return transitionSpeedMultiplier; }
+
         void scale_up(const WorldScalar& scaleUpAmount);
 
         void save_file(cereal::PortableBinaryOutputArchive& a) const;
@@ -61,6 +78,10 @@ class Waypoint {
         // version >= 0.6.0; pre-0.6 files don't have the payload, so
         // the caller skips this call.
         void load_skin_from_archive(cereal::PortableBinaryInputArchive& a, VersionNumber version);
+        // PHASE2 M4: reads the per-waypoint transition controls
+        // (currently just the speed multiplier; M5 will append easing).
+        // Caller gates on file version >= 0.9.0.
+        void load_transition_data_from_archive(cereal::PortableBinaryInputArchive& a, VersionNumber version);
 
         static void register_class(World& w);
 
@@ -71,4 +92,5 @@ class Waypoint {
         CoordSpaceHelper coords;
         Vector<int32_t, 2> windowSize{0, 0};
         sk_sp<SkImage> skin;
+        float transitionSpeedMultiplier = TRANSITION_SPEED_DEFAULT;
 };

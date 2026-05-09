@@ -36,7 +36,7 @@ void DrawCamera::set_viewing_area(Vector2f viewingAreaNew) {
     viewingAreaGenerousCollider = SCollision::AABB<WorldScalar>(center - WorldVec{a, a}, center + WorldVec{a, a});
 }
 
-void DrawCamera::smooth_move_to(World& w, const CoordSpaceHelper& newCoords, Vector2f windowSize, bool instantJump) {
+void DrawCamera::smooth_move_to(World& w, const CoordSpaceHelper& newCoords, Vector2f windowSize, bool instantJump, float speedMultiplier) {
     smoothMove.start = c;
     smoothMove.end = newCoords;
     smoothMove.endWindowSize = windowSize;
@@ -47,8 +47,14 @@ void DrawCamera::smooth_move_to(World& w, const CoordSpaceHelper& newCoords, Vec
     float a2(w.main.window.size.y() / windowSize.y());
     smoothMove.endUniformZoom = std::max(smoothMove.end.inverseScale.multiply_double((a1 < a2) ? a1 : a2), WorldScalar(1));
 
+    // PHASE2 M4: compute the target duration up-front. >1 multiplier
+    // shortens the transition; <1 lengthens it. Clamp the divisor so
+    // a zero or near-zero multiplier doesn't blow up the duration.
+    const float effectiveMultiplier = std::max(0.01f, speedMultiplier);
+    smoothMove.targetDuration = w.main.conf.jumpTransitionTime / effectiveMultiplier;
+
     smoothMove.occurring = true;
-    smoothMove.moveTime = (instantJump || w.main.conf.jumpTransitionTime <= 0.01f) ? w.main.conf.jumpTransitionTime : 0.0f;
+    smoothMove.moveTime = (instantJump || smoothMove.targetDuration <= 0.01f) ? smoothMove.targetDuration : 0.0f;
 }
 
 void DrawCamera::scale_up(World& w, const WorldScalar& scaleUpAmount) {
@@ -64,7 +70,13 @@ void DrawCamera::scale_up(World& w, const WorldScalar& scaleUpAmount) {
 void DrawCamera::update_main(World& w) {
     if(smoothMove.occurring) {
         BezierEasing zoomAnim{w.main.conf.jumpTransitionEasing};
-        float smoothTime = smooth_two_way_animation_time_get_lerp(smoothMove.moveTime, w.main.deltaTime, true, w.main.conf.jumpTransitionTime);
+        // PHASE2 M4: use the per-transition target duration (set in
+        // smooth_move_to from the global config × any speed multiplier).
+        // Falls back to the global if a stale state somehow has 0.
+        const float targetDuration = (smoothMove.targetDuration > 0.0f)
+            ? smoothMove.targetDuration
+            : w.main.conf.jumpTransitionTime;
+        float smoothTime = smooth_two_way_animation_time_get_lerp(smoothMove.moveTime, w.main.deltaTime, true, targetDuration);
         float lerpTime;
         float rotationLerpTime = zoomAnim(smoothTime);
         lerpTime = zoomAnim(smoothTime);
