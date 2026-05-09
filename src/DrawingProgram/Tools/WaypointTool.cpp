@@ -10,6 +10,8 @@
 #include "../../GUIStuff/ElementHelpers/TextLabelHelpers.hpp"
 #include "../../GUIStuff/ElementHelpers/TextBoxHelpers.hpp"
 #include "../../GUIStuff/ElementHelpers/NumberSliderHelpers.hpp"
+#include "../../GUIStuff/ElementHelpers/LayoutHelpers.hpp"
+#include "../../GUIStuff/Elements/DropDown.hpp"
 #include "Helpers/NetworkingObjects/NetObjTemporaryPtr.decl.hpp"
 #include "Helpers/SCollision.hpp"
 
@@ -114,6 +116,16 @@ void WaypointTool::gui_toolbox(Toolbar&) {
                     &wpRef->mutable_transition_speed_multiplier(),
                     Waypoint::TRANSITION_SPEED_MIN, Waypoint::TRANSITION_SPEED_MAX,
                     { .decimalPrecision = 2 });
+                // PHASE2 M5: easing dropdown. The DropDown<T> widget reads
+                // *(size_t*)d as the selection index, so we cast through
+                // a uint8 alias of the enum (TransitionEasing values
+                // 0..4 correspond to dropdown options in order).
+                left_to_right_line_layout(gui, [&]() {
+                    text_label(gui, "Easing");
+                    gui.element<DropDown<uint8_t>>("easing dropdown",
+                        reinterpret_cast<uint8_t*>(&wpRef->mutable_transition_easing()),
+                        transition_easing_display_names());
+                });
                 return;
             }
         }
@@ -134,6 +146,16 @@ void WaypointTool::gui_phone_toolbox(PhoneDrawingProgramScreen&) {
                     &wpRef->mutable_transition_speed_multiplier(),
                     Waypoint::TRANSITION_SPEED_MIN, Waypoint::TRANSITION_SPEED_MAX,
                     { .decimalPrecision = 2 });
+                // PHASE2 M5: easing dropdown. The DropDown<T> widget reads
+                // *(size_t*)d as the selection index, so we cast through
+                // a uint8 alias of the enum (TransitionEasing values
+                // 0..4 correspond to dropdown options in order).
+                left_to_right_line_layout(gui, [&]() {
+                    text_label(gui, "Easing");
+                    gui.element<DropDown<uint8_t>>("easing dropdown",
+                        reinterpret_cast<uint8_t*>(&wpRef->mutable_transition_easing()),
+                        transition_easing_display_names());
+                });
             }
         }
     });

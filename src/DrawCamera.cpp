@@ -36,7 +36,7 @@ void DrawCamera::set_viewing_area(Vector2f viewingAreaNew) {
     viewingAreaGenerousCollider = SCollision::AABB<WorldScalar>(center - WorldVec{a, a}, center + WorldVec{a, a});
 }
 
-void DrawCamera::smooth_move_to(World& w, const CoordSpaceHelper& newCoords, Vector2f windowSize, bool instantJump, float speedMultiplier) {
+void DrawCamera::smooth_move_to(World& w, const CoordSpaceHelper& newCoords, Vector2f windowSize, bool instantJump, float speedMultiplier, std::optional<Eigen::Vector4f> easingOverride) {
     smoothMove.start = c;
     smoothMove.end = newCoords;
     smoothMove.endWindowSize = windowSize;
@@ -52,6 +52,10 @@ void DrawCamera::smooth_move_to(World& w, const CoordSpaceHelper& newCoords, Vec
     // a zero or near-zero multiplier doesn't blow up the duration.
     const float effectiveMultiplier = std::max(0.01f, speedMultiplier);
     smoothMove.targetDuration = w.main.conf.jumpTransitionTime / effectiveMultiplier;
+    // PHASE2 M5: snapshot the easing override (if any) so the curve
+    // applied through the rest of the transition matches what was set
+    // at start.
+    smoothMove.targetEasing = easingOverride;
 
     smoothMove.occurring = true;
     smoothMove.moveTime = (instantJump || smoothMove.targetDuration <= 0.01f) ? smoothMove.targetDuration : 0.0f;
@@ -69,7 +73,13 @@ void DrawCamera::scale_up(World& w, const WorldScalar& scaleUpAmount) {
 
 void DrawCamera::update_main(World& w) {
     if(smoothMove.occurring) {
-        BezierEasing zoomAnim{w.main.conf.jumpTransitionEasing};
+        // PHASE2 M5: use the per-transition easing override if set,
+        // else the global jumpTransitionEasing.
+        BezierEasing zoomAnim{
+            smoothMove.targetEasing.has_value()
+                ? smoothMove.targetEasing.value()
+                : w.main.conf.jumpTransitionEasing
+        };
         // PHASE2 M4: use the per-transition target duration (set in
         // smooth_move_to from the global config × any speed multiplier).
         // Falls back to the global if a stale state somehow has 0.

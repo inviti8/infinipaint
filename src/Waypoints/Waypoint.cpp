@@ -13,6 +13,33 @@
 
 using namespace NetworkingObjects;
 
+// PHASE2 M5: CSS-style cubic-bezier easing presets. Control points are
+// (x1, y1, x2, y2) — the same convention CSS's cubic-bezier() function
+// uses, which BezierEasing accepts directly.
+Eigen::Vector4f transition_easing_to_bezier_curve(TransitionEasing e) {
+    switch (e) {
+        case TransitionEasing::LINEAR:      return {0.0f, 0.0f, 1.0f, 1.0f};
+        case TransitionEasing::EASE:        return {0.25f, 0.1f, 0.25f, 1.0f};
+        case TransitionEasing::EASE_IN:     return {0.42f, 0.0f, 1.0f, 1.0f};
+        case TransitionEasing::EASE_OUT:    return {0.0f, 0.0f, 0.58f, 1.0f};
+        case TransitionEasing::EASE_IN_OUT: return {0.42f, 0.0f, 0.58f, 1.0f};
+    }
+    return {0.25f, 0.1f, 0.25f, 1.0f};  // Fallback to EASE on garbage input.
+}
+
+const std::vector<std::string>& transition_easing_display_names() {
+    // Order MUST match the enum's numeric values so a dropdown can
+    // index this list by static_cast<size_t>(TransitionEasing).
+    static const std::vector<std::string> names = {
+        "Linear",
+        "Ease",
+        "Ease in",
+        "Ease out",
+        "Ease in-out"
+    };
+    return names;
+}
+
 Waypoint::Waypoint() {}
 
 Waypoint::Waypoint(const std::string& initLabel,
@@ -58,11 +85,12 @@ void Waypoint::save_file(cereal::PortableBinaryOutputArchive& a) const {
     a(label, coords, windowSize);
     std::vector<uint8_t> skinBytes = encode_skin_png(skin);
     a(skinBytes);
-    // PHASE2 M4: per-waypoint reader-mode transition controls. Always
+    // PHASE2 M4 / M5: per-waypoint reader-mode transition controls. Always
     // written from format v0.9 onward; the load path gates its read
     // on file version >= 0.9 so older files don't try to consume bytes
     // that aren't there.
     a(transitionSpeedMultiplier);
+    a(static_cast<uint8_t>(transitionEasing));
 }
 
 void Waypoint::load_skin_from_archive(cereal::PortableBinaryInputArchive& a, VersionNumber) {
@@ -74,6 +102,12 @@ void Waypoint::load_skin_from_archive(cereal::PortableBinaryInputArchive& a, Ver
 void Waypoint::load_transition_data_from_archive(cereal::PortableBinaryInputArchive& a, VersionNumber) {
     a(transitionSpeedMultiplier);
     transitionSpeedMultiplier = std::clamp(transitionSpeedMultiplier, TRANSITION_SPEED_MIN, TRANSITION_SPEED_MAX);
+    uint8_t easingByte;
+    a(easingByte);
+    // Clamp to valid enum range; unknown values fall back to EASE.
+    if (easingByte > static_cast<uint8_t>(TransitionEasing::EASE_IN_OUT))
+        easingByte = static_cast<uint8_t>(TransitionEasing::EASE);
+    transitionEasing = static_cast<TransitionEasing>(easingByte);
 }
 
 void Waypoint::write_constructor_data(const NetObjTemporaryPtr<Waypoint>& o, cereal::PortableBinaryOutputArchive& a) {

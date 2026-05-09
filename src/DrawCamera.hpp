@@ -6,6 +6,7 @@
 #include "CoordSpaceHelper.hpp"
 #include <Helpers/VersionNumber.hpp>
 #include "InputManager.hpp"
+#include <optional>
 
 using namespace Eigen;
 
@@ -27,9 +28,14 @@ class DrawCamera {
         // to validate; out-of-range values may produce odd timings but won't
         // crash. The 0.1..2.0 range used by Waypoint is a UX choice, not
         // a structural constraint here.
+        //
+        // PHASE2 M5: easingOverride, if set, replaces the global
+        // jumpTransitionEasing curve for this transition. Same units as
+        // BezierEasing's ctor (CSS cubic-bezier control points (x1, y1, x2, y2)).
         void smooth_move_to(World& w, const CoordSpaceHelper& c, Vector2f windowSize,
                             bool instantJump = false,
-                            float speedMultiplier = 1.0f);
+                            float speedMultiplier = 1.0f,
+                            std::optional<Eigen::Vector4f> easingOverride = std::nullopt);
         void set_based_on_properties(World& w, const WorldVec& newPos, const WorldScalar& newZoom, double newRotate);
         void set_based_on_center(World& w, const WorldVec& newPos, const WorldScalar& newZoom, double newRotate);
         void update_main(World& main);
@@ -60,6 +66,11 @@ class DrawCamera {
             // update_main reads this rather than the live config so a
             // mid-transition config change doesn't slow/speed an active move.
             float targetDuration = 0.0f;
+            // PHASE2 M5: easing curve to apply for this transition. Empty
+            // = use the global jumpTransitionEasing. Snapshotted alongside
+            // targetDuration so a mid-transition config change can't shift
+            // the in-flight curve.
+            std::optional<Eigen::Vector4f> targetEasing;
         } smoothMove;
 
         WorldScalar startZoomVal;

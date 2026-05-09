@@ -109,13 +109,14 @@ void ReaderMode::snap_camera_to_current() {
     if (!currentId.has_value()) return;
     auto wpRef = world.netObjMan.get_obj_temporary_ref_from_id<Waypoint>(currentId.value());
     if (!wpRef) return;
-    // PHASE2 M4: per-waypoint speed multiplier scales the transition
-    // duration. The waypoint's value is the speed for the camera move
-    // INTO it, applied by the camera as duration / multiplier.
+    // PHASE2 M4 + M5: per-waypoint speed multiplier scales the transition
+    // duration; per-waypoint easing preset overrides the global curve.
+    // Both apply to the camera move INTO this waypoint.
     world.drawData.cam.smooth_move_to(world, wpRef->get_coords(),
                                       wpRef->get_window_size().cast<float>(),
                                       /*instantJump=*/false,
-                                      wpRef->get_transition_speed_multiplier());
+                                      wpRef->get_transition_speed_multiplier(),
+                                      transition_easing_to_bezier_curve(wpRef->get_transition_easing()));
 }
 
 namespace {

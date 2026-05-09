@@ -5,9 +5,30 @@
 #include <cereal/archives/portable_binary.hpp>
 #include <include/core/SkImage.h>
 #include <include/core/SkRefCnt.h>
+#include <Eigen/Core>
 #include <algorithm>
+#include <cstdint>
 #include <string>
+#include <vector>
 #include "../CoordSpaceHelper.hpp"
+
+// PHASE2 M5 — fixed set of CSS-style easing presets for the per-waypoint
+// reader-mode transition curve. Stored as a uint8 in the file; resolved
+// to (x1, y1, x2, y2) cubic-bezier control points at render time so the
+// curve definitions can be tweaked without breaking saved files.
+//
+// Custom-curve editing (a CSS cubic-bezier visualizer that lets the
+// artist drag handles) is intentionally Phase 3 territory. Phase 2
+// ships these five and stops there.
+enum class TransitionEasing : uint8_t {
+    LINEAR      = 0,
+    EASE        = 1,  // CSS default — the "ease" timing function
+    EASE_IN     = 2,
+    EASE_OUT    = 3,
+    EASE_IN_OUT = 4
+};
+Eigen::Vector4f transition_easing_to_bezier_curve(TransitionEasing e);
+const std::vector<std::string>& transition_easing_display_names();
 
 class World;
 class WaypointGraph;
@@ -68,6 +89,14 @@ class Waypoint {
         // clamps when callers come through that path.
         float& mutable_transition_speed_multiplier() { return transitionSpeedMultiplier; }
 
+        // PHASE2 M5: easing preset for the reader-mode transition INTO
+        // this waypoint. Stored as enum, resolved to a bezier curve via
+        // transition_easing_to_bezier_curve() at transition time.
+        TransitionEasing get_transition_easing() const { return transitionEasing; }
+        void set_transition_easing(TransitionEasing e) { transitionEasing = e; }
+        // Mutable raw access for the WaypointTool dropdown widget.
+        TransitionEasing& mutable_transition_easing() { return transitionEasing; }
+
         void scale_up(const WorldScalar& scaleUpAmount);
 
         void save_file(cereal::PortableBinaryOutputArchive& a) const;
@@ -93,4 +122,5 @@ class Waypoint {
         Vector<int32_t, 2> windowSize{0, 0};
         sk_sp<SkImage> skin;
         float transitionSpeedMultiplier = TRANSITION_SPEED_DEFAULT;
+        TransitionEasing transitionEasing = TransitionEasing::EASE;
 };
