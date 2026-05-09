@@ -36,6 +36,12 @@ void MyPaintLayerCanvasComponent::load(cereal::PortableBinaryInputArchive&) {
 
 void MyPaintLayerCanvasComponent::save_file(cereal::PortableBinaryOutputArchive& a) const {
     surface_->save_tiles_to_archive(a);
+    // PHASE2 M1: per-stroke recording. Always written from v0.9 onward;
+    // older versions had no recording field.
+    a(strokeRecordingValid_);
+    a(recordedColor_.x(), recordedColor_.y(), recordedColor_.z());
+    a(recordedBaseRadius_);
+    a(recordedSamples_);
 }
 
 void MyPaintLayerCanvasComponent::load_file(cereal::PortableBinaryInputArchive& a, VersionNumber version) {
@@ -45,6 +51,18 @@ void MyPaintLayerCanvasComponent::load_file(cereal::PortableBinaryInputArchive& 
     }
     // Pre-0.7 files had MyPaintLayer save_file as a stub (no bytes
     // written), so there's nothing to read. The layer just stays empty.
+
+    if (version >= VersionNumber(0, 9, 0)) {
+        a(strokeRecordingValid_);
+        float r, g, b;
+        a(r, g, b);
+        recordedColor_ = Eigen::Vector3f{r, g, b};
+        a(recordedBaseRadius_);
+        a(recordedSamples_);
+    }
+    // Pre-0.9 components stay with strokeRecordingValid_ = false
+    // (the ctor default), which makes them no-ops for the stroke
+    // vectorize tool — exactly the design-doc behavior.
 }
 
 std::unique_ptr<CanvasComponent> MyPaintLayerCanvasComponent::get_data_copy() const {
@@ -91,6 +109,11 @@ bool MyPaintLayerCanvasComponent::collides_within_coords(const SCollision::Colli
 
 void MyPaintLayerCanvasComponent::erase_along_segment(const Vector2f& localStart, const Vector2f& localEnd, float localRadius) {
     if (localRadius <= 0.0f) return;
+    // PHASE2 M1: any eraser touch on this stroke's tiles invalidates
+    // the recorded path — replaying it would no longer match what the
+    // user sees. Per design doc, the simplest correct behavior is
+    // "touched stroke is fully consumed from the recording log."
+    invalidate_recording();
     MyPaintSurface* surf = surface_->surface();
     const Vector2f delta = localEnd - localStart;
     const float segLen = delta.norm();
@@ -119,6 +142,24 @@ void MyPaintLayerCanvasComponent::erase_along_segment(const Vector2f& localStart
     }
     mypaint_surface_end_atomic(surf, nullptr);
     mark_dirty();
+}
+
+void MyPaintLayerCanvasComponent::begin_recorded_stroke(const Eigen::Vector3f& color, float baseRadius) {
+    recordedSamples_.clear();
+    recordedColor_ = color;
+    recordedBaseRadius_ = baseRadius;
+    strokeRecordingValid_ = true;
+}
+
+void MyPaintLayerCanvasComponent::record_stroke_sample(float x, float y, float pressure) {
+    if (!strokeRecordingValid_) return;
+    recordedSamples_.push_back({x, y, pressure});
+}
+
+void MyPaintLayerCanvasComponent::invalidate_recording() {
+    strokeRecordingValid_ = false;
+    recordedSamples_.clear();   // also free the storage
+    recordedSamples_.shrink_to_fit();
 }
 
 SCollision::AABB<float> MyPaintLayerCanvasComponent::get_obj_coord_bounds() const {

@@ -266,6 +266,22 @@ void MyPaintBrushTool::begin_stroke(const Vector2f& canvasPos, float pressure) {
     mypaint_brush_new_stroke(brush_);
 
     auto& layer = static_cast<MyPaintLayerCanvasComponent&>(container->get_comp());
+
+    // PHASE2 M1: start recording the stroke. Color comes from the
+    // global foreground (same source apply_foreground_color_to_brush
+    // just used). Base radius from the brush's current
+    // RADIUS_LOGARITHMIC setting (libmypaint stores radius as
+    // ln(radius_in_pixels)) so the M2 Schneider-fit pass can recover
+    // per-sample width as baseRadius * pressure-derived factor.
+    {
+        const Vector4f& fg = drawP.world.main.toolConfig.globalConf.foregroundColor;
+        const float radiusLog = mypaint_brush_get_base_value(brush_, MYPAINT_BRUSH_SETTING_RADIUS_LOGARITHMIC);
+        layer.begin_recorded_stroke(Eigen::Vector3f{fg.x(), fg.y(), fg.z()}, std::exp(radiusLog));
+        // Container's coords were just set to the camera coords above,
+        // so canvasPos is already in component-local space at this instant.
+        layer.record_stroke_sample(canvasPos.x(), canvasPos.y(), pressure);
+    }
+
     MyPaintSurface* surf = layer.surface().surface();
 
     mypaint_surface_begin_atomic(surf);
@@ -289,6 +305,10 @@ void MyPaintBrushTool::continue_stroke(const Vector2f& canvasPos, float pressure
     auto& container = *objInfoBeingEdited->obj;
     auto& layer = static_cast<MyPaintLayerCanvasComponent&>(container.get_comp());
     const Vector2f localPos = container.coords.from_cam_space_to_this(drawP.world, canvasPos);
+
+    // PHASE2 M1: append the pen-motion sample to the recorded stroke
+    // (same coords we feed into mypaint_brush_stroke_to below).
+    layer.record_stroke_sample(localPos.x(), localPos.y(), pressure);
 
     const auto now = std::chrono::steady_clock::now();
     const double dtime = std::chrono::duration<double>(now - lastEventTime).count();

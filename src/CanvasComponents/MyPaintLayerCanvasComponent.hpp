@@ -1,12 +1,14 @@
 #pragma once
 #include "CanvasComponent.hpp"
 #include "Helpers/SCollision.hpp"
+#include <Eigen/Core>
 
 #ifdef HVYM_HAS_LIBMYPAINT
 #include "../Brushes/LibMyPaintSkiaSurface.hpp"
 #endif
 
 #include <memory>
+#include <vector>
 
 // PHASE1.md §3 — per-stroke raster layer that owns a LibMyPaintSkiaSurface.
 // One MyPaintBrushTool stroke produces one of these, mirroring how each
@@ -44,6 +46,34 @@ class MyPaintLayerCanvasComponent : public CanvasComponent {
         // ("destination-out dab pass on the raster surface for libmypaint
         // layers, unchanged path-erase for vector strokes").
         void erase_along_segment(const Vector2f& localStart, const Vector2f& localEnd, float localRadius);
+
+        // PHASE2 M1: per-stroke recording. Each MyPaintLayer component
+        // holds at most one libmypaint stroke (M3 architecture: one
+        // pen-down → one component). The brush tool calls
+        // begin_recorded_stroke at pen-down, then record_stroke_sample
+        // for each pen-motion event. The samples store the artist's pen
+        // path (component-local coords + pressure) — that's the input
+        // libmypaint converts into dabs, and it's the right input for
+        // M2's bezier fitting (smoother + more truthful to artist intent
+        // than the post-discretization dab positions).
+        //
+        // The recording is "valid" until invalidate_recording() is
+        // called. The eraser invalidates on touch — once a stroke's
+        // raster has been independently modified, replaying its
+        // recorded path would no longer match what the user sees.
+        struct RecordedStrokeSample {
+            float x, y;       // component-local coords (same space as tile data)
+            float pressure;   // 0..1, multiplies brush radius for spine width
+            template <typename Archive> void serialize(Archive& a) { a(x, y, pressure); }
+        };
+        void begin_recorded_stroke(const Eigen::Vector3f& color, float baseRadius);
+        void record_stroke_sample(float x, float y, float pressure);
+        void invalidate_recording();
+
+        bool has_valid_recording() const { return strokeRecordingValid_ && !recordedSamples_.empty(); }
+        const std::vector<RecordedStrokeSample>& get_recorded_samples() const { return recordedSamples_; }
+        Eigen::Vector3f get_recorded_color() const { return recordedColor_; }
+        float get_recorded_base_radius() const { return recordedBaseRadius_; }
 #endif
 
     private:
@@ -61,5 +91,12 @@ class MyPaintLayerCanvasComponent : public CanvasComponent {
 
         mutable bool boundsCacheValid_ = false;
         mutable SCollision::AABB<float> boundsCache_{};
+
+        // PHASE2 M1: stroke recording state. Set on begin_recorded_stroke,
+        // appended on record_stroke_sample, dropped on invalidate_recording.
+        std::vector<RecordedStrokeSample> recordedSamples_;
+        Eigen::Vector3f recordedColor_{0.0f, 0.0f, 0.0f};
+        float recordedBaseRadius_ = 0.0f;
+        bool strokeRecordingValid_ = false;
 #endif
 };
