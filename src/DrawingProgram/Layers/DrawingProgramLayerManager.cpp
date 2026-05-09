@@ -18,7 +18,63 @@ DrawingProgramLayerManager::DrawingProgramLayerManager(DrawingProgram& drawProg)
 void DrawingProgramLayerManager::server_init_no_file() {
     layerTreeRoot = drawP.world.netObjMan.make_obj_from_ptr<DrawingProgramLayerListItem>(new DrawingProgramLayerListItem(drawP.world.netObjMan, "ROOT", true));
     layerTreeRoot->get_folder().set_component_list_callbacks(*this); // Only need to call set_component_list_callbacks on root, and the rest will get the callbacks set as well
-    editingLayer = layerTreeRoot->get_folder().folderList->emplace_back_direct(layerTreeRoot->get_folder().folderList, drawP.world.netObjMan, "First Layer", false)->obj;
+    // PHASE2: replace the legacy single "First Layer" with the named
+    // Sketch / Color / Ink trio. ensure_named_layers handles the
+    // stack-anchor placement and sets editingLayer to INK.
+    ensure_named_layers();
+}
+
+void DrawingProgramLayerManager::ensure_named_layers() {
+    if(!layerTreeRoot) return;
+    auto& rootList = layerTreeRoot->get_folder().folderList;
+
+    bool hasSketch = false, hasColor = false, hasInk = false;
+    NetworkingObjects::NetObjWeakPtr<DrawingProgramLayerListItem> inkRef;
+    for(auto& info : *rootList) {
+        switch(info.obj->get_kind()) {
+            case LayerKind::SKETCH:  hasSketch = true; break;
+            case LayerKind::COLOR:   hasColor  = true; break;
+            case LayerKind::INK:     hasInk = true; inkRef = info.obj; break;
+            case LayerKind::DEFAULT: break;
+        }
+    }
+
+    // Lazy-create missing named layers in stack-anchor positions:
+    // SKETCH at the very bottom (end of folderList), INK at the very
+    // top (front of folderList), COLOR just above SKETCH. For an
+    // empty doc this yields [INK, COLOR, SKETCH]. For a legacy file
+    // with existing layers, this anchors the named layers without
+    // disturbing the legacy content (which sits between INK and COLOR).
+    NetworkingObjects::NetObjOrderedListIterator<DrawingProgramLayerListItem> sketchIt;
+    bool justAddedSketch = false;
+    if(!hasSketch) {
+        sketchIt = rootList->emplace_direct(rootList, rootList->end(), drawP.world.netObjMan, "Sketch", false, LayerKind::SKETCH);
+        justAddedSketch = true;
+    }
+    if(!hasColor) {
+        if(justAddedSketch)
+            rootList->emplace_direct(rootList, sketchIt, drawP.world.netObjMan, "Color", false, LayerKind::COLOR);
+        else
+            rootList->emplace_direct(rootList, rootList->end(), drawP.world.netObjMan, "Color", false, LayerKind::COLOR);
+    }
+    if(!hasInk) {
+        auto inkIt = rootList->emplace_direct(rootList, rootList->begin(), drawP.world.netObjMan, "Ink", false, LayerKind::INK);
+        inkRef = inkIt->obj;
+    }
+
+    // Default editingLayer to INK so the artist's first stroke goes
+    // into the right layer; survives lazy-create across loads.
+    if(!inkRef.expired())
+        editingLayer = inkRef;
+}
+
+NetworkingObjects::NetObjWeakPtr<DrawingProgramLayerListItem> DrawingProgramLayerManager::get_named_layer(LayerKind k) {
+    if(!layerTreeRoot || k == LayerKind::DEFAULT) return {};
+    for(auto& info : *layerTreeRoot->get_folder().folderList) {
+        if(info.obj->get_kind() == k)
+            return info.obj;
+    }
+    return {};
 }
 
 void DrawingProgramLayerManager::scale_up(const WorldScalar& scaleUpAmount) {
@@ -39,7 +95,10 @@ void DrawingProgramLayerManager::read_components_client(cereal::PortableBinaryIn
         comp->obj->commit_update_dont_invalidate_cache(drawP);
     });
     drawP.rebuild_cache();
-    editingLayer = layerTreeRoot->get_folder().get_initial_editing_layer();
+    // Server should ship named layers in the tree already; ensure_named_layers
+    // is a no-op in the normal case but defends against a server that
+    // somehow sent a tree missing one.
+    ensure_named_layers();
 }
 
 bool DrawingProgramLayerManager::is_a_layer_being_edited() {
@@ -286,7 +345,10 @@ void DrawingProgramLayerManager::load_file(cereal::PortableBinaryInputArchive& a
     });
     layerTreeRoot->erase_invalid_components();
     drawP.rebuild_cache();
-    editingLayer = layerTreeRoot->get_folder().get_initial_editing_layer();
+    // PHASE2: ensure Sketch / Color / Ink exist; lazy-create any missing
+    // (legacy InfiniPaint files and pre-Phase-2 Inkternity files have
+    // none) and set editingLayer to INK.
+    ensure_named_layers();
 }
 
 void DrawingProgramLayerManager::save_file(cereal::PortableBinaryOutputArchive& a) const {

@@ -10,7 +10,7 @@ namespace VersionConstants {
     VersionNumber header_to_version_number(const std::string& header); 
 
     constexpr int SAVEFILE_HEADER_LEN = 12; // DO NOT CHANGE THIS HEADER LENGTH
-    const std::string CURRENT_SAVEFILE_HEADER = "INFPNT000008"; // Change whenever the save file is incompatible with the previous version
-    const std::string CURRENT_VERSION_STRING = "0.7.0";
-    constexpr VersionNumber CURRENT_VERSION_NUMBER(0, 7, 0);
+    const std::string CURRENT_SAVEFILE_HEADER = "INFPNT000009"; // Change whenever the save file is incompatible with the previous version
+    const std::string CURRENT_VERSION_STRING = "0.8.0";
+    constexpr VersionNumber CURRENT_VERSION_NUMBER(0, 8, 0);
 }

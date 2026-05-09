@@ -1,6 +1,7 @@
 #pragma once
 #include "DrawingProgramLayerListItem.hpp"
 #include "DrawingProgramLayerManagerGUI.hpp"
+#include "LayerKind.hpp"
 #include <unordered_set>
 
 class DrawingProgramLayerManager {
@@ -59,6 +60,14 @@ class DrawingProgramLayerManager {
         bool layer_tree_root_exists();
         const DrawingProgramLayerListItem& get_layer_root();
         uint32_t total_component_count();
+
+        // PHASE2: ensure exactly one of each named-kind layer exists at
+        // root; lazy-create any that are missing. Sets editingLayer to
+        // the INK layer afterward. Safe to call multiple times.
+        void ensure_named_layers();
+        // Returns the root-level layer with the given non-DEFAULT kind,
+        // or an expired weak ptr if none exists.
+        NetworkingObjects::NetObjWeakPtr<DrawingProgramLayerListItem> get_named_layer(LayerKind k);
 
         CanvasComponentContainer::ObjInfo* add_component_to_layer_being_edited(CanvasComponentContainer* newObj);
         std::vector<CanvasComponentContainer::ObjInfoIterator> add_many_components_to_layer_being_edited(const std::vector<std::pair<CanvasComponentContainer::ObjInfoIterator, CanvasComponentContainer*>>& newObjs);

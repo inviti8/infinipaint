@@ -5,6 +5,7 @@
 #include <unordered_set>
 #include "DrawingProgramLayerFolder.hpp"
 #include "DrawingProgramLayer.hpp"
+#include "LayerKind.hpp"
 #include "SerializedBlendMode.hpp"
 #include "../../CanvasComponents/CanvasComponentContainer.hpp"
 
@@ -32,8 +33,10 @@ struct DrawingProgramLayerListItemUndoData {
 class DrawingProgramLayerListItem {
     public:
         DrawingProgramLayerListItem();
-        DrawingProgramLayerListItem(NetworkingObjects::NetObjManager& netObjMan, const std::string& initName, bool isFolder);
+        DrawingProgramLayerListItem(NetworkingObjects::NetObjManager& netObjMan, const std::string& initName, bool isFolder, LayerKind initKind = LayerKind::DEFAULT);
         DrawingProgramLayerListItem(World& w, const DrawingProgramLayerListItemUndoData& undoData);
+
+        LayerKind get_kind() const { return kind; }
         DrawingProgramLayerListItemUndoData get_undo_data(WorldUndoManager& u) const;
         bool is_folder() const;
         DrawingProgramLayerFolder& get_folder() const;
@@ -89,4 +92,9 @@ class DrawingProgramLayerListItem {
         };
         NetworkingObjects::NetObjOwnerPtr<NameData> nameData;
         NetworkingObjects::NetObjOwnerPtr<DisplayData> displayData;
+        // Set at construction; immutable for the lifetime of the layer
+        // (named-kind invariants are enforced by the layer manager, not
+        // by mutating this field). NetObj-synced via constructor data;
+        // file-saved gated at format version >= 0.8.
+        LayerKind kind = LayerKind::DEFAULT;
 };

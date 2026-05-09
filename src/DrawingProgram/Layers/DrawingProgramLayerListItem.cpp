@@ -2,6 +2,8 @@
 #include "DrawingProgramLayerFolder.hpp"
 #include <cereal/types/string.hpp>
 #include "DrawingProgramLayer.hpp"
+#include "../../MainProgram.hpp"
+#include "../../ReaderMode/ReaderMode.hpp"
 #include "../../World.hpp"
 #include "SerializedBlendMode.hpp"
 
@@ -20,7 +22,7 @@ void DrawingProgramLayerListItemUndoData::scale_up(const WorldScalar& scaleUpAmo
 
 DrawingProgramLayerListItem::DrawingProgramLayerListItem() {}
 
-DrawingProgramLayerListItem::DrawingProgramLayerListItem(NetworkingObjects::NetObjManager& netObjMan, const std::string& initName, bool isFolder) {
+DrawingProgramLayerListItem::DrawingProgramLayerListItem(NetworkingObjects::NetObjManager& netObjMan, const std::string& initName, bool isFolder, LayerKind initKind) {
     if(isFolder) {
         folderData = std::make_unique<DrawingProgramLayerFolder>();
         folderData->folderList = netObjMan.make_obj<NetworkingObjects::NetObjOrderedList<DrawingProgramLayerListItem>>();
@@ -32,6 +34,7 @@ DrawingProgramLayerListItem::DrawingProgramLayerListItem(NetworkingObjects::NetO
     nameData = netObjMan.make_obj<NameData>();
     nameData->name = initName;
     displayData = netObjMan.make_obj<DisplayData>();
+    kind = initKind;
 }
 
 DrawingProgramLayerListItem::DrawingProgramLayerListItem(World& w, const DrawingProgramLayerListItemUndoData& initData) {
@@ -162,6 +165,13 @@ void DrawingProgramLayerListItem::load_file(cereal::PortableBinaryInputArchive& 
     displayData = layerMan.drawP.world.netObjMan.make_obj<DisplayData>();
     a(*displayData);
 
+    if(version >= VersionNumber(0, 8, 0)) {
+        uint8_t kindByte;
+        a(kindByte);
+        kind = static_cast<LayerKind>(kindByte);
+    }
+    // Pre-0.8 layers stay LayerKind::DEFAULT (the ctor default).
+
     bool isFolder;
     a(isFolder);
     if(isFolder) {
@@ -177,6 +187,7 @@ void DrawingProgramLayerListItem::load_file(cereal::PortableBinaryInputArchive& 
 void DrawingProgramLayerListItem::save_file(cereal::PortableBinaryOutputArchive& a) const {
     a(*nameData);
     a(*displayData);
+    a(static_cast<uint8_t>(kind));
     a(static_cast<bool>(folderData));
     if(folderData)
         folderData->save_file(a);
@@ -192,6 +203,11 @@ void DrawingProgramLayerListItem::get_used_resources(std::unordered_set<Networki
 }
 
 void DrawingProgramLayerListItem::draw(SkCanvas* canvas, const DrawData& drawData) const {
+    // Reader mode hides SKETCH-kind layers (raster-only rough scratch
+    // surface; not part of the published comic). COLOR + INK + DEFAULT
+    // render normally.
+    if(kind == LayerKind::SKETCH && drawData.main && drawData.main->world && drawData.main->world->readerMode.is_active())
+        return;
     if(displayData->visible) {
         if(!drawData.isSVGRender) {
             SkPaint layerPaint;
@@ -308,6 +324,7 @@ void DrawingProgramLayerListItem::write_constructor_func(const NetworkingObjects
         o->layerData->components.write_create_message(a);
     o->nameData.write_create_message(a);
     o->displayData.write_create_message(a);
+    a(static_cast<uint8_t>(o->kind));
 }
 
 void DrawingProgramLayerListItem::read_constructor_func(const NetworkingObjects::NetObjTemporaryPtr<DrawingProgramLayerListItem>& o, cereal::PortableBinaryInputArchive& a, const std::shared_ptr<NetServer::ClientData>& c) {
@@ -323,4 +340,7 @@ void DrawingProgramLayerListItem::read_constructor_func(const NetworkingObjects:
     }
     o->nameData = o.get_obj_man()->read_create_message<NameData>(a, c);
     o->displayData = o.get_obj_man()->read_create_message<DisplayData>(a, c);
+    uint8_t kindByte;
+    a(kindByte);
+    o->kind = static_cast<LayerKind>(kindByte);
 }
