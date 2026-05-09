@@ -99,25 +99,15 @@ namespace {
 
 #ifdef HVYM_HAS_LIBMYPAINT
 
-// Walks each fitted bezier and emits sample points for the BrushStrokeCanvas
-// component. kSamplesPerBezier is intentionally modest — BrushStrokeCanvas
-// already smooths internally between adjacent points, so 8 samples per
-// segment yields a visually-smooth stroke without ballooning the point
-// count. Width per sample is interpolated linearly from the recorded
-// pressures at the closest source-sample positions.
-constexpr int kSamplesPerBezier = 8;
-
-// Map a parameter t ∈ [0..1] back to "source sample index space" so we
-// can interpolate per-sample pressure into per-sample width along the
-// resampled bezier output. This is approximate (the bezier param doesn't
-// correspond exactly to chord-position in the original polyline), but
-// it's accurate enough for variable-width visual fidelity on ink strokes.
+// Map a parameter t ∈ [0..1] across the entire stroke back to "source
+// sample index space" so we can pull per-sample pressure from the
+// recorded samples at any point along the fitted output.
 float pressure_at_chord_t(const std::vector<MyPaintLayerCanvasComponent::RecordedStrokeSample>& src,
                           float chordT)
 {
     if (src.empty()) return 1.0f;
     if (src.size() == 1) return src[0].pressure;
-    const float idxF = chordT * static_cast<float>(src.size() - 1);
+    const float idxF = std::clamp(chordT, 0.0f, 1.0f) * static_cast<float>(src.size() - 1);
     const int i0 = std::clamp(static_cast<int>(std::floor(idxF)), 0, static_cast<int>(src.size()) - 2);
     const float frac = idxF - static_cast<float>(i0);
     return src[i0].pressure * (1.0f - frac) + src[i0 + 1].pressure * frac;
@@ -126,6 +116,15 @@ float pressure_at_chord_t(const std::vector<MyPaintLayerCanvasComponent::Recorde
 // Build a BrushStrokeCanvasComponent from a fitted-bezier list + the
 // source recording (for color, base radius, and per-sample pressure).
 // Returns nullptr if the result would be visually empty.
+//
+// Output strategy: emit the bezier endpoints (P0 of segment 0, plus P3
+// of every segment) as the polyline points. BrushStrokeCanvasComponent
+// internally Catmull-Rom subdivides each segment 5 times, so a sparse
+// input with intelligent breakpoints (which is exactly what Schneider
+// gives us — splits land at the high-curvature points) yields a far
+// smoother rendered stroke than a dense per-segment resampling would.
+// Dense resampling fights the Catmull-Rom smoother and produces
+// chevron-shaped artifacts at every input control point.
 CanvasComponentContainer* build_vector_stroke_from_recording(
     NetworkingObjects::NetObjManager& netObjMan,
     const std::vector<StrokeVectorize::CubicBezier2D>& beziers,
@@ -147,36 +146,32 @@ CanvasComponentContainer* build_vector_stroke_from_recording(
 
     const float baseRadius = source.get_recorded_base_radius();
     const auto& srcSamples = source.get_recorded_samples();
+    const auto width_at = [&](float globalT) {
+        const float p = pressure_at_chord_t(srcSamples, globalT);
+        // Width = diameter ≈ baseRadius * pressure * 2.
+        return std::max(0.5f, baseRadius * p * 2.0f);
+    };
 
-    // Walk each bezier, sampling at uniform t. Skip the t=0 of every
-    // bezier after the first to avoid duplicating the join point.
     auto& outPts = *bs.d.points;
+    outPts.reserve(beziers.size() + 1);
+
+    // First point: P0 of the first bezier (== first recorded sample).
+    {
+        BrushStrokeCanvasComponentPoint p;
+        p.pos = Vector2f{beziers.front().p0.x(), beziers.front().p0.y()};
+        p.width = width_at(0.0f);
+        outPts.push_back(p);
+    }
+    // Then P3 of every bezier in order (each is also the next bezier's P0).
     for (size_t b = 0; b < beziers.size(); ++b) {
         const auto& bz = beziers[b];
-        const int startI = (b == 0) ? 0 : 1;
-        for (int i = startI; i <= kSamplesPerBezier; ++i) {
-            const float tLocal = static_cast<float>(i) / static_cast<float>(kSamplesPerBezier);
-            const float mu = 1.0f - tLocal;
-            const Vector2f pos =
-                mu * mu * mu * bz.p0 +
-                3.0f * mu * mu * tLocal * bz.p1 +
-                3.0f * mu * tLocal * tLocal * bz.p2 +
-                tLocal * tLocal * tLocal * bz.p3;
-
-            // Map (b, tLocal) to a global chord-fraction across the entire
-            // stroke and pull pressure from the closest source samples.
-            const float globalT = (static_cast<float>(b) + tLocal) / static_cast<float>(beziers.size());
-            const float pressure = pressure_at_chord_t(srcSamples, globalT);
-
-            BrushStrokeCanvasComponentPoint p;
-            p.pos = pos;
-            // Width = diameter ≈ baseRadius * pressure * 2. The factor of
-            // 2 ports radius→diameter; if the visual weight ends up off
-            // we'll calibrate by eyeball.
-            p.width = std::max(0.5f, baseRadius * pressure * 2.0f);
-            outPts.emplace_back(p);
-        }
+        const float globalT = static_cast<float>(b + 1) / static_cast<float>(beziers.size());
+        BrushStrokeCanvasComponentPoint p;
+        p.pos = Vector2f{bz.p3.x(), bz.p3.y()};
+        p.width = width_at(globalT);
+        outPts.push_back(p);
     }
+
     if (outPts.size() < 2) {
         delete container;
         return nullptr;
