@@ -2,6 +2,8 @@
 #include "DrawingProgramLayerManager.hpp"
 #include "../DrawingProgram.hpp"
 #include "../../World.hpp"
+#include "../../CanvasComponents/WaypointCanvasComponent.hpp"
+#include "../../Waypoints/WaypointGraph.hpp"
 #include <Helpers/NetworkingObjects/NetObjOrderedList.hpp>
 #include <Helpers/Parallel.hpp>
 #include <Helpers/Logger.hpp>
@@ -30,6 +32,15 @@ void DrawingProgramLayer::set_component_list_callbacks(DrawingProgramLayerListIt
             return downloadingFile.comp == &(*c);
         });
         layerMan.drawP.updateableComponents.erase(&(*c));
+        // PHASE2 polish: when a WaypointCanvasComponent goes away (undo
+        // of a waypoint drop, eraser tool over the marker, layer delete,
+        // etc.) sweep the linked Waypoint out of wpGraph too — without
+        // this the tree-view node persists as an orphan and the file
+        // still saves it.
+        if (c->obj->get_comp().get_type() == CanvasComponentType::WAYPOINT) {
+            const auto& wpc = static_cast<const WaypointCanvasComponent&>(c->obj->get_comp());
+            layerMan.drawP.world.wpGraph.erase_waypoint_by_id(wpc.get_waypoint_id());
+        }
     };
     components->set_insert_callback(insertCallback);
     components->set_erase_callback(eraseCallback);

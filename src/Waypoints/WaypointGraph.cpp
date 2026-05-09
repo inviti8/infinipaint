@@ -41,6 +41,33 @@ void WaypointGraph::scale_up(const WorldScalar& scaleUpAmount) {
     }
 }
 
+void WaypointGraph::erase_waypoint_by_id(NetworkingObjects::NetObjID id) {
+    // Erase any edges referencing the waypoint first — the iterators
+    // get invalidated after the node erase below, so do this pass first.
+    if (edges) {
+        std::vector<NetObjOrderedListIterator<Edge>> edgesToErase;
+        for (auto it = edges->begin(); it != edges->end(); ++it) {
+            if (it->obj->get_from() == id || it->obj->get_to() == id)
+                edgesToErase.push_back(it);
+        }
+        for (auto& it : edgesToErase)
+            edges->erase(edges, it);
+    }
+    // Erase the node itself.
+    if (nodes) {
+        for (auto it = nodes->begin(); it != nodes->end(); ++it) {
+            if (it->obj.get_net_id() == id) {
+                nodes->erase(nodes, it);
+                break;
+            }
+        }
+    }
+    // Drop the layout entry + clear selection if it pointed here.
+    layout.erase(id);
+    if (selectedId.has_value() && selectedId.value() == id)
+        selectedId.reset();
+}
+
 void WaypointGraph::save_file(cereal::PortableBinaryOutputArchive& a) const {
     // Build NetObjID -> file-index map so edges and layout entries can
     // reference nodes by stable position rather than by runtime

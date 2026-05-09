@@ -89,6 +89,14 @@ void EraserTool::erase_between_points(const Vector2f& start, const Vector2f& end
     // delete), false when we kept it but mutated its tiles (raster erase).
     auto try_punch_or_mark = [&](auto c) -> bool {
         auto& container = *c->obj;
+        // PHASE2 polish: waypoint markers are protected from the eraser.
+        // Inkternity's drawing flow has artists drawing alongside placed
+        // waypoints; an accidental brush over a marker would lose the
+        // waypoint (and any edges into it via the linked-deletion sweep
+        // in the layer's eraseCallback). The Edit tool / waypoint tool
+        // remain the explicit way to delete a waypoint.
+        if (container.get_comp().get_type() == CanvasComponentType::WAYPOINT)
+            return false;
 #ifdef HVYM_HAS_LIBMYPAINT
         if (container.get_comp().get_type() == CanvasComponentType::MYPAINTLAYER) {
             auto& layer = static_cast<MyPaintLayerCanvasComponent&>(container.get_comp());

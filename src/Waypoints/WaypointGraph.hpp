@@ -50,6 +50,15 @@ class WaypointGraph {
         void select(NetworkingObjects::NetObjID id)        { selectedId = id; }
         void clear_selection()                             { selectedId.reset(); }
 
+        // PHASE2 polish: erases the Waypoint with the given NetObjID,
+        // any edges that reference it, its layout entry, and clears
+        // selection if it pointed at this waypoint. No-op if the id
+        // doesn't match a known node. Called from the layer-component
+        // erase callback so any path that removes the on-canvas
+        // WaypointCanvasComponent (undo, eraser, layer delete) also
+        // sweeps the graph-side state.
+        void erase_waypoint_by_id(NetworkingObjects::NetObjID id);
+
     private:
         World& world;
 
