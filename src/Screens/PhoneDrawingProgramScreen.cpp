@@ -134,6 +134,21 @@ void PhoneDrawingProgramScreen::top_toolbar() {
                             });
                         }
                     }
+                    // PHASE2 (M6 followup): layer manager button. Phone
+                    // layout's top toolbar predates Phase 2 and lacked
+                    // any way to reach the layer-manager popup; without
+                    // this the visibility/alpha/blend controls on the
+                    // Sketch/Color/Ink layers (and any DEFAULT layers)
+                    // are unreachable. Hidden in reader mode for parity
+                    // with the dropdown.
+                    Element* layerMenuButton = nullptr;
+                    if (!main.world->readerMode.is_active()) {
+                        layerMenuButton = svg_icon_button(gui, "Layer Manager Button", "data/icons/layer.svg", {
+                            .drawType = SelectableButton::DrawType::TRANSPARENT_ALL,
+                            .isSelected = layerMenuPopupOpen,
+                            .onClick = [&] { layerMenuPopupOpen = !layerMenuPopupOpen; }
+                        });
+                    }
                     // Reader-mode toggle: lives in the top toolbar (never
                     // hidden) so the user can exit reader mode after the
                     // bottom editor toolbar disappears.
@@ -142,6 +157,8 @@ void PhoneDrawingProgramScreen::top_toolbar() {
                         .isSelected = main.world->readerMode.is_active(),
                         .onClick = [&] { main.world->readerMode.toggle(); }
                     });
+                    if (layerMenuPopupOpen && layerMenuButton)
+                        layer_menu_popup(layerMenuButton);
                 }
             });
         }
@@ -247,6 +264,43 @@ void PhoneDrawingProgramScreen::bottom_toolbar() {
                 }
             }
         }
+    });
+}
+
+void PhoneDrawingProgramScreen::layer_menu_popup(Element* triggerButton) {
+    auto& gui = main.g.gui;
+    auto& io = gui.io;
+    gui.set_z_index(gui.get_z_index() + 1, [&] {
+        gui.element<LayoutElement>("phone layer menu", [&] (LayoutElement*, const Clay_ElementId& lId) {
+            CLAY(lId, {
+                .layout = {
+                    .sizing = {.width = CLAY_SIZING_FIT(300), .height = CLAY_SIZING_FIT(0, 600) },
+                    .padding = CLAY_PADDING_ALL(io.theme->padding1),
+                    .childGap = io.theme->childGap1,
+                    .childAlignment = { .x = CLAY_ALIGN_X_CENTER, .y = CLAY_ALIGN_Y_TOP},
+                    .layoutDirection = CLAY_TOP_TO_BOTTOM
+                },
+                .backgroundColor = convert_vec4<Clay_Color>(io.theme->backColor1),
+                .cornerRadius = CLAY_CORNER_RADIUS(io.theme->windowCorners1),
+                .floating = {
+                    .offset = {.x = 0, .y = static_cast<float>(io.theme->padding1)},
+                    .zIndex = gui.get_z_index(),
+                    .attachPoints = {.element = CLAY_ATTACH_POINT_RIGHT_TOP, .parent = CLAY_ATTACH_POINT_RIGHT_BOTTOM},
+                    .attachTo = CLAY_ATTACH_TO_PARENT
+                }
+            }) {
+                text_label_centered(gui, "Layers");
+                main.world->drawProg.layerMan.listGUI.setup_list_gui();
+            }
+        }, LayoutElement::Callbacks {
+            .onClick = [&, triggerButton] (LayoutElement* l, const InputManager::MouseButtonCallbackArgs& button) {
+                if(!l->mouseHovering && !l->childMouseHovering && !triggerButton->mouseHovering && button.down) {
+                    main.world->drawProg.layerMan.listGUI.refresh_gui_data();
+                    layerMenuPopupOpen = false;
+                    main.g.gui.set_to_layout();
+                }
+            }
+        });
     });
 }
 

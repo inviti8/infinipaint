@@ -30,6 +30,12 @@ class PhoneDrawingProgramScreen : public DrawingProgramScreen {
         // kind each frame; default Ink (matches the new-world default
         // editingLayer).
         size_t layerDropdownIndex = 2;
+        // PHASE2 (M6 followup): layer-manager popup state. Phone layout
+        // didn't carry a layer-manager surface pre-Phase-2; without
+        // this the Sketch/Color/Ink visibility/alpha/blend controls
+        // would be unreachable from the phone toolbar.
+        bool layerMenuPopupOpen = false;
+        void layer_menu_popup(GUIStuff::Element* triggerButton);
         struct ColorPickerPopupData {
             enum class ScreenType {
                 NORMAL,
