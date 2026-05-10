@@ -428,14 +428,17 @@ void render_reader_branch_overlay(World& world, GUIStuff::GUIManager& gui) {
             },
         }) {
             // Back button as the first item, only when there's history
-            // to pop. Same square size as the choice buttons so the row
-            // reads as a uniform strip.
+            // to pop. Sized down to ~60% of the choice-button side so
+            // the bare arrow glyph dominates and reads as "just a
+            // symbol" rather than a button-in-a-box. TRANSPARENT_ALL
+            // already kills the resting background; the smaller hit
+            // box collapses the empty padding around the glyph.
             if (world.readerMode.has_history()) {
                 GUIStuff::ElementHelpers::svg_icon_button(
                     gui, "reader back",
                     "data/icons/RemixIcon/arrow-left-s-line.svg", {
                     .drawType = GUIStuff::SelectableButton::DrawType::TRANSPARENT_ALL,
-                    .size = BRANCH_BUTTON_SIDE,
+                    .size = BRANCH_BUTTON_SIDE * 0.6f,
                     .onClick = [&world] { world.readerMode.back(); }
                 });
             }
