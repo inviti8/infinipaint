@@ -83,6 +83,29 @@ class World {
         std::filesystem::path filePath;
         std::string name;
 
+        // P0-C2 (DISTRIBUTION-PHASE0.md §C): subscription metadata.
+        // Set when an artist publishes the canvas through the portal;
+        // empty/default for unpublished canvases. The host-mode token
+        // verifier reads these to validate incoming subscriber tokens
+        // (canvas binding + identity binding). All three persisted in
+        // the .inkternity file from format version 0.11 onward.
+        //
+        //   canvasId             — UUID assigned by the portal at
+        //                          publish-for-subscribers time.
+        //   artistMemberPubkey   — Stellar G... or hex pubkey of the
+        //                          artist that owns this canvas. The
+        //                          host's own member pubkey must match
+        //                          this on every accepted token.
+        //   appPubkeyAtPublish   — hex pubkey of the Inkternity app
+        //                          install that published this canvas.
+        //                          The host's own app pubkey must match.
+        //
+        // Host runs in subscriber-only mode iff !canvasId.empty().
+        std::string canvasId;
+        std::string artistMemberPubkey;
+        std::string appPubkeyAtPublish;
+        bool is_published_for_subscribers() const { return !canvasId.empty(); }
+
         NetworkingObjects::NetObjTemporaryPtr<ClientData> ownClientData;
         NetworkingObjects::NetObjOwnerPtr<NetworkingObjects::NetObjUnorderedSet<ClientData>> clients;
 

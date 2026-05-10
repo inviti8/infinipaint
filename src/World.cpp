@@ -7,6 +7,7 @@
 #include <Helpers/VersionNumber.hpp>
 #include <Helpers/NetworkingObjects/NetObjGenericSerializedClass.hpp>
 #include <Helpers/NetworkingObjects/DelayUpdateSerializedClassManager.hpp>
+#include <cereal/types/string.hpp>
 #include <cereal/types/unordered_map.hpp>
 #include "DrawingProgram/Layers/DrawingProgramLayerListItem.hpp"
 #include "Helpers/NetworkingObjects/NetObjOrderedList.hpp"
@@ -607,6 +608,12 @@ void World::save_file(cereal::PortableBinaryOutputArchive& a) const {
     wpGraph.save_file(a);
     gridMan.save_file(a);
     rMan.save_file(a);
+    // P0-C2: subscription metadata. Always written from format v0.11
+    // onward; load gates on >= 0.11 so older files don't try to consume
+    // bytes that aren't there.
+    a(canvasId);
+    a(artistMemberPubkey);
+    a(appPubkeyAtPublish);
 }
 
 void World::load_file(cereal::PortableBinaryInputArchive& a, VersionNumber version) {
@@ -620,6 +627,12 @@ void World::load_file(cereal::PortableBinaryInputArchive& a, VersionNumber versi
         wpGraph.server_init_no_file();  // M4-b will migrate from bMan instead
     gridMan.load_file(a, version);
     rMan.load_file(a, version);
+    if (version >= VersionNumber(0, 11, 0)) {
+        a(canvasId);
+        a(artistMemberPubkey);
+        a(appPubkeyAtPublish);
+    }
+    // Older files default to empty (unpublished) — exactly what we want.
 }
 
 WorldScalar World::calculate_zoom_from_uniform_zoom(WorldScalar uniformZoom, WorldVec oldWindowSize) {
