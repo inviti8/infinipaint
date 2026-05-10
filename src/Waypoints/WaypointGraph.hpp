@@ -71,6 +71,16 @@ class WaypointGraph {
                                           NetworkingObjects::NetObjID to,
                                           std::optional<std::string> label);
 
+        // TRANSITIONS.md T6 — counts outgoing edges from `from`. Used
+        // by WaypointTool to decide whether to surface the multi-out
+        // toggle-on cleanup prompt.
+        size_t count_outgoing_edges_from(NetworkingObjects::NetObjID from) const;
+
+        // TRANSITIONS.md T6 — keeps the first outgoing edge from
+        // `from` (in graph order) and erases every other one. The
+        // user-facing "Keep first" cleanup action is the trigger.
+        void prune_outgoing_edges_to_first(NetworkingObjects::NetObjID from);
+
     private:
         World& world;
 

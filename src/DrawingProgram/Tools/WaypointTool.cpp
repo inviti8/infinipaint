@@ -12,6 +12,7 @@
 #include "../../GUIStuff/ElementHelpers/NumberSliderHelpers.hpp"
 #include "../../GUIStuff/ElementHelpers/LayoutHelpers.hpp"
 #include "../../GUIStuff/ElementHelpers/CheckBoxHelpers.hpp"
+#include "../../GUIStuff/ElementHelpers/ButtonHelpers.hpp"
 #include "../../GUIStuff/Elements/DropDown.hpp"
 #include "Helpers/NetworkingObjects/NetObjTemporaryPtr.decl.hpp"
 #include "Helpers/SCollision.hpp"
@@ -139,6 +140,27 @@ void WaypointTool::gui_toolbox(Toolbar&) {
                         &wpRef->mutable_stop_time(),
                         Waypoint::TRANSITION_STOP_TIME_MIN, Waypoint::TRANSITION_STOP_TIME_MAX,
                         { .decimalPrecision = 1 });
+                    // T6: invariant-violation prompt. Shown whenever a
+                    // transition-flagged waypoint has 2+ outgoing edges
+                    // (most commonly right after the user just toggled
+                    // the flag on). Stateless — re-evaluates each frame
+                    // from the live graph state, so navigating away and
+                    // back leaves the prompt in place until acted on.
+                    const auto selId = drawP.world.wpGraph.get_selected();
+                    const size_t outCount = drawP.world.wpGraph.count_outgoing_edges_from(selId);
+                    if (outCount >= 2) {
+                        text_label(gui, "Has " + std::to_string(outCount) + " outgoing edges; transitions allow only 1.");
+                        text_button(gui, "prune outgoing", "Keep first edge",
+                            { .onClick = [this, selId] {
+                                drawP.world.wpGraph.prune_outgoing_edges_to_first(selId);
+                            }});
+                        text_button(gui, "cancel transition", "Cancel transition",
+                            { .onClick = [this, selId] {
+                                auto ref = drawP.world.netObjMan.get_obj_temporary_ref_from_id<Waypoint>(selId);
+                                if (ref) ref->set_is_transition(false);
+                                invalidate_marker_caches();
+                            }});
+                    }
                 }
                 return;
             }
@@ -178,6 +200,22 @@ void WaypointTool::gui_phone_toolbox(PhoneDrawingProgramScreen&) {
                         &wpRef->mutable_stop_time(),
                         Waypoint::TRANSITION_STOP_TIME_MIN, Waypoint::TRANSITION_STOP_TIME_MAX,
                         { .decimalPrecision = 1 });
+                    // T6 — see desktop variant for full notes; identical logic.
+                    const auto selId = drawP.world.wpGraph.get_selected();
+                    const size_t outCount = drawP.world.wpGraph.count_outgoing_edges_from(selId);
+                    if (outCount >= 2) {
+                        text_label(gui, "Has " + std::to_string(outCount) + " outgoing edges; transitions allow only 1.");
+                        text_button(gui, "prune outgoing", "Keep first edge",
+                            { .onClick = [this, selId] {
+                                drawP.world.wpGraph.prune_outgoing_edges_to_first(selId);
+                            }});
+                        text_button(gui, "cancel transition", "Cancel transition",
+                            { .onClick = [this, selId] {
+                                auto ref = drawP.world.netObjMan.get_obj_temporary_ref_from_id<Waypoint>(selId);
+                                if (ref) ref->set_is_transition(false);
+                                invalidate_marker_caches();
+                            }});
+                    }
                 }
             }
         }

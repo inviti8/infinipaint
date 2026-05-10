@@ -170,6 +170,7 @@ class TreeViewGraphElement : public GUIStuff::Element {
                 const bool selected = selectedOpt.has_value() && selectedOpt.value() == nb.id;
                 auto wpRef = world->netObjMan.get_obj_temporary_ref_from_id<Waypoint>(nb.id);
                 const bool hasSkin = wpRef && wpRef->has_skin();
+                const bool isTransition = wpRef && wpRef->is_transition();
 
                 if (hasSkin) {
                     // Skinned: draw only the skin, preserving aspect ratio
@@ -225,6 +226,35 @@ class TreeViewGraphElement : public GUIStuff::Element {
                     canvas->drawSimpleText(display.data(), display.size(), SkTextEncoding::kUTF8,
                                            topLeft.x() + 12.0f, topLeft.y() + NODE_H * 0.5f + 5.0f,
                                            font, textPaint);
+                }
+
+                // T4: transition-point badge — small filled diamond in
+                // the top-right corner. Same shape as the canvas marker
+                // variant so the two views read as the same kind of
+                // node at a glance. Drawn on top of both skinned and
+                // plain backgrounds so it's visible either way.
+                if (isTransition) {
+                    constexpr float BADGE_RADIUS = 5.0f;
+                    constexpr float BADGE_PAD    = 6.0f;
+                    const float bcx = topLeft.x() + NODE_W - BADGE_PAD - BADGE_RADIUS;
+                    const float bcy = topLeft.y() + BADGE_PAD + BADGE_RADIUS;
+                    SkPathBuilder badgePB;
+                    badgePB.moveTo(bcx,                bcy - BADGE_RADIUS);
+                    badgePB.lineTo(bcx + BADGE_RADIUS, bcy);
+                    badgePB.lineTo(bcx,                bcy + BADGE_RADIUS);
+                    badgePB.lineTo(bcx - BADGE_RADIUS, bcy);
+                    badgePB.close();
+                    SkPath badge = badgePB.detach();
+                    SkPaint badgeFill;
+                    badgeFill.setAntiAlias(skiaAA);
+                    badgeFill.setColor4f({0.88f, 0.69f, 0.25f, 1.0f});  // gold
+                    canvas->drawPath(badge, badgeFill);
+                    SkPaint badgeOutline;
+                    badgeOutline.setAntiAlias(skiaAA);
+                    badgeOutline.setStyle(SkPaint::kStroke_Style);
+                    badgeOutline.setStrokeWidth(0.0f);
+                    badgeOutline.setColor4f({0.15f, 0.10f, 0.05f, 1.0f});
+                    canvas->drawPath(badge, badgeOutline);
                 }
 
                 // Edge port (small dot at bottom-center). Drag from this

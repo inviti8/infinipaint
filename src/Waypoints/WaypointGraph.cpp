@@ -63,6 +63,27 @@ void WaypointGraph::add_edge_enforcing_invariant(NetObjID from,
     edges->emplace_back_direct(edges, from, to, std::move(label));
 }
 
+size_t WaypointGraph::count_outgoing_edges_from(NetObjID from) const {
+    if (!edges) return 0;
+    size_t n = 0;
+    for (auto& info : *edges) {
+        if (info.obj->get_from() == from) ++n;
+    }
+    return n;
+}
+
+void WaypointGraph::prune_outgoing_edges_to_first(NetObjID from) {
+    if (!edges) return;
+    bool keptFirst = false;
+    std::vector<NetObjOrderedListIterator<Edge>> toErase;
+    for (auto it = edges->begin(); it != edges->end(); ++it) {
+        if (it->obj->get_from() != from) continue;
+        if (!keptFirst) { keptFirst = true; continue; }
+        toErase.push_back(it);
+    }
+    for (auto& it : toErase) edges->erase(edges, it);
+}
+
 void WaypointGraph::erase_waypoint_by_id(NetworkingObjects::NetObjID id) {
     // Erase any edges referencing the waypoint first — the iterators
     // get invalidated after the node erase below, so do this pass first.
