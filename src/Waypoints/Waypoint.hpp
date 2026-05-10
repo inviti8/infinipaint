@@ -97,6 +97,25 @@ class Waypoint {
         // Mutable raw access for the WaypointTool dropdown widget.
         TransitionEasing& mutable_transition_easing() { return transitionEasing; }
 
+        // TRANSITIONS.md — transition-point variant. When `isTransition`
+        // is true, this waypoint is auto-advanced through by reader mode
+        // rather than stopped at: the camera arrives, pauses for
+        // `stopTime` seconds, then walks the (single) outgoing edge.
+        // Both fields default to "behaves as a normal waypoint" so old
+        // saves and toggling the flag off restore Phase-2 behavior
+        // exactly. The "single outgoing edge" invariant is enforced at
+        // edge-creation/toggle time; reader mode falls back to "first
+        // outgoing edge wins" when the data temporarily violates it.
+        static constexpr float TRANSITION_STOP_TIME_MIN     = 0.0f;
+        static constexpr float TRANSITION_STOP_TIME_MAX     = 5.0f;
+        static constexpr float TRANSITION_STOP_TIME_DEFAULT = 0.0f;
+        bool  is_transition()                 const { return isTransition; }
+        void  set_is_transition(bool v)             { isTransition = v; }
+        bool& mutable_is_transition()               { return isTransition; }
+        float get_stop_time()                 const { return stopTime; }
+        void  set_stop_time(float t)                { stopTime = std::clamp(t, TRANSITION_STOP_TIME_MIN, TRANSITION_STOP_TIME_MAX); }
+        float& mutable_stop_time()                  { return stopTime; }
+
         void scale_up(const WorldScalar& scaleUpAmount);
 
         void save_file(cereal::PortableBinaryOutputArchive& a) const;
@@ -111,6 +130,12 @@ class Waypoint {
         // (currently just the speed multiplier; M5 will append easing).
         // Caller gates on file version >= 0.9.0.
         void load_transition_data_from_archive(cereal::PortableBinaryInputArchive& a, VersionNumber version);
+        // TRANSITIONS.md — reads the transition-point fields
+        // (isTransition + stopTime). Caller gates on file version >=
+        // 0.10.0. Block is independent of load_transition_data so a
+        // future migration can rearrange one without touching the
+        // other.
+        void load_transition_point_data_from_archive(cereal::PortableBinaryInputArchive& a, VersionNumber version);
 
         static void register_class(World& w);
 
@@ -123,4 +148,6 @@ class Waypoint {
         sk_sp<SkImage> skin;
         float transitionSpeedMultiplier = TRANSITION_SPEED_DEFAULT;
         TransitionEasing transitionEasing = TransitionEasing::EASE;
+        bool  isTransition = false;
+        float stopTime     = TRANSITION_STOP_TIME_DEFAULT;
 };

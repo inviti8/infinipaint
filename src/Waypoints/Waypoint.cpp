@@ -91,6 +91,10 @@ void Waypoint::save_file(cereal::PortableBinaryOutputArchive& a) const {
     // that aren't there.
     a(transitionSpeedMultiplier);
     a(static_cast<uint8_t>(transitionEasing));
+    // TRANSITIONS.md — transition-point fields. Written from format
+    // v0.10 onward; load path gates on >= 0.10.
+    a(isTransition);
+    a(stopTime);
 }
 
 void Waypoint::load_skin_from_archive(cereal::PortableBinaryInputArchive& a, VersionNumber) {
@@ -108,6 +112,12 @@ void Waypoint::load_transition_data_from_archive(cereal::PortableBinaryInputArch
     if (easingByte > static_cast<uint8_t>(TransitionEasing::EASE_IN_OUT))
         easingByte = static_cast<uint8_t>(TransitionEasing::EASE);
     transitionEasing = static_cast<TransitionEasing>(easingByte);
+}
+
+void Waypoint::load_transition_point_data_from_archive(cereal::PortableBinaryInputArchive& a, VersionNumber) {
+    a(isTransition);
+    a(stopTime);
+    stopTime = std::clamp(stopTime, TRANSITION_STOP_TIME_MIN, TRANSITION_STOP_TIME_MAX);
 }
 
 void Waypoint::write_constructor_data(const NetObjTemporaryPtr<Waypoint>& o, cereal::PortableBinaryOutputArchive& a) {

@@ -11,6 +11,7 @@
 #include "../../GUIStuff/ElementHelpers/TextBoxHelpers.hpp"
 #include "../../GUIStuff/ElementHelpers/NumberSliderHelpers.hpp"
 #include "../../GUIStuff/ElementHelpers/LayoutHelpers.hpp"
+#include "../../GUIStuff/ElementHelpers/CheckBoxHelpers.hpp"
 #include "../../GUIStuff/Elements/DropDown.hpp"
 #include "Helpers/NetworkingObjects/NetObjTemporaryPtr.decl.hpp"
 #include "Helpers/SCollision.hpp"
@@ -126,6 +127,19 @@ void WaypointTool::gui_toolbox(Toolbar&) {
                         reinterpret_cast<uint8_t*>(&wpRef->mutable_transition_easing()),
                         transition_easing_display_names());
                 });
+                // TRANSITIONS.md — transition-point flag + stop-time
+                // slider (slider only renders when the flag is on).
+                // Toggling the flag is just a data flip here; T6 will
+                // add the multi-out confirm guard around it.
+                checkbox_boolean_field(gui, "is transition", "Transition point",
+                    &wpRef->mutable_is_transition(),
+                    [this] { invalidate_marker_caches(); });
+                if (wpRef->is_transition()) {
+                    slider_scalar_field<float>(gui, "stop time", "Stop time (s)",
+                        &wpRef->mutable_stop_time(),
+                        Waypoint::TRANSITION_STOP_TIME_MIN, Waypoint::TRANSITION_STOP_TIME_MAX,
+                        { .decimalPrecision = 1 });
+                }
                 return;
             }
         }
@@ -156,9 +170,22 @@ void WaypointTool::gui_phone_toolbox(PhoneDrawingProgramScreen&) {
                         reinterpret_cast<uint8_t*>(&wpRef->mutable_transition_easing()),
                         transition_easing_display_names());
                 });
+                checkbox_boolean_field(gui, "is transition", "Transition point",
+                    &wpRef->mutable_is_transition(),
+                    [this] { invalidate_marker_caches(); });
+                if (wpRef->is_transition()) {
+                    slider_scalar_field<float>(gui, "stop time", "Stop time (s)",
+                        &wpRef->mutable_stop_time(),
+                        Waypoint::TRANSITION_STOP_TIME_MIN, Waypoint::TRANSITION_STOP_TIME_MAX,
+                        { .decimalPrecision = 1 });
+                }
             }
         }
     });
+}
+
+void WaypointTool::invalidate_marker_caches() {
+    drawP.drawCache.clear_own_cached_surfaces();
 }
 
 void WaypointTool::right_click_popup_gui(Toolbar&, Vector2f) {}

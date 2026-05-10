@@ -48,6 +48,16 @@ class WaypointTool : public DrawingProgramToolBase {
         // to the clicked one. Returns true if an edge was created.
         bool try_create_edge_to_clicked(const Vector2f& clickPos);
 
+        // Drops the entire draw-cache surface so the next frame
+        // re-renders every component. Used after a waypoint property
+        // change that alters the marker's pixels (e.g. the transition
+        // flag) — without this, the BVH keeps blitting the previously-
+        // rendered marker. Heavy hammer but safe and matches what
+        // CanvasTheme uses for the same class of "visuals changed"
+        // event; the cost is one full re-render on a user click, which
+        // is unnoticeable.
+        void invalidate_marker_caches();
+
         // Selection state lives on WaypointGraph as the single source of
         // truth shared between this tool and the TreeView panel — a
         // click in either updates the other's chrome.

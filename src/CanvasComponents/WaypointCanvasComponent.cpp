@@ -9,6 +9,7 @@
 #include <include/core/SkCanvas.h>
 #include <include/core/SkPaint.h>
 #include <include/core/SkPath.h>
+#include <include/core/SkPathBuilder.h>
 
 CanvasComponentType WaypointCanvasComponent::get_type() const {
     return CanvasComponentType::WAYPOINT;
@@ -63,9 +64,13 @@ void WaypointCanvasComponent::draw(SkCanvas* canvas, const DrawData& drawData, c
     const SkScalar r = static_cast<SkScalar>(MARKER_RADIUS_PX);
 
     bool hasSkin = false;
+    bool isTransition = false;
     if (drawData.main && drawData.main->world) {
         auto wpRef = drawData.main->world->netObjMan.get_obj_temporary_ref_from_id<Waypoint>(d.waypointId);
-        if (wpRef) hasSkin = wpRef->has_skin();
+        if (wpRef) {
+            hasSkin = wpRef->has_skin();
+            isTransition = wpRef->is_transition();
+        }
     }
 
     SkPaint fill;
@@ -74,14 +79,32 @@ void WaypointCanvasComponent::draw(SkCanvas* canvas, const DrawData& drawData, c
         ? SkColor4f{0.92f, 0.40f, 0.62f, 1.0f}   // accent pink for skinned
         : SkColor4f{0.88f, 0.69f, 0.25f, 1.0f}); // gold for plain
     fill.setStyle(SkPaint::kFill_Style);
-    canvas->drawCircle(cx, cy, r, fill);
 
     SkPaint outline;
     outline.setAntiAlias(drawData.skiaAA);
     outline.setColor4f({0.15f, 0.10f, 0.05f, 1.0f});
     outline.setStyle(SkPaint::kStroke_Style);
     outline.setStrokeWidth(0.0f);
-    canvas->drawCircle(cx, cy, r, outline);
+
+    if (isTransition) {
+        // TRANSITIONS.md — transition points draw as a smaller diamond
+        // (square rotated 45°) so they read as visually subordinate
+        // stepping-stones between user-stop waypoints. ~70% radius keeps
+        // them clearly smaller than waypoint discs at any zoom level.
+        const SkScalar dr = r * 0.7f;
+        SkPathBuilder pb;
+        pb.moveTo(cx,      cy - dr);
+        pb.lineTo(cx + dr, cy);
+        pb.lineTo(cx,      cy + dr);
+        pb.lineTo(cx - dr, cy);
+        pb.close();
+        SkPath diamond = pb.detach();
+        canvas->drawPath(diamond, fill);
+        canvas->drawPath(diamond, outline);
+    } else {
+        canvas->drawCircle(cx, cy, r, fill);
+        canvas->drawCircle(cx, cy, r, outline);
+    }
 }
 
 void WaypointCanvasComponent::initialize_draw_data(DrawingProgram&) {
