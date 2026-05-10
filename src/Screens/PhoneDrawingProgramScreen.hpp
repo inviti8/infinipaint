@@ -36,6 +36,26 @@ class PhoneDrawingProgramScreen : public DrawingProgramScreen {
         // would be unreachable from the phone toolbar.
         bool layerMenuPopupOpen = false;
         void layer_menu_popup(GUIStuff::Element* triggerButton);
+
+        // P0-C0 (DISTRIBUTION-PHASE0.md): networking menu state. The
+        // phone top-bar previously had no Host/Connect surface — only
+        // the desktop Toolbar exposed it. Without this, no Phase 0
+        // testing is possible on touch devices (which is the only screen
+        // FileSelectScreen instantiates today).
+        bool mainMenuPopupOpen = false;
+        enum class PhoneNetMenu : uint8_t {
+            NONE,
+            HOST,         // pre-host: showing the lobby address + Host/Cancel
+            CONNECT,      // pre-connect: paste address, Connect/Cancel
+            LOBBY_INFO    // already hosting/connected: show address + copy
+        } phoneNetMenu = PhoneNetMenu::NONE;
+        // Mirror of Toolbar's serverToConnectTo / serverLocalID. Held
+        // here so HOST flow can pre-generate the address before the user
+        // confirms (matching desktop UX in Toolbar.cpp:577-580).
+        std::string phoneNetLobbyAddress;
+        std::string phoneNetLocalID;
+        void main_menu_popup(GUIStuff::Element* triggerButton);
+        void network_menu_popup();
         struct ColorPickerPopupData {
             enum class ScreenType {
                 NORMAL,

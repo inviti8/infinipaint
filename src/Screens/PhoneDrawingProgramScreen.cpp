@@ -14,6 +14,8 @@
 #include "../GUIStuff/ElementHelpers/TextBoxHelpers.hpp"
 #include "FileSelectScreen.hpp"
 #include "../Brushes/BrushPresets.hpp"
+#include "../CustomEvents.hpp"
+#include <Helpers/Networking/NetLibrary.hpp>
 #include <Helpers/Logger.hpp>
 
 using namespace GUIStuff;
@@ -101,6 +103,16 @@ void PhoneDrawingProgramScreen::top_toolbar() {
                     CLAY_AUTO_ID({
                         .layout = {.sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_GROW(0)}}
                     }) {}
+                    // P0-C0: networking menu trigger. The phone top-bar
+                    // had no Host/Connect surface before this; tapping
+                    // this opens a small popup with Host / Connect /
+                    // Lobby Info actions, mirroring the desktop Toolbar
+                    // menu but phone-native (centered modal sub-popups).
+                    Element* mainMenuButton = svg_icon_button(gui, "main menu button (phone)", "data/icons/RemixIcon/more-fill.svg", {
+                        .drawType = SelectableButton::DrawType::TRANSPARENT_ALL,
+                        .isSelected = mainMenuPopupOpen,
+                        .onClick = [&] { mainMenuPopupOpen = !mainMenuPopupOpen; }
+                    });
                     // PHASE2 C4: Sketch / Color / Ink layer dropdown — picks
                     // which named layer is the active edit target. Hidden in
                     // reader mode (no edit target meaningful with chrome off).
@@ -160,10 +172,16 @@ void PhoneDrawingProgramScreen::top_toolbar() {
                     });
                     if (layerMenuPopupOpen && layerMenuButton)
                         layer_menu_popup(layerMenuButton);
+                    if (mainMenuPopupOpen)
+                        main_menu_popup(mainMenuButton);
                 }
             });
         }
     });
+    // Sub-modal for Host / Connect / Lobby Info. Rendered at the screen
+    // root so it overlays everything; gates internally on phoneNetMenu.
+    if (phoneNetMenu != PhoneNetMenu::NONE)
+        network_menu_popup();
 }
 
 void PhoneDrawingProgramScreen::bottom_toolbar() {
@@ -265,6 +283,163 @@ void PhoneDrawingProgramScreen::bottom_toolbar() {
                 }
             }
         }
+    });
+}
+
+void PhoneDrawingProgramScreen::main_menu_popup(Element* triggerButton) {
+    auto& gui = main.g.gui;
+    auto& io = gui.io;
+    gui.set_z_index(gui.get_z_index() + 1, [&] {
+        gui.element<LayoutElement>("phone main menu", [&] (LayoutElement*, const Clay_ElementId& lId) {
+            CLAY(lId, {
+                .layout = {
+                    .sizing = {.width = CLAY_SIZING_FIT(220), .height = CLAY_SIZING_FIT(0) },
+                    .padding = CLAY_PADDING_ALL(io.theme->padding1),
+                    .childGap = io.theme->childGap1,
+                    .childAlignment = { .x = CLAY_ALIGN_X_CENTER, .y = CLAY_ALIGN_Y_TOP},
+                    .layoutDirection = CLAY_TOP_TO_BOTTOM
+                },
+                .backgroundColor = convert_vec4<Clay_Color>(io.theme->backColor1),
+                .cornerRadius = CLAY_CORNER_RADIUS(io.theme->windowCorners1),
+                .floating = {
+                    .offset = {.x = 0, .y = static_cast<float>(io.theme->padding1)},
+                    .zIndex = gui.get_z_index(),
+                    .attachPoints = {.element = CLAY_ATTACH_POINT_RIGHT_TOP, .parent = CLAY_ATTACH_POINT_RIGHT_BOTTOM},
+                    .attachTo = CLAY_ATTACH_TO_PARENT
+                }
+            }) {
+                auto menu_item = [&](const char* id, std::string_view label, const std::function<void()>& onClick) {
+                    text_button(gui, id, label, {
+                        .drawType = SelectableButton::DrawType::TRANSPARENT_ALL,
+                        .wide = true,
+                        .centered = false,
+                        .onClick = [&, onClick] {
+                            onClick();
+                            mainMenuPopupOpen = false;
+                        }
+                    });
+                };
+                if (main.world->netObjMan.is_connected()) {
+                    menu_item("phone lobby info", "Lobby Info", [&] {
+                        phoneNetMenu = PhoneNetMenu::LOBBY_INFO;
+                    });
+                }
+                menu_item("phone host", "Host", [&] {
+                    // Pre-generate the lobby address so the user sees it
+                    // before confirming. Mirrors Toolbar.cpp:577-580.
+                    phoneNetLocalID = NetLibrary::get_random_server_local_id();
+                    phoneNetLobbyAddress = NetLibrary::get_global_id() + phoneNetLocalID;
+                    phoneNetMenu = PhoneNetMenu::HOST;
+                });
+                menu_item("phone connect", "Connect", [&] {
+                    phoneNetLobbyAddress.clear();
+                    phoneNetMenu = PhoneNetMenu::CONNECT;
+                });
+            }
+        }, LayoutElement::Callbacks {
+            .onClick = [&, triggerButton] (LayoutElement* l, const InputManager::MouseButtonCallbackArgs& button) {
+                if(!l->mouseHovering && !l->childMouseHovering && !triggerButton->mouseHovering && button.down) {
+                    mainMenuPopupOpen = false;
+                    main.g.gui.set_to_layout();
+                }
+            }
+        });
+    });
+}
+
+void PhoneDrawingProgramScreen::network_menu_popup() {
+    auto& gui = main.g.gui;
+    auto& io = gui.io;
+    // Centered modal — same shape as Toolbar::center_obstructing_window_gui
+    // but inlined here so the phone screen doesn't need a Toolbar member.
+    gui.set_z_index(100, [&] {
+        gui.element<LayoutElement>("phone network menu modal", [&] (LayoutElement*, const Clay_ElementId& lId) {
+            CLAY(lId, {
+                .layout = {
+                    .sizing = {.width = CLAY_SIZING_FIT(600), .height = CLAY_SIZING_FIT(0) },
+                    .padding = CLAY_PADDING_ALL(io.theme->padding1),
+                    .childGap = io.theme->childGap1,
+                    .childAlignment = { .x = CLAY_ALIGN_X_CENTER, .y = CLAY_ALIGN_Y_TOP},
+                    .layoutDirection = CLAY_TOP_TO_BOTTOM
+                },
+                .backgroundColor = convert_vec4<Clay_Color>(io.theme->backColor1),
+                .cornerRadius = CLAY_CORNER_RADIUS(io.theme->windowCorners1),
+                .floating = {
+                    .zIndex = gui.get_z_index(),
+                    .attachPoints = {.element = CLAY_ATTACH_POINT_CENTER_CENTER, .parent = CLAY_ATTACH_POINT_CENTER_CENTER},
+                    .attachTo = CLAY_ATTACH_TO_PARENT
+                }
+            }) {
+                switch (phoneNetMenu) {
+                    case PhoneNetMenu::HOST: {
+                        text_label_centered(gui, "Host this canvas");
+                        input_text_field(gui, "phone host lobby field", "Lobby", &phoneNetLobbyAddress);
+                        left_to_right_line_layout(gui, [&]() {
+                            text_button(gui, "phone host copy", "Copy Address", {
+                                .wide = true,
+                                .onClick = [&] { main.input.set_clipboard_str(phoneNetLobbyAddress); }
+                            });
+                            text_button(gui, "phone host confirm", "Host", {
+                                .wide = true,
+                                .onClick = [&] {
+                                    main.world->start_hosting(phoneNetLobbyAddress, phoneNetLocalID);
+                                    phoneNetMenu = PhoneNetMenu::NONE;
+                                }
+                            });
+                            text_button(gui, "phone host cancel", "Cancel", {
+                                .wide = true,
+                                .onClick = [&] { phoneNetMenu = PhoneNetMenu::NONE; }
+                            });
+                        });
+                        break;
+                    }
+                    case PhoneNetMenu::CONNECT: {
+                        text_label_centered(gui, "Connect to a lobby");
+                        input_text_field(gui, "phone connect lobby field", "Lobby", &phoneNetLobbyAddress);
+                        left_to_right_line_layout(gui, [&]() {
+                            text_button(gui, "phone connect confirm", "Connect", {
+                                .wide = true,
+                                .onClick = [&] {
+                                    if (phoneNetLobbyAddress.length() != (NetLibrary::LOCALID_LEN + NetLibrary::GLOBALID_LEN))
+                                        Logger::get().log("USERINFO", "Connect issue: Incorrect address length");
+                                    else if (phoneNetLobbyAddress.substr(0, NetLibrary::GLOBALID_LEN) == NetLibrary::get_global_id())
+                                        Logger::get().log("USERINFO", "Connect issue: Can't connect to your own address");
+                                    else {
+                                        CustomEvents::emit_event<CustomEvents::OpenInfiniPaintFileEvent>({
+                                            .isClient = true,
+                                            .netSource = phoneNetLobbyAddress
+                                        });
+                                        phoneNetMenu = PhoneNetMenu::NONE;
+                                    }
+                                }
+                            });
+                            text_button(gui, "phone connect cancel", "Cancel", {
+                                .wide = true,
+                                .onClick = [&] { phoneNetMenu = PhoneNetMenu::NONE; }
+                            });
+                        });
+                        break;
+                    }
+                    case PhoneNetMenu::LOBBY_INFO: {
+                        text_label_centered(gui, "Lobby info");
+                        input_text_field(gui, "phone lobby info field", "Lobby", &main.world->netSource);
+                        left_to_right_line_layout(gui, [&]() {
+                            text_button(gui, "phone lobby info copy", "Copy Address", {
+                                .wide = true,
+                                .onClick = [&] { main.input.set_clipboard_str(main.world->netSource); }
+                            });
+                            text_button(gui, "phone lobby info close", "Close", {
+                                .wide = true,
+                                .onClick = [&] { phoneNetMenu = PhoneNetMenu::NONE; }
+                            });
+                        });
+                        break;
+                    }
+                    case PhoneNetMenu::NONE:
+                        break;
+                }
+            }
+        });
     });
 }
 
