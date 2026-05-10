@@ -421,6 +421,19 @@ void World::ensure_display_name_unique(std::string& displayName) {
 }
 
 void World::start_hosting(const std::string& initNetSource, const std::string& serverLocalID) {
+    // P0-C-DEV: dev-mode auto-publish. When dev keys are loaded AND
+    // this canvas hasn't been published yet, populate the subscription
+    // fields from the dev keys so the host runs in subscriber-only
+    // mode and accepts dev-minted tokens. Production replaces this
+    // with the explicit Publish-for-Subscribers UI (P0-C4).
+    if (!is_published_for_subscribers() && main.devKeys.is_loaded()) {
+        canvasId            = main.devKeys.canvas_id();
+        artistMemberPubkey  = main.devKeys.member_pubkey();
+        appPubkeyAtPublish  = main.devKeys.app_pubkey();
+        Logger::get().log("USERINFO",
+            "DevKeys: hosting this canvas in subscriber-only mode (canvas " + canvasId + ")");
+    }
+
     main.init_net_library();
     netServer = std::make_shared<NetServer>(serverLocalID);
     lastKeepAliveSent = std::chrono::steady_clock::now();

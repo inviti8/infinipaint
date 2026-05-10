@@ -465,6 +465,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv) {
         mS.m->window.sdlWindow = mS.window;
         mS.m->update_scale_and_density();
         mS.m->load_config();
+        mS.m->devKeys.load(mS.m->conf.configPath);
         #ifdef __EMSCRIPTEN__
             emscripten_set_beforeunload_callback((void*)mSPtr, emscripten_before_unload);
         #endif

@@ -16,6 +16,7 @@
 #include "DrawingProgram/ToolConfiguration.hpp"
 #include "GUIHolder.hpp"
 #include "GlobalConfig.hpp"
+#include "DevKeys.hpp"
 #include "Screens/Screen.hpp"
 
 #ifdef USE_SKIA_BACKEND_GRAPHITE
@@ -130,6 +131,11 @@ class MainProgram {
         std::vector<std::shared_ptr<World>> worlds;
 
         GlobalConfig conf;
+
+        // P0-C-DEV: dev-mode credentials, loaded once at startup from
+        // <configPath>/inkternity_dev_keys.json. Stand-in for the
+        // proper credential store coming in P0-C1/C3. See DevKeys.hpp.
+        DevKeys devKeys;
 
         std::optional<unsigned> keybindWaiting;
         void input_add_file_to_canvas_callback(const CustomEvents::AddFileToCanvasEvent& addFile);
