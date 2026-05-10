@@ -390,14 +390,12 @@ class BranchChoiceElement : public GUIStuff::Element {
 
 void render_reader_branch_overlay(World& world, GUIStuff::GUIManager& gui) {
     if (!world.readerMode.is_active()) return;
-    // T9: at a transition point, never show outgoing-choice buttons —
-    // the reader doesn't pick from a transition, the auto-advance
-    // walks it. The back button still shows when there's history so
-    // the reader isn't stranded mid-chain (rare since back is also
-    // available the moment they reach the next real waypoint).
-    auto choices = world.readerMode.current_is_transition()
-        ? std::vector<std::pair<NetworkingObjects::NetObjID, std::optional<std::string>>>{}
-        : world.readerMode.outgoing_choices();
+    // T9 / TRANSITIONS.md — at a transition point the camera is
+    // auto-advancing. The reader has no decision to make (no choice
+    // buttons) and should not be able to interrupt the flow (no back
+    // button either). Nothing renders during a transition stop.
+    if (world.readerMode.current_is_transition()) return;
+    auto choices = world.readerMode.outgoing_choices();
     // Render whenever there's something to show — at least one
     // outgoing choice OR history to step back through. Dead-ends with
     // history still get a back button so the reader isn't stranded.
