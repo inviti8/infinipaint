@@ -41,6 +41,28 @@ void WaypointGraph::scale_up(const WorldScalar& scaleUpAmount) {
     }
 }
 
+void WaypointGraph::add_edge_enforcing_invariant(NetObjID from,
+                                                 NetObjID to,
+                                                 std::optional<std::string> label) {
+    if (!edges) return;
+    // Resolve `from` to a Waypoint to check the transition flag. If the
+    // ref is dangling we still append (no enforcement to apply).
+    auto fromRef = world.netObjMan.get_obj_temporary_ref_from_id<Waypoint>(from);
+    if (fromRef && fromRef->is_transition()) {
+        // Walk outgoing edges from `from`; each is a candidate to
+        // displace. There should be at most one in a well-formed
+        // graph, but defensively erase all of them so a transient
+        // invariant violation (e.g. mid-toggle, future multi-user
+        // race) collapses to a clean single-out state after this call.
+        std::vector<NetObjOrderedListIterator<Edge>> stale;
+        for (auto it = edges->begin(); it != edges->end(); ++it) {
+            if (it->obj->get_from() == from) stale.push_back(it);
+        }
+        for (auto& it : stale) edges->erase(edges, it);
+    }
+    edges->emplace_back_direct(edges, from, to, std::move(label));
+}
+
 void WaypointGraph::erase_waypoint_by_id(NetworkingObjects::NetObjID id) {
     // Erase any edges referencing the waypoint first — the iterators
     // get invalidated after the node erase below, so do this pass first.

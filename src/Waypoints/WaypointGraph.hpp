@@ -59,6 +59,18 @@ class WaypointGraph {
         // sweeps the graph-side state.
         void erase_waypoint_by_id(NetworkingObjects::NetObjID id);
 
+        // TRANSITIONS.md T5 — adds an edge while enforcing the
+        // "transition point has at most one outgoing edge" invariant.
+        // If `from` resolves to a transition Waypoint that already has
+        // an outgoing edge, that edge is erased first; then the new
+        // edge is appended. Non-transition `from` falls through to a
+        // plain append. File-load and any other low-level path that
+        // needs to bypass the invariant should still call
+        // `edges->emplace_back_direct` directly.
+        void add_edge_enforcing_invariant(NetworkingObjects::NetObjID from,
+                                          NetworkingObjects::NetObjID to,
+                                          std::optional<std::string> label);
+
     private:
         World& world;
 

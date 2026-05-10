@@ -2,6 +2,7 @@
 #include "../World.hpp"
 #include "../MainProgram.hpp"
 #include "../FontData.hpp"
+#include <Helpers/Logger.hpp>
 #include "../Waypoints/Waypoint.hpp"
 #include "../Waypoints/Edge.hpp"
 #include "../Waypoints/WaypointGraph.hpp"
@@ -27,9 +28,24 @@ void ReaderMode::toggle() {
     set_active(!active);
 }
 
+// TRANSITIONS.md T7 — small helper used by every navigation entry
+// point: returns true if `id` resolves to a Waypoint with the
+// transition flag set. Dangling refs and missing nodes return false.
+namespace {
+bool is_waypoint_transition(World& w, NetworkingObjects::NetObjID id) {
+    auto ref = w.netObjMan.get_obj_temporary_ref_from_id<Waypoint>(id);
+    return ref && ref->is_transition();
+}
+}  // namespace
+
+bool ReaderMode::current_is_transition() const {
+    return currentId.has_value() && is_waypoint_transition(world, currentId.value());
+}
+
 void ReaderMode::set_active(bool a) {
     if (active == a) return;
     active = a;
+    cancel_auto_advance();  // clean state on every toggle
     if (active) {
         // Pick a starting waypoint: existing selection if any, else the
         // first node in the graph. Reader mode with zero waypoints is a
@@ -41,15 +57,25 @@ void ReaderMode::set_active(bool a) {
             startId = world.wpGraph.get_nodes()->begin()->obj.get_net_id();
         currentId = startId;
         history.clear();
-        if (currentId.has_value())
+        if (currentId.has_value()) {
             snap_camera_to_current();
+            // T7: entering reader mode directly onto a transition
+            // point is allowed — auto-advance kicks in on the first
+            // tick after this. The first node the reader actually
+            // *stops* at is the first non-transition downstream.
+            if (current_is_transition()) enter_transition_phase_for_current();
+        }
     }
     world.set_to_layout_gui_if_focus();
 }
 
 void ReaderMode::set_current(NetworkingObjects::NetObjID id) {
     currentId = id;
-    if (active) snap_camera_to_current();
+    cancel_auto_advance();
+    if (active) {
+        snap_camera_to_current();
+        if (current_is_transition()) enter_transition_phase_for_current();
+    }
 }
 
 void ReaderMode::forward() {
@@ -62,10 +88,10 @@ void ReaderMode::forward() {
     // arrow's "advance" semantics.
     for (auto& info : *edges) {
         if (info.obj->get_from() != currentId.value()) continue;
-        history.push_back(currentId.value());
-        currentId = info.obj->get_to();
-        snap_camera_to_current();
-        world.set_to_layout_gui_if_focus();
+        // Route through navigate_to so all the T7/T8/T10 bookkeeping
+        // (history-skip, chain reset, transition-phase entry) lives
+        // in one place.
+        navigate_to(info.obj->get_to());
         return;
     }
     // No outgoing edge — dead end. M7-d will surface a "the end"
@@ -74,9 +100,13 @@ void ReaderMode::forward() {
 
 void ReaderMode::back() {
     if (!active || history.empty()) return;
+    cancel_auto_advance();  // user input cancels any in-flight chain
     currentId = history.back();
     history.pop_back();
     snap_camera_to_current();
+    // The previous waypoint we just popped to is by definition NOT a
+    // transition (T8: transitions never enter history). So no need
+    // to re-enter the transition phase here.
     world.set_to_layout_gui_if_focus();
 }
 
@@ -99,9 +129,30 @@ bool ReaderMode::is_branch_point() const {
 
 void ReaderMode::navigate_to(NetworkingObjects::NetObjID id) {
     if (!active) return;
-    if (currentId.has_value()) history.push_back(currentId.value());
+    cancel_auto_advance();
+    chainHopCount = 0;  // user-driven nav resets the cycle counter
+    // T8: only push to history if leaving a real (non-transition)
+    // waypoint. Transition ids never enter history, so the chain
+    // A -> P1 -> P2 -> B leaves only A on the stack when at B.
+    if (currentId.has_value() && !current_is_transition())
+        history.push_back(currentId.value());
     currentId = id;
     snap_camera_to_current();
+    if (current_is_transition()) enter_transition_phase_for_current();
+    world.set_to_layout_gui_if_focus();
+}
+
+void ReaderMode::auto_advance_to(NetworkingObjects::NetObjID id) {
+    // Internal navigation triggered by the auto-advance state machine.
+    // Distinct from navigate_to in three ways:
+    //  - never pushes onto history (T8 — we're leaving a transition)
+    //  - DOESN'T reset chainHopCount (T10 — keep counting through chain)
+    //  - DOESN'T cancel the auto-advance (we ARE the auto-advance)
+    if (!active) return;
+    currentId = id;
+    snap_camera_to_current();
+    if (current_is_transition()) enter_transition_phase_for_current();
+    else                          phase = TransitionPhase::IDLE;
     world.set_to_layout_gui_if_focus();
 }
 
@@ -117,6 +168,106 @@ void ReaderMode::snap_camera_to_current() {
                                       /*instantJump=*/false,
                                       wpRef->get_transition_speed_multiplier(),
                                       transition_easing_to_bezier_curve(wpRef->get_transition_easing()));
+}
+
+void ReaderMode::cancel_auto_advance() {
+    phase = TransitionPhase::IDLE;
+    cameraTimeRemaining = 0.0f;
+    pauseTimeRemaining  = 0.0f;
+    autoAdvanceTarget.reset();
+    chainHopCount = 0;
+}
+
+float ReaderMode::compute_camera_duration_for(NetworkingObjects::NetObjID id) const {
+    auto ref = world.netObjMan.get_obj_temporary_ref_from_id<Waypoint>(id);
+    if (!ref) return 0.0f;
+    // Mirrors DrawCamera::smooth_move_to math (jumpTransitionTime /
+    // speedMultiplier), so our local timer tracks the camera's move
+    // without polling DrawCamera state.
+    const float mult = ref->get_transition_speed_multiplier();
+    if (mult <= 0.0f) return 0.0f;
+    return world.main.conf.jumpTransitionTime / mult;
+}
+
+void ReaderMode::enter_transition_phase_for_current() {
+    if (!currentId.has_value()) return;
+    cameraTimeRemaining = compute_camera_duration_for(currentId.value());
+    pauseTimeRemaining  = 0.0f;
+    // First outgoing edge target — wins by graph order (T5 enforces
+    // single-out for transitions; if multi-out somehow leaks in, the
+    // first edge is the deterministic fallback per the design doc).
+    autoAdvanceTarget.reset();
+    if (auto& edges = world.wpGraph.get_edges()) {
+        for (auto& info : *edges) {
+            if (info.obj->get_from() != currentId.value()) continue;
+            autoAdvanceTarget = info.obj->get_to();
+            break;
+        }
+    }
+    // T11: transition with no outgoing edges = dead-end. We don't
+    // enter the auto-advance phase at all; reader stops here just
+    // like any dead-end waypoint. Existing dead-end UX (back-only)
+    // applies.
+    if (!autoAdvanceTarget.has_value()) {
+        phase = TransitionPhase::IDLE;
+        return;
+    }
+    phase = TransitionPhase::CAMERA_MOVING;
+}
+
+void ReaderMode::update(float deltaTime) {
+    if (!active || phase == TransitionPhase::IDLE) return;
+    if (deltaTime <= 0.0f) return;
+
+    if (phase == TransitionPhase::CAMERA_MOVING) {
+        cameraTimeRemaining -= deltaTime;
+        if (cameraTimeRemaining > 0.0f) return;
+        // Camera arrived. Read stopTime from the current Waypoint;
+        // <= 0 means "no pause, advance immediately."
+        float stopTime = 0.0f;
+        if (currentId.has_value()) {
+            auto ref = world.netObjMan.get_obj_temporary_ref_from_id<Waypoint>(currentId.value());
+            if (ref) stopTime = ref->get_stop_time();
+        }
+        if (stopTime <= 0.0f) {
+            // Skip the pause phase; fall straight through to the
+            // PAUSING-handling logic below by resetting the timer to
+            // 0 and changing phase. (Easier than duplicating the
+            // advance code.)
+            phase = TransitionPhase::PAUSING;
+            pauseTimeRemaining = 0.0f;
+        } else {
+            phase = TransitionPhase::PAUSING;
+            pauseTimeRemaining = stopTime;
+            return;
+        }
+    }
+
+    if (phase == TransitionPhase::PAUSING) {
+        pauseTimeRemaining -= deltaTime;
+        if (pauseTimeRemaining > 0.0f) return;
+        // T10: cycle protection — bail before the next hop if we've
+        // walked too many transitions in a row. The reader sees the
+        // current node as a dead-end (back-button only) which is the
+        // safest visible behavior; logged once per occurrence.
+        if (chainHopCount >= MAX_TRANSITION_CHAIN) {
+            Logger::get().log("WARN", "ReaderMode: transition chain exceeded MAX_TRANSITION_CHAIN, stopping at current node");
+            cancel_auto_advance();
+            return;
+        }
+        if (autoAdvanceTarget.has_value()) {
+            ++chainHopCount;
+            auto target = autoAdvanceTarget.value();
+            // Note: auto_advance_to may set phase to CAMERA_MOVING
+            // again (chained transition) or IDLE (landed on a real
+            // waypoint).
+            auto_advance_to(target);
+        } else {
+            // Dead-end transition — already handled at phase entry,
+            // but defensive in case something raced.
+            cancel_auto_advance();
+        }
+    }
 }
 
 namespace {
@@ -239,7 +390,14 @@ class BranchChoiceElement : public GUIStuff::Element {
 
 void render_reader_branch_overlay(World& world, GUIStuff::GUIManager& gui) {
     if (!world.readerMode.is_active()) return;
-    auto choices = world.readerMode.outgoing_choices();
+    // T9: at a transition point, never show outgoing-choice buttons —
+    // the reader doesn't pick from a transition, the auto-advance
+    // walks it. The back button still shows when there's history so
+    // the reader isn't stranded mid-chain (rare since back is also
+    // available the moment they reach the next real waypoint).
+    auto choices = world.readerMode.current_is_transition()
+        ? std::vector<std::pair<NetworkingObjects::NetObjID, std::optional<std::string>>>{}
+        : world.readerMode.outgoing_choices();
     // Render whenever there's something to show — at least one
     // outgoing choice OR history to step back through. Dead-ends with
     // history still get a back button so the reader isn't stranded.

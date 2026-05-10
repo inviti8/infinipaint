@@ -1,5 +1,6 @@
 #pragma once
 #include <Helpers/NetworkingObjects/NetObjID.hpp>
+#include <cstdint>
 #include <optional>
 #include <string>
 #include <utility>
@@ -54,17 +55,74 @@ class ReaderMode {
         // isn't active.
         void navigate_to(NetworkingObjects::NetObjID id);
 
+        // TRANSITIONS.md T7 — per-frame tick. Drives the auto-advance
+        // state machine (camera-arrival timer + stopTime pause). No-op
+        // when not on a transition point. Called from World::update
+        // after the camera tick.
+        void update(float deltaTime);
+
+        // TRANSITIONS.md T9 — true when the current node is a
+        // transition point. Branch-overlay render path uses this to
+        // suppress the outgoing-choice buttons (the reader doesn't
+        // pick from a transition; it's auto-advanced).
+        bool current_is_transition() const;
+
     private:
         // Anchors the camera to currentId's stored framing.
         void snap_camera_to_current();
+
+        // TRANSITIONS.md T7 — internal "user didn't trigger this"
+        // navigation, used by the auto-advance walk. Same as
+        // navigate_to but skips the history push (transition ids
+        // never enter history per T8) and doesn't reset the chain
+        // hop counter.
+        void auto_advance_to(NetworkingObjects::NetObjID id);
+
+        // TRANSITIONS.md T7 — entered after navigate_to / auto_advance_to
+        // lands on a transition point. Snapshots the camera-move
+        // duration locally so we tick our own timer rather than polling
+        // DrawCamera (the polish-attempt failure mode).
+        void enter_transition_phase_for_current();
+
+        // TRANSITIONS.md T7 — clears phase + timers. Called on user
+        // input (back/forward/branch click) and on set_active(false)
+        // so the auto-advance never fires after a user interaction.
+        void cancel_auto_advance();
+
+        // TRANSITIONS.md T7 — looks up the target Waypoint and returns
+        // the duration its smooth_move_to will use. Mirrors the math
+        // DrawCamera::smooth_move_to applies (jumpTransitionTime /
+        // speedMultiplier). Used to seed the local camera-arrival
+        // timer.
+        float compute_camera_duration_for(NetworkingObjects::NetObjID id) const;
+
+        // TRANSITIONS.md T10 — guard against an artist building a
+        // transition cycle (A -> P -> A). The chain hop counter
+        // resets on any user-driven nav, increments on each
+        // auto-advance step, and bails when it exceeds this cap.
+        static constexpr int MAX_TRANSITION_CHAIN = 32;
+
+        enum class TransitionPhase : uint8_t {
+            IDLE,            // not on a transition, or chain finished
+            CAMERA_MOVING,   // smooth-move in flight to a transition
+            PAUSING,         // arrived; counting down stopTime
+        };
 
         World& world;
         bool active = false;
         std::optional<NetworkingObjects::NetObjID> currentId;
         // History of previously-visited waypoint ids, in order — back()
         // pops one. Forward navigation pushes the prior currentId here
-        // before swapping current.
+        // before swapping current. Transition-point ids are NEVER
+        // pushed (T8): a chain A -> P1 -> P2 -> B leaves only A in
+        // history when the reader is at B.
         std::vector<NetworkingObjects::NetObjID> history;
+
+        TransitionPhase phase = TransitionPhase::IDLE;
+        float cameraTimeRemaining = 0.0f;
+        float pauseTimeRemaining  = 0.0f;
+        std::optional<NetworkingObjects::NetObjID> autoAdvanceTarget;
+        int   chainHopCount = 0;
 };
 
 // Renders the branch-choice overlay when reader mode is active and

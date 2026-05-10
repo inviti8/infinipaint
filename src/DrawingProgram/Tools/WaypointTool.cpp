@@ -269,8 +269,7 @@ bool WaypointTool::try_create_edge_to_clicked(const Vector2f& clickPos) {
     const auto sel = drawP.world.wpGraph.get_selected();
     if (hitId == sel) return false;  // self-edge: skip
 
-    auto& edges = drawP.world.wpGraph.get_edges();
-    edges->emplace_back_direct(edges, sel, hitId, std::optional<std::string>{});
+    drawP.world.wpGraph.add_edge_enforcing_invariant(sel, hitId, std::optional<std::string>{});
     return true;
 }
 

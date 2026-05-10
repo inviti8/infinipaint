@@ -189,6 +189,12 @@ void World::focus_update() {
     }
 
     drawData.cam.update_main(*this);
+    // TRANSITIONS.md T7 — drives the auto-advance state machine
+    // for transition points. No-op when reader mode isn't active or
+    // we aren't on a transition. Placed after the camera tick so the
+    // local arrival-timer and the actual camera move use the same
+    // deltaTime in the same frame ordering.
+    readerMode.update(main.deltaTime);
 
     rMan.update();
 }

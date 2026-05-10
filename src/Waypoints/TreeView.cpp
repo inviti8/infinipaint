@@ -277,8 +277,8 @@ class TreeViewGraphElement : public GUIStuff::Element {
                     if (dragMode == DragMode::EDGE_CREATE) {
                         if (auto nodeHit = hit_test_node(panelLocal)) {
                             if (nodeHit.value().id != dragSourceId) {
-                                auto& edges = world->wpGraph.get_edges();
-                                edges->emplace_back_direct(edges, dragSourceId, nodeHit.value().id, std::optional<std::string>{});
+                                world->wpGraph.add_edge_enforcing_invariant(
+                                    dragSourceId, nodeHit.value().id, std::optional<std::string>{});
                             }
                         }
                     }
