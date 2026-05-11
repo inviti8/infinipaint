@@ -78,6 +78,7 @@ jobs:
           name: linux-flatpak
           path: Inkternity-*.flatpak
           if-no-files-found: error
+          retention-days: 1  # transport between jobs only; Release asset is the canonical copy
 
   # =====================================================================
   # build-windows  →  NSIS installer (signed)
@@ -193,6 +194,7 @@ jobs:
           name: windows-nsis
           path: build/*.exe
           if-no-files-found: error
+          retention-days: 1
 
   # =====================================================================
   # build-macos  →  DragNDrop DMG (signed + notarized)
@@ -373,6 +375,7 @@ jobs:
           name: macos-dmg
           path: build/Release/*.dmg
           if-no-files-found: error
+          retention-days: 1
 
   # =====================================================================
   # create-release  →  draft GitHub Release with all three installers
