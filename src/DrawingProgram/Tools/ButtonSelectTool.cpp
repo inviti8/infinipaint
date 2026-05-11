@@ -153,4 +153,9 @@ void ButtonSelectTool::capture_skin_to_selected(const Vector2f& camMin, const Ve
     auto wpRef = drawP.world.netObjMan.get_obj_temporary_ref_from_id<Waypoint>(drawP.world.wpGraph.get_selected());
     if (!wpRef) return;
     wpRef->set_skin(cpuImage);
+    // P0.5-LIVE-SYNC: push the new skin to already-connected
+    // subscribers so the branch-overlay button artwork updates live.
+    // Larger payload than the scalar fields but fires only on this
+    // explicit capture action, never on continuous interaction.
+    Waypoint::publish_skin_update(wpRef);
 }

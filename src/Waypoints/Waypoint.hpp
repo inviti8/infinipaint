@@ -61,12 +61,18 @@ class Waypoint {
         // input via onEdit; future fields follow the same pattern.
         std::string& mutable_label() { return label; }
 
-        // P0.5-LIVE-SYNC: broadcasts the current label as a NetObj
-        // update message so already-connected peers (subscribers in
-        // Phase 0's terminology) see the new value. Idempotent —
-        // mutate the label first via mutable_label() / set_label(),
-        // then call this. Safe to call repeatedly.
+        // P0.5-LIVE-SYNC: each publish_*_update broadcasts the current
+        // value of the named field as a NetObj update message so
+        // already-connected peers (subscribers in Phase 0's terminology)
+        // see the new value. Idempotent — mutate the field first via
+        // the mutable_*() / set_*() handle, then call the matching
+        // publish method. Safe to call repeatedly.
         static void publish_label_update(const NetworkingObjects::NetObjTemporaryPtr<Waypoint>& o);
+        static void publish_transition_speed_update(const NetworkingObjects::NetObjTemporaryPtr<Waypoint>& o);
+        static void publish_transition_easing_update(const NetworkingObjects::NetObjTemporaryPtr<Waypoint>& o);
+        static void publish_is_transition_update(const NetworkingObjects::NetObjTemporaryPtr<Waypoint>& o);
+        static void publish_stop_time_update(const NetworkingObjects::NetObjTemporaryPtr<Waypoint>& o);
+        static void publish_skin_update(const NetworkingObjects::NetObjTemporaryPtr<Waypoint>& o);
 
         const CoordSpaceHelper& get_coords() const { return coords; }
         const Vector<int32_t, 2>& get_window_size() const { return windowSize; }

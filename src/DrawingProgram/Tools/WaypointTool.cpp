@@ -123,7 +123,8 @@ void WaypointTool::gui_toolbox(Toolbar&) {
                 slider_scalar_field<float>(gui, "transition speed", "Transition speed",
                     &wpRef->mutable_transition_speed_multiplier(),
                     Waypoint::TRANSITION_SPEED_MIN, Waypoint::TRANSITION_SPEED_MAX,
-                    { .decimalPrecision = 2 });
+                    { .decimalPrecision = 2,
+                      .onEdit = [wpRef] { Waypoint::publish_transition_speed_update(wpRef); } });
                 // PHASE2 M5: easing dropdown. The DropDown<T> widget reads
                 // *(size_t*)d as the selection index, so we cast through
                 // a uint8 alias of the enum (TransitionEasing values
@@ -132,20 +133,25 @@ void WaypointTool::gui_toolbox(Toolbar&) {
                     text_label(gui, "Easing");
                     gui.element<DropDown<uint8_t>>("easing dropdown",
                         reinterpret_cast<uint8_t*>(&wpRef->mutable_transition_easing()),
-                        transition_easing_display_names());
+                        transition_easing_display_names(),
+                        DropdownOptions{
+                            .onClick = [wpRef] { Waypoint::publish_transition_easing_update(wpRef); }
+                        });
                 });
                 // TRANSITIONS.md — transition-point flag + stop-time
                 // slider (slider only renders when the flag is on).
-                // Toggling the flag is just a data flip here; T6 will
-                // add the multi-out confirm guard around it.
                 checkbox_boolean_field(gui, "is transition", "Transition point",
                     &wpRef->mutable_is_transition(),
-                    [this] { invalidate_marker_caches(); });
+                    [this, wpRef] {
+                        invalidate_marker_caches();
+                        Waypoint::publish_is_transition_update(wpRef);
+                    });
                 if (wpRef->is_transition()) {
                     slider_scalar_field<float>(gui, "stop time", "Stop time (s)",
                         &wpRef->mutable_stop_time(),
                         Waypoint::TRANSITION_STOP_TIME_MIN, Waypoint::TRANSITION_STOP_TIME_MAX,
-                        { .decimalPrecision = 1 });
+                        { .decimalPrecision = 1,
+                          .onEdit = [wpRef] { Waypoint::publish_stop_time_update(wpRef); } });
                     // T6: invariant-violation prompt. Shown whenever a
                     // transition-flagged waypoint has 2+ outgoing edges
                     // (most commonly right after the user just toggled
@@ -190,7 +196,8 @@ void WaypointTool::gui_phone_toolbox(PhoneDrawingProgramScreen&) {
                 slider_scalar_field<float>(gui, "transition speed", "Transition speed",
                     &wpRef->mutable_transition_speed_multiplier(),
                     Waypoint::TRANSITION_SPEED_MIN, Waypoint::TRANSITION_SPEED_MAX,
-                    { .decimalPrecision = 2 });
+                    { .decimalPrecision = 2,
+                      .onEdit = [wpRef] { Waypoint::publish_transition_speed_update(wpRef); } });
                 // PHASE2 M5: easing dropdown. The DropDown<T> widget reads
                 // *(size_t*)d as the selection index, so we cast through
                 // a uint8 alias of the enum (TransitionEasing values
@@ -199,16 +206,23 @@ void WaypointTool::gui_phone_toolbox(PhoneDrawingProgramScreen&) {
                     text_label(gui, "Easing");
                     gui.element<DropDown<uint8_t>>("easing dropdown",
                         reinterpret_cast<uint8_t*>(&wpRef->mutable_transition_easing()),
-                        transition_easing_display_names());
+                        transition_easing_display_names(),
+                        DropdownOptions{
+                            .onClick = [wpRef] { Waypoint::publish_transition_easing_update(wpRef); }
+                        });
                 });
                 checkbox_boolean_field(gui, "is transition", "Transition point",
                     &wpRef->mutable_is_transition(),
-                    [this] { invalidate_marker_caches(); });
+                    [this, wpRef] {
+                        invalidate_marker_caches();
+                        Waypoint::publish_is_transition_update(wpRef);
+                    });
                 if (wpRef->is_transition()) {
                     slider_scalar_field<float>(gui, "stop time", "Stop time (s)",
                         &wpRef->mutable_stop_time(),
                         Waypoint::TRANSITION_STOP_TIME_MIN, Waypoint::TRANSITION_STOP_TIME_MAX,
-                        { .decimalPrecision = 1 });
+                        { .decimalPrecision = 1,
+                          .onEdit = [wpRef] { Waypoint::publish_stop_time_update(wpRef); } });
                     // T6 — see desktop variant for full notes; identical logic.
                     const auto selId = drawP.world.wpGraph.get_selected();
                     const size_t outCount = drawP.world.wpGraph.count_outgoing_edges_from(selId);

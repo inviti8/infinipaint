@@ -122,17 +122,59 @@ void Waypoint::load_transition_point_data_from_archive(cereal::PortableBinaryInp
 }
 
 // P0.5-LIVE-SYNC: command set for Waypoint NetObj update messages.
-// Phase 0.5 starts with label only; other fields (transition speed,
-// easing, isTransition, stopTime, skin) follow the same pattern when
-// they need live sync.
+// One enum value per editable field. Wire format: `<command_byte> <field_value>`.
 enum class WaypointCommand : uint8_t {
-    SET_LABEL = 0
+    SET_LABEL              = 0,
+    SET_TRANSITION_SPEED   = 1,
+    SET_TRANSITION_EASING  = 2,
+    SET_IS_TRANSITION      = 3,
+    SET_STOP_TIME          = 4,
+    SET_SKIN               = 5
 };
 
 void Waypoint::publish_label_update(const NetObjTemporaryPtr<Waypoint>& o) {
     o.send_update_to_all(RELIABLE_COMMAND_CHANNEL,
         [](const NetObjTemporaryPtr<Waypoint>& o, cereal::PortableBinaryOutputArchive& a) {
             a(WaypointCommand::SET_LABEL, o->label);
+        });
+}
+
+void Waypoint::publish_transition_speed_update(const NetObjTemporaryPtr<Waypoint>& o) {
+    o.send_update_to_all(RELIABLE_COMMAND_CHANNEL,
+        [](const NetObjTemporaryPtr<Waypoint>& o, cereal::PortableBinaryOutputArchive& a) {
+            a(WaypointCommand::SET_TRANSITION_SPEED, o->transitionSpeedMultiplier);
+        });
+}
+
+void Waypoint::publish_transition_easing_update(const NetObjTemporaryPtr<Waypoint>& o) {
+    o.send_update_to_all(RELIABLE_COMMAND_CHANNEL,
+        [](const NetObjTemporaryPtr<Waypoint>& o, cereal::PortableBinaryOutputArchive& a) {
+            a(WaypointCommand::SET_TRANSITION_EASING, static_cast<uint8_t>(o->transitionEasing));
+        });
+}
+
+void Waypoint::publish_is_transition_update(const NetObjTemporaryPtr<Waypoint>& o) {
+    o.send_update_to_all(RELIABLE_COMMAND_CHANNEL,
+        [](const NetObjTemporaryPtr<Waypoint>& o, cereal::PortableBinaryOutputArchive& a) {
+            a(WaypointCommand::SET_IS_TRANSITION, o->isTransition);
+        });
+}
+
+void Waypoint::publish_stop_time_update(const NetObjTemporaryPtr<Waypoint>& o) {
+    o.send_update_to_all(RELIABLE_COMMAND_CHANNEL,
+        [](const NetObjTemporaryPtr<Waypoint>& o, cereal::PortableBinaryOutputArchive& a) {
+            a(WaypointCommand::SET_STOP_TIME, o->stopTime);
+        });
+}
+
+void Waypoint::publish_skin_update(const NetObjTemporaryPtr<Waypoint>& o) {
+    // Skin is a PNG byte vector — same encoding the snapshot uses.
+    // Larger payload than the scalar fields but fires only on
+    // ButtonSelectTool capture, not on continuous interaction.
+    std::vector<uint8_t> skinBytes = encode_skin_png(o->skin);
+    o.send_update_to_all(RELIABLE_COMMAND_CHANNEL,
+        [&skinBytes](const NetObjTemporaryPtr<Waypoint>& o, cereal::PortableBinaryOutputArchive& a) {
+            a(WaypointCommand::SET_SKIN, skinBytes);
         });
 }
 
@@ -172,10 +214,10 @@ void Waypoint::register_class(World& w) {
         o->skin = decode_skin_png(skinBytes);
         canvas_scale_up_check(*o, w, c);
     };
-    // P0.5-LIVE-SYNC: SET_LABEL update handler.
-    // Client side: receives broadcast, mutates local label.
-    // Server side: receives client send, mutates, re-broadcasts to all
-    // other clients (the canonical fan-out pattern from ClientData).
+    // P0.5-LIVE-SYNC: update handlers for every editable Waypoint
+    // field. Client side receives broadcast and mutates local state.
+    // Server side mutates AND re-broadcasts to all other clients (the
+    // canonical fan-out pattern from ClientData::register_class).
     auto readUpdateClient = [](const NetObjTemporaryPtr<Waypoint>& o, cereal::PortableBinaryInputArchive& a, const std::shared_ptr<NetServer::ClientData>&) {
         WaypointCommand cmd;
         a(cmd);
@@ -183,6 +225,32 @@ void Waypoint::register_class(World& w) {
             case WaypointCommand::SET_LABEL:
                 a(o->label);
                 break;
+            case WaypointCommand::SET_TRANSITION_SPEED:
+                a(o->transitionSpeedMultiplier);
+                o->transitionSpeedMultiplier = std::clamp(o->transitionSpeedMultiplier,
+                                                          TRANSITION_SPEED_MIN, TRANSITION_SPEED_MAX);
+                break;
+            case WaypointCommand::SET_TRANSITION_EASING: {
+                uint8_t b;
+                a(b);
+                if (b > static_cast<uint8_t>(TransitionEasing::EASE_IN_OUT))
+                    b = static_cast<uint8_t>(TransitionEasing::EASE);
+                o->transitionEasing = static_cast<TransitionEasing>(b);
+                break;
+            }
+            case WaypointCommand::SET_IS_TRANSITION:
+                a(o->isTransition);
+                break;
+            case WaypointCommand::SET_STOP_TIME:
+                a(o->stopTime);
+                o->stopTime = std::clamp(o->stopTime, TRANSITION_STOP_TIME_MIN, TRANSITION_STOP_TIME_MAX);
+                break;
+            case WaypointCommand::SET_SKIN: {
+                std::vector<uint8_t> skinBytes;
+                a(skinBytes);
+                o->skin = decode_skin_png(skinBytes);
+                break;
+            }
         }
     };
     auto readUpdateServer = [](const NetObjTemporaryPtr<Waypoint>& o, cereal::PortableBinaryInputArchive& a, const std::shared_ptr<NetServer::ClientData>& c) {
@@ -196,6 +264,52 @@ void Waypoint::register_class(World& w) {
                         a(WaypointCommand::SET_LABEL, o->label);
                     });
                 break;
+            case WaypointCommand::SET_TRANSITION_SPEED:
+                a(o->transitionSpeedMultiplier);
+                o->transitionSpeedMultiplier = std::clamp(o->transitionSpeedMultiplier,
+                                                          TRANSITION_SPEED_MIN, TRANSITION_SPEED_MAX);
+                o.send_server_update_to_all_clients_except(c, RELIABLE_COMMAND_CHANNEL,
+                    [](const NetObjTemporaryPtr<Waypoint>& o, cereal::PortableBinaryOutputArchive& a) {
+                        a(WaypointCommand::SET_TRANSITION_SPEED, o->transitionSpeedMultiplier);
+                    });
+                break;
+            case WaypointCommand::SET_TRANSITION_EASING: {
+                uint8_t b;
+                a(b);
+                if (b > static_cast<uint8_t>(TransitionEasing::EASE_IN_OUT))
+                    b = static_cast<uint8_t>(TransitionEasing::EASE);
+                o->transitionEasing = static_cast<TransitionEasing>(b);
+                o.send_server_update_to_all_clients_except(c, RELIABLE_COMMAND_CHANNEL,
+                    [](const NetObjTemporaryPtr<Waypoint>& o, cereal::PortableBinaryOutputArchive& a) {
+                        a(WaypointCommand::SET_TRANSITION_EASING, static_cast<uint8_t>(o->transitionEasing));
+                    });
+                break;
+            }
+            case WaypointCommand::SET_IS_TRANSITION:
+                a(o->isTransition);
+                o.send_server_update_to_all_clients_except(c, RELIABLE_COMMAND_CHANNEL,
+                    [](const NetObjTemporaryPtr<Waypoint>& o, cereal::PortableBinaryOutputArchive& a) {
+                        a(WaypointCommand::SET_IS_TRANSITION, o->isTransition);
+                    });
+                break;
+            case WaypointCommand::SET_STOP_TIME:
+                a(o->stopTime);
+                o->stopTime = std::clamp(o->stopTime, TRANSITION_STOP_TIME_MIN, TRANSITION_STOP_TIME_MAX);
+                o.send_server_update_to_all_clients_except(c, RELIABLE_COMMAND_CHANNEL,
+                    [](const NetObjTemporaryPtr<Waypoint>& o, cereal::PortableBinaryOutputArchive& a) {
+                        a(WaypointCommand::SET_STOP_TIME, o->stopTime);
+                    });
+                break;
+            case WaypointCommand::SET_SKIN: {
+                std::vector<uint8_t> skinBytes;
+                a(skinBytes);
+                o->skin = decode_skin_png(skinBytes);
+                o.send_server_update_to_all_clients_except(c, RELIABLE_COMMAND_CHANNEL,
+                    [&skinBytes](const NetObjTemporaryPtr<Waypoint>& o, cereal::PortableBinaryOutputArchive& a) {
+                        a(WaypointCommand::SET_SKIN, skinBytes);
+                    });
+                break;
+            }
         }
     };
 
