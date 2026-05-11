@@ -263,7 +263,7 @@ A second forward path: host-side `hvym_roster` membership check (the pattern `hv
 **Why now:** the host is where token verification happens. The artist needs (1) a per-install app keypair, (2) a way to register a canvas with the portal, (3) a host mode that gates new connections on a valid token.
 
 **What:**
-- **App keypair generation.** On first run after portal credentials are installed, Inkternity generates an ed25519 keypair (`crypto_sign_keypair` from libsodium). Stored locally encrypted alongside the portal credentials in the existing credential store. Pubkey exposed under `Menu → Settings → HEAVYMETA → Inkternity App Key` with a "Copy public key" button. The artist pastes this pubkey into the portal's app-registration page (§B).
+- **App keypair generation.** On first run after portal credentials are installed, Inkternity generates an ed25519 keypair (`crypto_sign_keypair` from libsodium). Stored locally encrypted alongside the portal credentials in the existing credential store. Pubkey exposed in **lobby settings** (`FileSelectScreen` settings panel — *not* the per-canvas drawing view, since the keypair is per-install and persists across all canvases). UI: `Lobby → Settings → HEAVYMETA → Inkternity App Key` with a "Copy public key" button. The artist pastes this pubkey into the portal's app-registration page (§B).
 - **Format bump 0.11 → 0.12** on the `.inkternity` file: adds `canvas_id` (UUID), `artist_member_pubkey` (Stellar address), and `app_pubkey_at_publish` (which install this canvas was published from). All three default null/empty for unpublished canvases. Save/load gated on version >= 0.12 same way TRANSITIONS bumped.
 - **`Menu → Publish for Subscribers...` action:**
   1. Reads artist credentials from local credential store (set up via portal `/launch` — this leverages the existing Metavinci credential pattern).
@@ -381,7 +381,8 @@ ONE-TIME SETUP (per Inkternity install):
      extended with an Inkternity entry in apps.json).
   2. Open Inkternity, paste credentials. App generates a fresh ed25519 app keypair
      and stores it locally encrypted alongside the credentials.
-  3. Menu → Settings → HEAVYMETA → Inkternity App Key → "Copy public key".
+  3. From the lobby (file-select screen, not inside a canvas):
+     Settings → HEAVYMETA → Inkternity App Key → "Copy public key".
   4. On the portal: /dashboard/inkternity/apps → "Register new" → paste the pubkey,
      give it a label ("Studio iMac"). One-time per machine.
 
@@ -465,7 +466,7 @@ PER SESSION (when the artist is live):
 
 | | Deliverable |
 |---|---|
-| P0-C1 | App keypair generation on first run after credentials load; encrypted local store. `Menu → Settings → HEAVYMETA → Inkternity App Key` exposes pubkey + Copy button. |
+| P0-C1 | App keypair generation on first run after credentials load; encrypted local store. **Lobby** (FileSelectScreen) settings panel exposes the pubkey + Copy button under HEAVYMETA → Inkternity App Key. (Per-install identity belongs at lobby scope, not per-canvas.) |
 | P0-C2 | Format bump 0.11 → 0.12 with `canvas_id` + `artist_member_pubkey` + `app_pubkey_at_publish` fields. Save/load with version gate. |
 | P0-C3 | Credential store: read portal-issued Inkternity credentials at startup. |
 | P0-C4 | `Menu → Publish for Subscribers...` UI + portal API call. Confirms app pubkey is registered; stamps canvas_id + member pubkey + app pubkey into file. |
