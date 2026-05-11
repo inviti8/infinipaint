@@ -121,12 +121,39 @@ void Waypoint::load_transition_point_data_from_archive(cereal::PortableBinaryInp
 }
 
 void Waypoint::write_constructor_data(const NetObjTemporaryPtr<Waypoint>& o, cereal::PortableBinaryOutputArchive& a) {
+    // P0.5-SKINS / P0.5-LIVE-SYNC partial fix: include every
+    // post-construction-editable field in the constructor payload so
+    // a subscriber's initial-state snapshot reflects the current
+    // canvas, not just the construction-time defaults. Symmetric with
+    // the file-format save_file order. Live updates for these fields
+    // (post-snapshot edits the subscriber should see) is a separate
+    // P0.5 task — this only fixes the snapshot path.
     a(o->label, o->coords, o->windowSize);
+    a(o->transitionSpeedMultiplier);
+    a(static_cast<uint8_t>(o->transitionEasing));
+    a(o->isTransition);
+    a(o->stopTime);
+    std::vector<uint8_t> skinBytes = encode_skin_png(o->skin);
+    a(skinBytes);
 }
 
 void Waypoint::register_class(World& w) {
     auto readConstructorData = [&w](const NetObjTemporaryPtr<Waypoint>& o, cereal::PortableBinaryInputArchive& a, const std::shared_ptr<NetServer::ClientData>& c) {
         a(o->label, o->coords, o->windowSize);
+        a(o->transitionSpeedMultiplier);
+        o->transitionSpeedMultiplier = std::clamp(o->transitionSpeedMultiplier,
+                                                  TRANSITION_SPEED_MIN, TRANSITION_SPEED_MAX);
+        uint8_t easingByte;
+        a(easingByte);
+        if (easingByte > static_cast<uint8_t>(TransitionEasing::EASE_IN_OUT))
+            easingByte = static_cast<uint8_t>(TransitionEasing::EASE);
+        o->transitionEasing = static_cast<TransitionEasing>(easingByte);
+        a(o->isTransition);
+        a(o->stopTime);
+        o->stopTime = std::clamp(o->stopTime, TRANSITION_STOP_TIME_MIN, TRANSITION_STOP_TIME_MAX);
+        std::vector<uint8_t> skinBytes;
+        a(skinBytes);
+        o->skin = decode_skin_png(skinBytes);
         canvas_scale_up_check(*o, w, c);
     };
     w.netObjMan.register_class<Waypoint, Waypoint, Waypoint, Waypoint>({
