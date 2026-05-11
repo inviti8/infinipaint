@@ -426,12 +426,20 @@ void World::ensure_display_name_unique(std::string& displayName) {
 }
 
 void World::start_hosting(const std::string& initNetSource, const std::string& serverLocalID) {
-    // P0-C-DEV: dev-mode auto-publish. When dev keys are loaded AND
+    // P0-C-DEV: dev-mode auto-publish. When dev keys carry a full
+    // mock-portal triple (member pubkey + canvas_id + app pubkey) AND
     // this canvas hasn't been published yet, populate the subscription
-    // fields from the dev keys so the host runs in subscriber-only
-    // mode and accepts dev-minted tokens. Production replaces this
-    // with the explicit Publish-for-Subscribers UI (P0-C4).
-    if (!is_published_for_subscribers() && main.devKeys.is_loaded()) {
+    // fields so the host runs in subscriber-only mode and accepts
+    // dev-minted tokens. After P0-C1 partial, an Inkternity install
+    // can have a locally-generated app keypair WITHOUT yet having a
+    // member pubkey + canvas_id (the latter come from dev_mint_token
+    // /the future portal); in that interim state, hosting falls back
+    // to vanilla collab mode. Production replaces this with the
+    // explicit Publish-for-Subscribers UI (P0-C4).
+    if (!is_published_for_subscribers() &&
+        !main.devKeys.member_pubkey().empty() &&
+        !main.devKeys.canvas_id().empty() &&
+        !main.devKeys.app_pubkey().empty()) {
         canvasId            = main.devKeys.canvas_id();
         artistMemberPubkey  = main.devKeys.member_pubkey();
         appPubkeyAtPublish  = main.devKeys.app_pubkey();

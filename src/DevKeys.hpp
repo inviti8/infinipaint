@@ -32,6 +32,15 @@
 // Absence of the file = vanilla collab mode (existing behavior).
 class DevKeys {
     public:
+        // P0-C1 partial: ensure an app keypair exists at first run.
+        // If <configPath>/inkternity_dev_keys.json doesn't exist OR
+        // exists but lacks an app keypair, generate a fresh ed25519
+        // pair (via tweetnacl crypto_sign_keypair + the OS RNG) and
+        // write it. Existing fields (member_*, canvas_id, etc.) are
+        // preserved when present. Idempotent — safe to call every run.
+        // Call BEFORE load().
+        bool ensure_app_keypair(const std::filesystem::path& configPath);
+
         // Returns true if the file existed and parsed cleanly. Logs
         // [USERINFO] on success/failure either way.
         bool load(const std::filesystem::path& configPath);
