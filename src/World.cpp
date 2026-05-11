@@ -7,6 +7,7 @@
 #include <Helpers/VersionNumber.hpp>
 #include <Helpers/NetworkingObjects/NetObjGenericSerializedClass.hpp>
 #include <Helpers/NetworkingObjects/DelayUpdateSerializedClassManager.hpp>
+#include "Subscription/TokenVerifier.hpp"
 #include <cereal/types/string.hpp>
 #include <cereal/types/unordered_map.hpp>
 #include "DrawingProgram/Layers/DrawingProgramLayerListItem.hpp"
@@ -67,7 +68,7 @@ World::World(MainProgram& initMain, const CustomEvents::OpenInfiniPaintFileEvent
     drawData.cam.set_viewing_area(main.window.size.cast<float>());
 
     if(worldInfo.isClient)
-        init_client(worldInfo.netSource);
+        init_client(worldInfo.netSource, worldInfo.subscriberToken);
     else {
         init_client_data_list();
         set_name(name);
@@ -127,7 +128,7 @@ void World::init_net_obj_type_list() {
 #endif
 }
 
-void World::init_client(const std::string& serverFullID) {
+void World::init_client(const std::string& serverFullID, const std::string& subscriberToken) {
     main.init_net_library();
     clientStillConnecting = true;
     netClient = std::make_shared<NetClient>(serverFullID);
@@ -169,7 +170,11 @@ void World::init_client(const std::string& serverFullID) {
     netClient->add_recv_callback(CLIENT_KEEP_ALIVE, [&](cereal::PortableBinaryInputArchive& message) {
     });
 
-    netClient->send_items_to_server(RELIABLE_COMMAND_CHANNEL, SERVER_INITIAL_DATA, main.conf.displayName);
+    // P0-C7 / P0-D2: handshake extended with subscriber token. Empty
+    // string for vanilla collab joins; non-empty when the subscriber
+    // pasted a token into the Connect-with-token dialog.
+    netClient->send_items_to_server(RELIABLE_COMMAND_CHANNEL, SERVER_INITIAL_DATA,
+                                    main.conf.displayName, subscriberToken);
 }
 
 void World::focus_update() {
@@ -445,8 +450,29 @@ void World::start_hosting(const std::string& initNetSource, const std::string& s
     netServer->add_recv_callback(SERVER_INITIAL_DATA, [&](std::shared_ptr<NetServer::ClientData> client, cereal::PortableBinaryInputArchive& message) {
         ClientData::InitStruct newClientData;
         newClientData.cursorColor = get_random_cursor_color();
-        message(newClientData.displayName);
+        std::string subscriberToken;
+        message(newClientData.displayName, subscriberToken);
         ensure_display_name_unique(newClientData.displayName);
+
+        // P0-C5/C6/C7: in subscriber-only mode, run the five-check token
+        // verification. Reject the connection cleanly on failure (the
+        // subscriber sees a disconnect and an INVALID-token log on the
+        // host).
+        if (is_published_for_subscribers()) {
+            Subscription::TokenPayload payload;
+            const auto r = Subscription::verify_token_for_host(subscriberToken, *this, payload);
+            if (r != Subscription::VerifyResult::OK) {
+                Logger::get().log("USERINFO",
+                    "Rejected subscriber connect from " + newClientData.displayName +
+                    ": " + Subscription::verify_result_str(r));
+                client->setToDisconnect = true;
+                return;
+            }
+            newClientData.isViewer = true;
+            Logger::get().log("USERINFO",
+                "Accepted subscriber " + newClientData.displayName +
+                " (token sub=" + payload.sub.substr(0, 8) + "...)");
+        }
 
         newClientData.camCoords = ownClientData->get_cam_coords();
         newClientData.windowSize = ownClientData->get_window_size();

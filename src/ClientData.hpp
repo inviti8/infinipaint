@@ -14,6 +14,11 @@ class ClientData {
             Vector3f cursorColor = {1.0f, 1.0f, 1.0f};
             std::string displayName;
             uint32_t gridSize = 0;
+            // P0-C8 / P0-D4: subscriber-vs-collaborator marker. Set
+            // true by the host when a client passes the five-check
+            // token verification (sub-only mode); false otherwise
+            // (vanilla collab join). Used for viewer-mode UI gating.
+            bool isViewer = false;
         };
 
         ClientData();
@@ -33,11 +38,12 @@ class ClientData {
         uint32_t get_grid_size() const;
         const std::string& get_display_name() const;
         const Vector3f& get_cursor_color() const;
+        bool is_viewer() const { return isViewer; }
 
         void draw_cursor(SkCanvas* canvas, const DrawData& drawData) const;
 
         template <typename Archive> void serialize(Archive& a) {
-            a(camCoords, windowSize, cursorPos, cursorColor, displayName, gridSize);
+            a(camCoords, windowSize, cursorPos, cursorColor, displayName, gridSize, isViewer);
         }
     private:
         void set_from_init_struct(const InitStruct& initStruct);
@@ -48,5 +54,6 @@ class ClientData {
         Vector3f cursorColor;
         std::string displayName;
         uint32_t gridSize;
+        bool isViewer = false;
 };
 

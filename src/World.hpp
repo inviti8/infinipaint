@@ -152,7 +152,7 @@ class World {
         void init_client_data_list_callbacks();
         void init_net_obj_type_list();
 
-        void init_client(const std::string& serverFullID);
+        void init_client(const std::string& serverFullID, const std::string& subscriberToken);
         void set_name(const std::string& n);
 
         void draw_other_player_cursors(SkCanvas* canvas, const DrawData& drawData);

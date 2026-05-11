@@ -30,6 +30,7 @@ void ClientData::set_from_init_struct(const InitStruct& initStruct) {
     cursorColor = initStruct.cursorColor;
     displayName = initStruct.displayName;
     gridSize = initStruct.gridSize;
+    isViewer = initStruct.isViewer;
 }
 
 void ClientData::register_class(World& world) {

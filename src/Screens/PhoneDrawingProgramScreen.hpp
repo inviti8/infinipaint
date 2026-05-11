@@ -54,6 +54,10 @@ class PhoneDrawingProgramScreen : public DrawingProgramScreen {
         // confirms (matching desktop UX in Toolbar.cpp:577-580).
         std::string phoneNetLobbyAddress;
         std::string phoneNetLocalID;
+        // P0-D1: subscriber-paste field for CONNECT mode. Empty for
+        // vanilla collab joins; non-empty when joining a published
+        // canvas as a subscriber.
+        std::string phoneNetSubscriberToken;
         void main_menu_popup(GUIStuff::Element* triggerButton);
         void network_menu_popup();
         struct ColorPickerPopupData {

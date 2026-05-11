@@ -54,6 +54,11 @@ namespace CustomEvents {
         std::string netSource;
         std::string serverLocalID;
         std::string_view fileDataBuffer;
+        // P0-D: subscriber-only access token. Empty for vanilla collab
+        // joins. Forwarded to World::init_client and sent over the
+        // SERVER_INITIAL_DATA handshake to the host, which verifies it
+        // (P0-C5/C6/C7) before accepting the connection.
+        std::string subscriberToken;
     };
 
     struct AddFileToCanvasEvent {

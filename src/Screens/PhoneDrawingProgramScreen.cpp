@@ -59,7 +59,10 @@ void PhoneDrawingProgramScreen::main_display() {
         // Editor toolbar disappears in reader mode (PHASE1.md §7
         // "toolbar minimized"). The top toolbar stays so the eye-icon
         // toggle remains reachable.
-        if (!main.world->readerMode.is_active())
+        // P0-D5: viewers (subscribers joined via token) never see the
+        // editing toolbar regardless of reader mode — they're read-only.
+        const bool isViewer = main.world->ownClientData && main.world->ownClientData->is_viewer();
+        if (!main.world->readerMode.is_active() && !isViewer)
             bottom_toolbar();
         // Branch-choice overlay is floating (attached to the screen's
         // bottom-center), so the canvas gets full vertical space
@@ -93,12 +96,24 @@ void PhoneDrawingProgramScreen::top_toolbar() {
                     svg_icon_button(gui, "back exit button", "data/icons/RemixIcon/arrow-left-s-line.svg", {
                         .drawType = SelectableButton::DrawType::TRANSPARENT_ALL,
                         .onClick = [&] {
-                            main.world->save_to_file(main.world->filePath);
+                            // P0-D5: viewers don't save anything — they're
+                            // read-only and shouldn't write a phantom local
+                            // copy of the artist's canvas.
+                            const bool ownIsViewer = main.world->ownClientData && main.world->ownClientData->is_viewer();
+                            if (!ownIsViewer)
+                                main.world->save_to_file(main.world->filePath);
                             main.set_tab_to_close(main.world.get());
                             main.set_screen([&] (std::unique_ptr<Screen>) { return std::make_unique<FileSelectScreen>(main); });
                         }
                     });
-                    text_label(gui, main.world->name);
+                    // P0-D6: viewer indicator — replace the file name with
+                    // a "Viewing live: ..." string so the subscriber knows
+                    // they're in read-only mode on someone else's canvas.
+                    const bool ownIsViewer = main.world->ownClientData && main.world->ownClientData->is_viewer();
+                    if (ownIsViewer)
+                        text_label(gui, "Viewing live: " + main.world->name);
+                    else
+                        text_label(gui, main.world->name);
                     // Spacer that pushes the layer dropdown + reader toggle to the right edge.
                     CLAY_AUTO_ID({
                         .layout = {.sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_GROW(0)}}
@@ -108,15 +123,20 @@ void PhoneDrawingProgramScreen::top_toolbar() {
                     // this opens a small popup with Host / Connect /
                     // Lobby Info actions, mirroring the desktop Toolbar
                     // menu but phone-native (centered modal sub-popups).
-                    Element* mainMenuButton = svg_icon_button(gui, "main menu button (phone)", "data/icons/RemixIcon/more-fill.svg", {
-                        .drawType = SelectableButton::DrawType::TRANSPARENT_ALL,
-                        .isSelected = mainMenuPopupOpen,
-                        .onClick = [&] { mainMenuPopupOpen = !mainMenuPopupOpen; }
-                    });
+                    // P0-D5: hidden for viewers — they can only Disconnect
+                    // (via the back button), not host/connect to other lobbies.
+                    Element* mainMenuButton = nullptr;
+                    if (!ownIsViewer) {
+                        mainMenuButton = svg_icon_button(gui, "main menu button (phone)", "data/icons/RemixIcon/more-fill.svg", {
+                            .drawType = SelectableButton::DrawType::TRANSPARENT_ALL,
+                            .isSelected = mainMenuPopupOpen,
+                            .onClick = [&] { mainMenuPopupOpen = !mainMenuPopupOpen; }
+                        });
+                    }
                     // PHASE2 C4: Sketch / Color / Ink layer dropdown — picks
                     // which named layer is the active edit target. Hidden in
                     // reader mode (no edit target meaningful with chrome off).
-                    if (!main.world->readerMode.is_active()) {
+                    if (!main.world->readerMode.is_active() && !ownIsViewer) {
                         // Sync the dropdown's index from whichever named
                         // layer editingLayer currently points at. If the
                         // user has switched to a non-named (DEFAULT) layer
@@ -155,7 +175,7 @@ void PhoneDrawingProgramScreen::top_toolbar() {
                     // are unreachable. Hidden in reader mode for parity
                     // with the dropdown.
                     Element* layerMenuButton = nullptr;
-                    if (!main.world->readerMode.is_active()) {
+                    if (!main.world->readerMode.is_active() && !ownIsViewer) {
                         layerMenuButton = svg_icon_button(gui, "Layer Manager Button", "data/icons/layer.svg", {
                             .drawType = SelectableButton::DrawType::TRANSPARENT_ALL,
                             .isSelected = layerMenuPopupOpen,
@@ -172,7 +192,7 @@ void PhoneDrawingProgramScreen::top_toolbar() {
                     });
                     if (layerMenuPopupOpen && layerMenuButton)
                         layer_menu_popup(layerMenuButton);
-                    if (mainMenuPopupOpen)
+                    if (mainMenuPopupOpen && mainMenuButton)
                         main_menu_popup(mainMenuButton);
                 }
             });
@@ -396,6 +416,11 @@ void PhoneDrawingProgramScreen::network_menu_popup() {
                     case PhoneNetMenu::CONNECT: {
                         text_label_centered(gui, "Connect to a lobby");
                         input_text_field(gui, "phone connect lobby field", "Lobby", &phoneNetLobbyAddress);
+                        // P0-D1: optional subscriber token. Leave empty
+                        // for vanilla collab; paste a portal-issued
+                        // (or dev-minted) token to join a published
+                        // canvas as a viewer.
+                        input_text_field(gui, "phone connect token field", "Token (optional, for subscribers)", &phoneNetSubscriberToken);
                         left_to_right_line_layout(gui, [&]() {
                             text_button(gui, "phone connect confirm", "Connect", {
                                 .wide = true,
@@ -407,7 +432,8 @@ void PhoneDrawingProgramScreen::network_menu_popup() {
                                     else {
                                         CustomEvents::emit_event<CustomEvents::OpenInfiniPaintFileEvent>({
                                             .isClient = true,
-                                            .netSource = phoneNetLobbyAddress
+                                            .netSource = phoneNetLobbyAddress,
+                                            .subscriberToken = phoneNetSubscriberToken
                                         });
                                         phoneNetMenu = PhoneNetMenu::NONE;
                                     }
