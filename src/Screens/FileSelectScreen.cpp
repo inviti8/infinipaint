@@ -11,6 +11,7 @@
 #include "../GUIStuff/Elements/SVGIcon.hpp"
 #include "../GUIStuff/Elements/TextParagraph.hpp"
 #include "../GUIStuff/ElementHelpers/LayoutHelpers.hpp"
+#include "../GUIStuff/ElementHelpers/TextBoxHelpers.hpp"
 #include "../GUIStuff/Elements/PositionAdjustingPopupMenu.hpp"
 #include "../World.hpp"
 #include "Helpers/StringHelpers.hpp"
@@ -173,6 +174,7 @@ void FileSelectScreen::main_display() {
                         case SelectedMenu::TRASH:
                             break;
                         case SelectedMenu::SETTINGS:
+                            settings_view();
                             break;
                     }
                 }
@@ -181,6 +183,60 @@ void FileSelectScreen::main_display() {
             window_gap_side_bar(gui, WindowFillSideBarConfig::Direction::BOTTOM);
             edit_action_bar();
             menu_black_box();
+        }
+    }
+}
+
+void FileSelectScreen::settings_view() {
+    auto& gui = main.g.gui;
+    auto& io = gui.io;
+
+    CLAY_AUTO_ID({
+        .layout = {
+            .sizing = {.width = CLAY_SIZING_FIT(700), .height = CLAY_SIZING_FIT(0)},
+            .padding = CLAY_PADDING_ALL(io.theme->padding1),
+            .childGap = io.theme->childGap1,
+            .childAlignment = { .x = CLAY_ALIGN_X_LEFT, .y = CLAY_ALIGN_Y_TOP },
+            .layoutDirection = CLAY_TOP_TO_BOTTOM
+        }
+    }) {
+        text_label_centered(gui, "Inkternity App Key");
+        text_label(gui,
+            "This Inkternity install's identity. Artists copy this pubkey "
+            "into the Heavymeta Portal once per install ("
+            "Portal -> Dashboard -> Inkternity -> Apps -> Register new) "
+            "so the portal can issue subscriber tokens addressed to it.");
+
+        if (main.devKeys.is_loaded()) {
+            // Display the pubkey in a read-only-ish text box so the user
+            // can see + select it. Copy button does the one-click path.
+            std::string pubkey = main.devKeys.app_pubkey();
+            input_text_field(gui, "app pubkey display", "App pubkey", &pubkey, {
+                .immutable = true
+            });
+            text_button(gui, "copy app pubkey", "Copy public key", {
+                .wide = true,
+                .onClick = [this] {
+                    main.input.set_clipboard_str(main.devKeys.app_pubkey());
+                }
+            });
+        } else {
+            // Stand-in instructions while the dev keys file is the
+            // credential source. P0-C1/C3 will replace this with the
+            // proper portal-issued credential flow + first-run keypair
+            // generation.
+            text_label(gui, "Status: not configured.");
+            text_label(gui,
+                "To configure dev keys (Phase 0 stand-in for portal-issued credentials):");
+            text_label(gui, "  1. Run from a terminal:");
+            text_label(gui, "       cd D:\\repos\\inkternity-server");
+            text_label(gui,
+                "       python scripts/dev_mint_token.py --gen-keys --save-state \"" +
+                (main.conf.configPath / "inkternity_dev_keys.json").string() + "\"");
+            text_label(gui, "  2. Restart Inkternity.");
+            text_label(gui,
+                "  3. The pubkey will appear above. Copy it into the portal's "
+                "Inkternity Apps registration page.");
         }
     }
 }

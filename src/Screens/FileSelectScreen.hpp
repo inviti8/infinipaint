@@ -54,6 +54,12 @@ class FileSelectScreen : public Screen {
         void main_display();
         void main_menu();
         void file_view();
+        // Lobby-side App Key surface (DISTRIBUTION-PHASE0.md): renders
+        // the Inkternity app pubkey + Copy button when dev keys are
+        // loaded; instructions to set up dev keys when not. Lives on
+        // the Settings tab because the keypair is per-install (not
+        // per-canvas) and persists across all canvases.
+        void settings_view();
         void create_file_button();
         void file_view_edit();
         void menu_black_box();
