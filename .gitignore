@@ -6,3 +6,11 @@ bscript
 .directory
 
 .claude/
+
+crash.log
+
+debug-crash.cdb
+
+debug-crash.ps1
+
+scripts/__pycache__/
