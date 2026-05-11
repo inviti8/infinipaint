@@ -1,0 +1,382 @@
+# Inkternity release pipeline.
+#
+# Three parallel platform jobs (Linux x86_64 / Windows x64 / macOS arm64),
+# each building, packaging, and signing its installer; then a single
+# create-release job that gathers all artifacts into a draft GitHub Release.
+#
+# Mirrors the HEAVYMETA house style from metavinci + glasswing
+# (see docs/design/BUILDS.md for the full design rationale):
+#   - Triggers on `v*` semver tag pushes.
+#   - `workflow_dispatch` with `skip-notarize` boolean for manual runs.
+#   - Magic `-no-notarize` substring in the tag bypasses macOS notarization.
+#   - Signing secrets share names with metavinci/glasswing so HEAVYMETA's
+#     existing certs cover this repo without provisioning new ones.
+
+name: Build installers
+
+on:
+  push:
+    tags: [ 'v*' ]
+    paths-ignore: ['**.md', 'docs/**']
+  workflow_dispatch:
+    inputs:
+      skip-notarize:
+        description: 'Skip macOS notarization (faster turnaround for testing)'
+        type: boolean
+        default: false
+
+# Tag is the source of truth for installer version metadata.
+# Numeric portion is extracted per-job via shell (Actions has no regex
+# in env-expression syntax).
+env:
+  BUILD_VERSION: ${{ github.ref_name }}
+
+permissions:
+  contents: write  # required for create-release to publish artifacts
+
+jobs:
+
+  # =====================================================================
+  # build-linux  →  Flatpak bundle
+  # =====================================================================
+  build-linux:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Flatpak + freedesktop runtime
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y flatpak flatpak-builder
+          sudo flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+          sudo flatpak install -y flathub \
+            org.freedesktop.Platform//25.08 \
+            org.freedesktop.Sdk//25.08
+
+      - name: Derive version
+        id: ver
+        run: |
+          # Strip leading 'v' and any pre-release suffix for the metainfo
+          # release-version attribute. e.g. v0.11.0-rc1 -> 0.11.0
+          VER="${BUILD_VERSION#v}"
+          VER="${VER%%-*}"
+          if [[ ! "$VER" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then VER="0.0.0"; fi
+          echo "numeric=$VER" >> "$GITHUB_OUTPUT"
+
+      - name: Build Flatpak
+        run: |
+          flatpak-builder --force-clean --repo=flatpak-repo build-dir \
+            linuxinstall/com.inkternity.inkternity.yml
+          flatpak build-bundle flatpak-repo \
+            Inkternity-${{ steps.ver.outputs.numeric }}-x86_64.flatpak \
+            com.inkternity.inkternity
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-flatpak
+          path: Inkternity-*.flatpak
+          if-no-files-found: error
+
+  # =====================================================================
+  # build-windows  →  NSIS installer (signed)
+  # =====================================================================
+  build-windows:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Conan
+        run: pip install --upgrade "conan>=2.0,<3.0"
+
+      - name: Cache Conan packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.conan2
+          key: conan-${{ runner.os }}-${{ hashFiles('conanfile.py', 'conan/**/conanfile.py') }}
+          restore-keys: |
+            conan-${{ runner.os }}-
+
+      - name: Derive version
+        id: ver
+        shell: bash
+        run: |
+          VER="${BUILD_VERSION#v}"
+          VER="${VER%%-*}"
+          if [[ ! "$VER" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then VER="0.0.0"; fi
+          IFS=. read -r MAJ MIN PATCH <<< "${VER}.0.0"
+          echo "numeric=$VER" >> "$GITHUB_OUTPUT"
+          echo "major=${MAJ}" >> "$GITHUB_OUTPUT"
+          echo "minor=${MIN}" >> "$GITHUB_OUTPUT"
+          echo "patch=${PATCH}" >> "$GITHUB_OUTPUT"
+
+      - name: Conan export + install
+        shell: cmd
+        run: |
+          conan profile detect --force
+          call conan\export_libs.bat
+          conan install . --build=missing -pr=conan/profiles/win-x86_64
+
+      - name: CMake configure + build
+        shell: cmd
+        run: |
+          cd build
+          call generators\conanbuild.bat
+          cmake .. -T host=x64 ^
+            -DCMAKE_TOOLCHAIN_FILE=generators\conan_toolchain.cmake ^
+            -DCMAKE_BUILD_TYPE=Release ^
+            -DCPACK_PACKAGE_VERSION_MAJOR=${{ steps.ver.outputs.major }} ^
+            -DCPACK_PACKAGE_VERSION_MINOR=${{ steps.ver.outputs.minor }} ^
+            -DCPACK_PACKAGE_VERSION_PATCH=${{ steps.ver.outputs.patch }}
+          cmake --build . --config Release
+
+      - name: CPack NSIS installer
+        shell: cmd
+        run: |
+          cd build
+          cpack -G NSIS -C Release
+
+      - name: Sign installer
+        if: env.WIN_CERT != ''
+        env:
+          WIN_CERT: ${{ secrets.WINDOWS_SIGNING_CERT }}
+          WIN_PASS: ${{ secrets.WINDOWS_SIGNING_PASSWORD }}
+        shell: pwsh
+        run: |
+          # Decode the base64 PFX into a temp file
+          $pfx = "$env:RUNNER_TEMP\inkternity-cert.pfx"
+          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:WIN_CERT))
+
+          # Locate signtool (latest Windows SDK x64 build)
+          $signtool = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin' -Recurse -Filter signtool.exe |
+                      Where-Object FullName -match 'x64\\signtool.exe$' |
+                      Sort-Object LastWriteTime -Descending |
+                      Select-Object -First 1 -ExpandProperty FullName
+          if (-not $signtool) { throw "signtool.exe not found" }
+
+          # Sign every NSIS installer CPack produced
+          Get-ChildItem build\*.exe | ForEach-Object {
+            & $signtool sign /f $pfx /p $env:WIN_PASS `
+              /tr http://timestamp.digicert.com /td sha256 /fd sha256 $_.FullName
+            if ($LASTEXITCODE -ne 0) { throw "signtool failed on $_" }
+          }
+
+          # Discard the PFX from the runner disk
+          Remove-Item $pfx -Force
+
+      - name: Fail if signing was required but skipped
+        # Hard-fail on real release tags if no cert was provisioned —
+        # we never want to ship an unsigned Windows installer publicly.
+        if: startsWith(github.ref, 'refs/tags/') && env.WIN_CERT == ''
+        env:
+          WIN_CERT: ${{ secrets.WINDOWS_SIGNING_CERT }}
+        run: |
+          echo "ERROR: WINDOWS_SIGNING_CERT secret not set; aborting tag release build."
+          exit 1
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-nsis
+          path: build/*.exe
+          if-no-files-found: error
+
+  # =====================================================================
+  # build-macos  →  DragNDrop DMG (signed + notarized)
+  # =====================================================================
+  build-macos:
+    runs-on: macos-14
+    environment: installers   # gates access to MACOS_* + APPLE_* secrets
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Conan
+        run: pip install --upgrade "conan>=2.0,<3.0"
+
+      - name: Cache Conan packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.conan2
+          key: conan-${{ runner.os }}-${{ hashFiles('conanfile.py', 'conan/**/conanfile.py') }}
+          restore-keys: |
+            conan-${{ runner.os }}-
+
+      - name: Derive version
+        id: ver
+        run: |
+          VER="${BUILD_VERSION#v}"
+          VER="${VER%%-*}"
+          if [[ ! "$VER" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then VER="0.0.0"; fi
+          IFS=. read -r MAJ MIN PATCH <<< "${VER}.0.0"
+          echo "numeric=$VER" >> "$GITHUB_OUTPUT"
+          echo "major=${MAJ}" >> "$GITHUB_OUTPUT"
+          echo "minor=${MIN}" >> "$GITHUB_OUTPUT"
+          echo "patch=${PATCH}" >> "$GITHUB_OUTPUT"
+
+      - name: Conan export + install
+        run: |
+          conan profile detect --force
+          ./conan/export_libs.sh
+          conan install . --build=missing -pr=conan/profiles/macOS-arm64
+
+      - name: CMake configure + build
+        run: |
+          cd build/Release
+          source generators/conanbuild.sh
+          cmake ../.. \
+            -DCMAKE_TOOLCHAIN_FILE=generators/conan_toolchain.cmake \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCPACK_PACKAGE_VERSION_MAJOR=${{ steps.ver.outputs.major }} \
+            -DCPACK_PACKAGE_VERSION_MINOR=${{ steps.ver.outputs.minor }} \
+            -DCPACK_PACKAGE_VERSION_PATCH=${{ steps.ver.outputs.patch }}
+          cmake --build .
+
+      - name: CPack DragNDrop DMG
+        run: |
+          cd build/Release
+          cpack -G DragNDrop
+
+      - name: Code-sign .app + DMG
+        if: env.MAC_P12 != ''
+        env:
+          MAC_P12: ${{ secrets.MACOS_APPLICATION_P12 }}
+          MAC_PW:  ${{ secrets.MACOS_CERT_PW }}
+        run: |
+          # Set up a temp keychain so we don't pollute the runner default
+          KEYCHAIN="$RUNNER_TEMP/inkternity.keychain-db"
+          KEYCHAIN_PW="$(uuidgen)"
+          security create-keychain -p "$KEYCHAIN_PW" "$KEYCHAIN"
+          security set-keychain-settings -lut 7200 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PW" "$KEYCHAIN"
+
+          # Import the Developer ID Application cert
+          P12="$RUNNER_TEMP/inkternity.p12"
+          echo "$MAC_P12" | base64 -d > "$P12"
+          security import "$P12" -P "$MAC_PW" -A -t cert -f pkcs12 -k "$KEYCHAIN"
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PW" "$KEYCHAIN"
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | sed s/\"//g)
+
+          IDENTITY=$(security find-identity -v -p codesigning "$KEYCHAIN" | grep "Developer ID Application" | head -1 | awk '{print $2}')
+          if [[ -z "$IDENTITY" ]]; then
+            echo "ERROR: no Developer ID Application identity found in keychain"
+            exit 1
+          fi
+
+          # Sign the .app inside the DMG flow:
+          # CPack DragNDrop already produced the DMG, but signing must
+          # happen on the .app contents BEFORE DMG creation in strict
+          # flows. CPack's bundling assembles the .app under
+          # build/Release/_CPack_Packages/.../*.app — sign that and
+          # re-run cpack to repackage. (Slight rework vs signing in-DMG.)
+          APP=$(find build/Release/_CPack_Packages -name "*.app" -maxdepth 6 -type d | head -1)
+          if [[ -z "$APP" ]]; then
+            echo "ERROR: could not locate built .app for signing"
+            exit 1
+          fi
+          codesign --force --options runtime --timestamp --deep \
+            --sign "$IDENTITY" "$APP"
+
+          # Re-pack the DMG so the signed .app is the one shipped
+          cd build/Release
+          rm -f Inkternity-*.dmg inkternity-*.dmg
+          cpack -G DragNDrop
+          cd ../..
+
+          # Sign the outer DMG too
+          DMG=$(ls build/Release/*.dmg | head -1)
+          codesign --force --options runtime --timestamp \
+            --sign "$IDENTITY" "$DMG"
+
+          rm -f "$P12"
+
+      - name: Notarize DMG
+        # Skip when tag contains the magic substring OR manual dispatch
+        # opted out. Hard-fail on real release tags missing secrets.
+        if: |
+          !contains(github.ref_name, '-no-notarize') &&
+          !inputs.skip-notarize &&
+          env.APPLE_ID != ''
+        env:
+          APPLE_ID:       ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID:  ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_PW:       ${{ secrets.APPLE_ID_APP_PW }}
+        run: |
+          DMG=$(ls build/Release/*.dmg | head -1)
+          xcrun notarytool submit "$DMG" \
+            --apple-id "$APPLE_ID" \
+            --team-id "$APPLE_TEAM_ID" \
+            --password "$APPLE_PW" \
+            --wait --timeout 1200
+          xcrun stapler staple "$DMG"
+
+      - name: Fail if signing was required but skipped
+        if: startsWith(github.ref, 'refs/tags/') && env.MAC_P12 == ''
+        env:
+          MAC_P12: ${{ secrets.MACOS_APPLICATION_P12 }}
+        run: |
+          echo "ERROR: MACOS_APPLICATION_P12 secret not set; aborting tag release build."
+          exit 1
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-dmg
+          path: build/Release/*.dmg
+          if-no-files-found: error
+
+  # =====================================================================
+  # create-release  →  draft GitHub Release with all three installers
+  # =====================================================================
+  create-release:
+    needs: [build-linux, build-windows, build-macos]
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: release
+
+      - name: Flatten artifact dirs
+        run: |
+          mkdir -p release-flat
+          find release -type f \( -name '*.flatpak' -o -name '*.exe' -o -name '*.dmg' \) \
+            -exec cp {} release-flat/ \;
+          ls -la release-flat/
+
+      - uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.ref_name }}
+          draft: true
+          prerelease: ${{ contains(github.ref_name, '-rc') || contains(github.ref_name, '-beta') }}
+          files: release-flat/*
+          body: |
+            ## Inkternity ${{ github.ref_name }}
+
+            <!-- Replace this stub with the release notes before publishing the draft. -->
+
+            ### What's new
+            - <bullet>
+
+            ### Install
+
+            - **Windows**: download the `.exe` installer, run, accept the (HEAVYMETA-signed) installer prompt.
+            - **macOS** (Apple Silicon): download the `.dmg`, open, drag Inkternity into Applications.
+            - **Linux**: install the Flatpak with `flatpak install Inkternity-*.flatpak` then `flatpak run com.inkternity.inkternity`.
+
+            ### Known issues
+            - <bullet>
