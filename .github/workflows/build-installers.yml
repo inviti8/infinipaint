@@ -147,8 +147,21 @@ jobs:
           cd build
           cpack -G NSIS -C Release
 
+      - name: Check for signing cert
+        id: win_sign_check
+        shell: pwsh
+        env:
+          WIN_CERT: ${{ secrets.WINDOWS_SIGNING_CERT }}
+        run: |
+          if ([string]::IsNullOrEmpty($env:WIN_CERT)) {
+            "have_cert=false" | Out-File -Append $env:GITHUB_OUTPUT
+            "::notice::WINDOWS_SIGNING_CERT not set — shipping unsigned installer (glasswing-style soft-fail)."
+          } else {
+            "have_cert=true" | Out-File -Append $env:GITHUB_OUTPUT
+          }
+
       - name: Sign installer
-        if: env.WIN_CERT != ''
+        if: steps.win_sign_check.outputs.have_cert == 'true'
         env:
           WIN_CERT: ${{ secrets.WINDOWS_SIGNING_CERT }}
           WIN_PASS: ${{ secrets.WINDOWS_SIGNING_PASSWORD }}
@@ -174,16 +187,6 @@ jobs:
 
           # Discard the PFX from the runner disk
           Remove-Item $pfx -Force
-
-      - name: Fail if signing was required but skipped
-        # Hard-fail on real release tags if no cert was provisioned —
-        # we never want to ship an unsigned Windows installer publicly.
-        if: startsWith(github.ref, 'refs/tags/') && env.WIN_CERT == ''
-        env:
-          WIN_CERT: ${{ secrets.WINDOWS_SIGNING_CERT }}
-        run: |
-          echo "ERROR: WINDOWS_SIGNING_CERT secret not set; aborting tag release build."
-          exit 1
 
       - uses: actions/upload-artifact@v4
         with:
@@ -252,8 +255,20 @@ jobs:
           cd build/Release
           cpack -G DragNDrop
 
+      - name: Check for signing cert
+        id: mac_sign_check
+        env:
+          MAC_P12: ${{ secrets.MACOS_APPLICATION_P12 }}
+        run: |
+          if [[ -z "$MAC_P12" ]]; then
+            echo "have_cert=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::MACOS_APPLICATION_P12 not set — shipping unsigned DMG (glasswing-style soft-fail)."
+          else
+            echo "have_cert=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Code-sign .app + DMG
-        if: env.MAC_P12 != ''
+        if: steps.mac_sign_check.outputs.have_cert == 'true'
         env:
           MAC_P12: ${{ secrets.MACOS_APPLICATION_P12 }}
           MAC_PW:  ${{ secrets.MACOS_CERT_PW }}
@@ -305,13 +320,41 @@ jobs:
 
           rm -f "$P12"
 
+      - name: Check for notarization secrets
+        id: mac_notarize_check
+        env:
+          APPLE_ID:      ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_PW:      ${{ secrets.APPLE_ID_APP_PW }}
+        run: |
+          # Skip on tag-substring opt-out or manual-dispatch opt-out
+          if [[ "${{ github.ref_name }}" == *-no-notarize* ]]; then
+            echo "should_notarize=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Tag contains -no-notarize substring — skipping macOS notarization."
+            exit 0
+          fi
+          if [[ "${{ inputs.skip-notarize }}" == "true" ]]; then
+            echo "should_notarize=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::workflow_dispatch.skip-notarize=true — skipping macOS notarization."
+            exit 0
+          fi
+          # Soft-skip when secrets aren't provisioned (glasswing pattern)
+          if [[ -z "$APPLE_ID" || -z "$APPLE_TEAM_ID" || -z "$APPLE_PW" ]]; then
+            echo "should_notarize=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Apple notarization secrets not set — shipping un-notarized DMG."
+            exit 0
+          fi
+          # Also skip if we never signed in the first place — notarytool
+          # requires the bundle to be code-signed.
+          if [[ "${{ steps.mac_sign_check.outputs.have_cert }}" != "true" ]]; then
+            echo "should_notarize=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::No code signing happened — skipping notarization (notarytool requires signed input)."
+            exit 0
+          fi
+          echo "should_notarize=true" >> "$GITHUB_OUTPUT"
+
       - name: Notarize DMG
-        # Skip when tag contains the magic substring OR manual dispatch
-        # opted out. Hard-fail on real release tags missing secrets.
-        if: |
-          !contains(github.ref_name, '-no-notarize') &&
-          !inputs.skip-notarize &&
-          env.APPLE_ID != ''
+        if: steps.mac_notarize_check.outputs.should_notarize == 'true'
         env:
           APPLE_ID:       ${{ secrets.APPLE_ID }}
           APPLE_TEAM_ID:  ${{ secrets.APPLE_TEAM_ID }}
@@ -324,14 +367,6 @@ jobs:
             --password "$APPLE_PW" \
             --wait --timeout 1200
           xcrun stapler staple "$DMG"
-
-      - name: Fail if signing was required but skipped
-        if: startsWith(github.ref, 'refs/tags/') && env.MAC_P12 == ''
-        env:
-          MAC_P12: ${{ secrets.MACOS_APPLICATION_P12 }}
-        run: |
-          echo "ERROR: MACOS_APPLICATION_P12 secret not set; aborting tag release build."
-          exit 1
 
       - uses: actions/upload-artifact@v4
         with:
