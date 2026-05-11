@@ -60,19 +60,19 @@ The `create-release` job uses `softprops/action-gh-release@v1` with `draft: true
 - The C++ source's `VersionConstants.hpp` `CURRENT_VERSION_STRING` does NOT need to match the tag at build time — it's the file-format version, not the release version. Convention: bump it independently when the file format changes (matches the existing pattern from PHASE2 / TRANSITIONS / DISTRIBUTION-PHASE0). Document the relationship in BUILDING.md.
 - Helper script: `scripts/create_release.py` (mirroring `metavinci`'s) — takes `git tag --sort=-version:refname`, suggests `v<MAJOR>.<MINOR>.<PATCH+1>`. Optional but recommended.
 
-### 2.4 Signing secrets (already provisioned for HEAVYMETA)
+### 2.4 Signing secrets
 
-These secret names exist in the org / are reused across `metavinci` and `glasswing`. Inkternity reuses the SAME names so HEAVYMETA's existing certs cover the new repo without provisioning new keys:
+Inkternity uses the same secret names as `metavinci` and `glasswing` so any HEAVYMETA-shared certs cover this repo without provisioning new keys. Each secret is **optional** — the workflow soft-fails when one is absent (per §8.3).
 
-| Secret | Purpose | Used by |
-|---|---|---|
-| `WINDOWS_SIGNING_CERT` | base64-encoded PFX | Windows job |
-| `WINDOWS_SIGNING_PASSWORD` | PFX password | Windows job |
-| `MACOS_APPLICATION_P12` | base64 macOS Developer ID Application cert | macOS job |
-| `MACOS_CERT_PW` | macOS cert password | macOS job |
-| `APPLE_ID` | Apple developer email | macOS notarization |
-| `APPLE_TEAM_ID` | Apple developer team ID | macOS notarization |
-| `APPLE_ID_APP_PW` | App-specific password | macOS notarization |
+| Secret | Purpose | Used by | Status today |
+|---|---|---|---|
+| `WINDOWS_SIGNING_CERT` | base64-encoded PFX | Windows job | **Not provisioned** (neither `glasswing` nor Inkternity has a Windows cert). Add when acquired. |
+| `WINDOWS_SIGNING_PASSWORD` | PFX password | Windows job | Same |
+| `MACOS_APPLICATION_P12` | base64 macOS Developer ID Application cert | macOS job | Available via the existing HEAVYMETA Apple Developer account (already used by `glasswing`) |
+| `MACOS_CERT_PW` | macOS cert password | macOS job | Same |
+| `APPLE_ID` | Apple developer email | macOS notarization | Same |
+| `APPLE_TEAM_ID` | Apple developer team ID | macOS notarization | Same |
+| `APPLE_ID_APP_PW` | App-specific password | macOS notarization | Same |
 
 The macOS job runs with `environment: installers` (matches `metavinci`) so secret access is gated on the environment selector — a small but consistent operational hygiene win.
 
@@ -219,19 +219,32 @@ Optional but very useful — without it the release dance is "go look at GitHub 
 
 ### 8.1 Inheritance from existing infra
 
-HEAVYMETA already owns the Authenticode cert (`heavymeta-code-sign` / `andromica-code-sign` PFXs are stored in the same secret pair, reused across `metavinci` and `glasswing`) and the Apple Developer Program account (used for `glasswing`'s Andromica notarization). Inkternity reuses these — **no new certs need provisioning**.
+HEAVYMETA has the Apple Developer Program account already in use for `glasswing`'s Andromica notarization. Inkternity reuses those Apple secrets (`MACOS_APPLICATION_P12`, `APPLE_ID`, etc.) — no new certs to provision for macOS.
+
+For Windows, **no shared Authenticode cert exists today** (neither `glasswing` nor Inkternity has one provisioned). Inkternity ships unsigned Windows installers until a cert is acquired. The workflow auto-picks-up signing the moment a `WINDOWS_SIGNING_CERT` secret is added; no workflow edits needed.
 
 ### 8.2 What ships per-platform
 
-| Platform | Signed | Notarized | Cert source |
-|---|---|---|---|
-| Windows NSIS installer | ✓ (signtool, DigiCert RFC3161 timestamp) | n/a | `WINDOWS_SIGNING_CERT` (existing) |
-| macOS DMG | ✓ (codesign hardened runtime) | ✓ (xcrun notarytool) | `MACOS_APPLICATION_P12` (existing) |
-| Linux Flatpak | n/a (Flatpak repo signing is its own thing) | n/a | — |
+| Platform | When secrets configured | When not configured |
+|---|---|---|
+| Windows NSIS installer | Signed (signtool, DigiCert RFC3161 timestamp) | Unsigned `.exe`, `::notice::` in workflow log |
+| macOS DMG | Signed (codesign hardened runtime) + notarized (notarytool) + stapled | Unsigned `.dmg`, `::notice::` in log |
+| Linux Flatpak | n/a (Flatpak repo signing is its own thing, deferred) | Same |
 
-### 8.3 Hard-fail policy
+### 8.3 Soft-fail policy (glasswing pattern)
 
-If signing or notarization fails on a real release tag (not `-no-notarize`), the job fails and no GitHub Release is created. Mirrors `metavinci`. The only acceptable unsigned shipping case is `workflow_dispatch` builds (devs explicitly choosing to skip).
+Inkternity mirrors `glasswing`, not `metavinci`: signing and notarization are **best-effort, never blocking**. A release tag with no signing cert configured produces a draft GitHub Release with unsigned installers and emits `::notice::` annotations naming each skip reason. This trades the strict-signing posture for one that lets the project ship from day one, before signing infrastructure is provisioned.
+
+The workflow's skip paths (each emits its own `::notice::`):
+
+1. `WINDOWS_SIGNING_CERT` secret absent → Windows installer ships unsigned.
+2. `MACOS_APPLICATION_P12` secret absent → DMG ships unsigned.
+3. Apple notary secrets absent → DMG ships signed-but-not-notarized.
+4. Tag contains `-no-notarize` substring → DMG signed but notarization skipped (fast iteration).
+5. `workflow_dispatch` with `skip-notarize: true` → same as #4.
+6. macOS bundle wasn't signed (cert absent) → notarization auto-skipped (notarytool requires signed input).
+
+When the cooperative acquires a Windows code-signing cert, drop the secret into the repo settings; the next build picks it up with no workflow edit. Same for Apple notarization secrets if they aren't initially shared with this repo.
 
 ## 9. Publishing
 
@@ -277,7 +290,8 @@ B1–B5 are roughly **3–4 days** of YAML / shell work for someone who's done a
 
 ## 12. Open questions before starting
 
-- **Existing signing certs valid for Inkternity binary metadata?** The Authenticode subject and Apple notarization team are tied to HEAVYMETA's existing apps. Confirm Inkternity is OK to ship under the same signer identity (it should be — it's the same cooperative). If a separate signer identity is preferred for branding, that's a new cert provisioning task.
+- **Windows code-signing cert — when?** Neither `glasswing` nor Inkternity has one provisioned today. The workflow ships unsigned Windows installers and auto-picks-up signing the moment a `WINDOWS_SIGNING_CERT` secret is added. Plan when to acquire (DigiCert / Sectigo / SSL.com Authenticode-EV runs ~$200-400/year). Not blocking the first release.
+- **macOS signer identity for Inkternity?** Apple Developer account exists (used by `glasswing`'s Andromica). Confirm Inkternity is OK to ship under the same Developer ID Application identity — it should be, both are HEAVYMETA cooperative software. If branding wants a separate identity, that's an extra Apple-side cert to provision.
 - **Flatpak vs deb (or both)?** Recommended Flatpak (already has manifest, distro-agnostic). If `.deb` is needed for any reason, add as a parallel artifact in the Linux job — not exclusive.
 - **GitHub repository for the build?** Inkternity's GitHub remote (currently the `zynx/inkternity` placeholder per other docs in this dir) needs to actually exist with the secrets configured. Not a code task but a prerequisite.
 - **Notarization environment selector.** `metavinci` uses `environment: installers` to gate access to the macOS secrets behind a GitHub Environment with required reviewers. Adopt? (Recommended yes — operational consistency.)
