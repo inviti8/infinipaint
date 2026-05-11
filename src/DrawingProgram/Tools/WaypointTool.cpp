@@ -111,7 +111,13 @@ void WaypointTool::gui_toolbox(Toolbar&) {
         if (drawP.world.wpGraph.has_selection()) {
             auto wpRef = drawP.world.netObjMan.get_obj_temporary_ref_from_id<Waypoint>(drawP.world.wpGraph.get_selected());
             if (wpRef) {
-                input_text_field(gui, "label", "Label", &wpRef->mutable_label());
+                input_text_field(gui, "label", "Label", &wpRef->mutable_label(), {
+                    // P0.5-LIVE-SYNC: publish label changes so already-
+                    // connected subscribers see the rename immediately
+                    // (instead of having to disconnect/reconnect for the
+                    // initial-state snapshot to pick up the new value).
+                    .onEdit = [wpRef] { Waypoint::publish_label_update(wpRef); }
+                });
                 // PHASE2 M4: per-waypoint reader-mode transition speed.
                 // Range 0.1× (slow) to 2× (fast); default 1× = global speed.
                 slider_scalar_field<float>(gui, "transition speed", "Transition speed",
@@ -177,7 +183,10 @@ void WaypointTool::gui_phone_toolbox(PhoneDrawingProgramScreen&) {
         if (drawP.world.wpGraph.has_selection()) {
             auto wpRef = drawP.world.netObjMan.get_obj_temporary_ref_from_id<Waypoint>(drawP.world.wpGraph.get_selected());
             if (wpRef) {
-                input_text_field(gui, "label", "Label", &wpRef->mutable_label());
+                input_text_field(gui, "label", "Label", &wpRef->mutable_label(), {
+                    // P0.5-LIVE-SYNC — see desktop variant for notes.
+                    .onEdit = [wpRef] { Waypoint::publish_label_update(wpRef); }
+                });
                 slider_scalar_field<float>(gui, "transition speed", "Transition speed",
                     &wpRef->mutable_transition_speed_multiplier(),
                     Waypoint::TRANSITION_SPEED_MIN, Waypoint::TRANSITION_SPEED_MAX,

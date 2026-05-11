@@ -2,6 +2,7 @@
 #include <cereal/types/string.hpp>
 #include <cereal/types/vector.hpp>
 #include "../World.hpp"
+#include "../CommandList.hpp"
 #include "../ScaleUpCanvas.hpp"
 
 #include <include/codec/SkCodec.h>
@@ -120,6 +121,21 @@ void Waypoint::load_transition_point_data_from_archive(cereal::PortableBinaryInp
     stopTime = std::clamp(stopTime, TRANSITION_STOP_TIME_MIN, TRANSITION_STOP_TIME_MAX);
 }
 
+// P0.5-LIVE-SYNC: command set for Waypoint NetObj update messages.
+// Phase 0.5 starts with label only; other fields (transition speed,
+// easing, isTransition, stopTime, skin) follow the same pattern when
+// they need live sync.
+enum class WaypointCommand : uint8_t {
+    SET_LABEL = 0
+};
+
+void Waypoint::publish_label_update(const NetObjTemporaryPtr<Waypoint>& o) {
+    o.send_update_to_all(RELIABLE_COMMAND_CHANNEL,
+        [](const NetObjTemporaryPtr<Waypoint>& o, cereal::PortableBinaryOutputArchive& a) {
+            a(WaypointCommand::SET_LABEL, o->label);
+        });
+}
+
 void Waypoint::write_constructor_data(const NetObjTemporaryPtr<Waypoint>& o, cereal::PortableBinaryOutputArchive& a) {
     // P0.5-SKINS / P0.5-LIVE-SYNC partial fix: include every
     // post-construction-editable field in the constructor payload so
@@ -156,13 +172,40 @@ void Waypoint::register_class(World& w) {
         o->skin = decode_skin_png(skinBytes);
         canvas_scale_up_check(*o, w, c);
     };
+    // P0.5-LIVE-SYNC: SET_LABEL update handler.
+    // Client side: receives broadcast, mutates local label.
+    // Server side: receives client send, mutates, re-broadcasts to all
+    // other clients (the canonical fan-out pattern from ClientData).
+    auto readUpdateClient = [](const NetObjTemporaryPtr<Waypoint>& o, cereal::PortableBinaryInputArchive& a, const std::shared_ptr<NetServer::ClientData>&) {
+        WaypointCommand cmd;
+        a(cmd);
+        switch (cmd) {
+            case WaypointCommand::SET_LABEL:
+                a(o->label);
+                break;
+        }
+    };
+    auto readUpdateServer = [](const NetObjTemporaryPtr<Waypoint>& o, cereal::PortableBinaryInputArchive& a, const std::shared_ptr<NetServer::ClientData>& c) {
+        WaypointCommand cmd;
+        a(cmd);
+        switch (cmd) {
+            case WaypointCommand::SET_LABEL:
+                a(o->label);
+                o.send_server_update_to_all_clients_except(c, RELIABLE_COMMAND_CHANNEL,
+                    [](const NetObjTemporaryPtr<Waypoint>& o, cereal::PortableBinaryOutputArchive& a) {
+                        a(WaypointCommand::SET_LABEL, o->label);
+                    });
+                break;
+        }
+    };
+
     w.netObjMan.register_class<Waypoint, Waypoint, Waypoint, Waypoint>({
         .writeConstructorFuncClient = write_constructor_data,
         .readConstructorFuncClient  = readConstructorData,
-        .readUpdateFuncClient       = nullptr,
+        .readUpdateFuncClient       = readUpdateClient,
         .writeConstructorFuncServer = write_constructor_data,
         .readConstructorFuncServer  = readConstructorData,
-        .readUpdateFuncServer       = nullptr
+        .readUpdateFuncServer       = readUpdateServer
     });
     register_ordered_list_class<Waypoint>(w.netObjMan);
 }

@@ -54,11 +54,19 @@ class Waypoint {
 
         const std::string& get_label() const { return label; }
         void set_label(const std::string& newLabel) { label = newLabel; }
-        // Direct mutable handle for the label-edit text input. NetObj sync
-        // for multi-user concurrent edits is deferred to a polish pass —
-        // single-user edits work because the field lives in a NetObj that
-        // already participates in the file-format save/load round-trip.
+        // Direct mutable handle for the label-edit text input. After
+        // mutating, callers MUST call publish_label_update() (below) on
+        // the corresponding NetObjTemporaryPtr so subscribers receive
+        // the update. Phase 0 wires this through WaypointTool's text
+        // input via onEdit; future fields follow the same pattern.
         std::string& mutable_label() { return label; }
+
+        // P0.5-LIVE-SYNC: broadcasts the current label as a NetObj
+        // update message so already-connected peers (subscribers in
+        // Phase 0's terminology) see the new value. Idempotent —
+        // mutate the label first via mutable_label() / set_label(),
+        // then call this. Safe to call repeatedly.
+        static void publish_label_update(const NetworkingObjects::NetObjTemporaryPtr<Waypoint>& o);
 
         const CoordSpaceHelper& get_coords() const { return coords; }
         const Vector<int32_t, 2>& get_window_size() const { return windowSize; }
