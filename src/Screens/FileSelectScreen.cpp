@@ -202,10 +202,8 @@ void FileSelectScreen::settings_view() {
     }) {
         text_label_centered(gui, "Inkternity App Key");
         text_label(gui,
-            "This Inkternity install's identity. Artists copy this pubkey "
-            "into the Heavymeta Portal once per install ("
-            "Portal -> Dashboard -> Inkternity -> Apps -> Register new) "
-            "so the portal can issue subscriber tokens addressed to it.");
+            "This install's identity. Copy this pubkey into the Inkternity "
+            "card in your Heavymeta Portal settings.");
 
         if (main.devKeys.is_loaded()) {
             // Display the pubkey in a read-only-ish text box so the user
@@ -221,22 +219,7 @@ void FileSelectScreen::settings_view() {
                 }
             });
         } else {
-            // Stand-in instructions while the dev keys file is the
-            // credential source. P0-C1/C3 will replace this with the
-            // proper portal-issued credential flow + first-run keypair
-            // generation.
-            text_label(gui, "Status: not configured.");
-            text_label(gui,
-                "To configure dev keys (Phase 0 stand-in for portal-issued credentials):");
-            text_label(gui, "  1. Run from a terminal:");
-            text_label(gui, "       cd D:\\repos\\inkternity-server");
-            text_label(gui,
-                "       python scripts/dev_mint_token.py --gen-keys --save-state \"" +
-                (main.conf.configPath / "inkternity_dev_keys.json").string() + "\"");
-            text_label(gui, "  2. Restart Inkternity.");
-            text_label(gui,
-                "  3. The pubkey will appear above. Copy it into the portal's "
-                "Inkternity Apps registration page.");
+            text_label(gui, "Not configured. Set up via your Heavymeta Portal settings.");
         }
     }
 }
