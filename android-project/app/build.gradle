@@ -2,25 +2,40 @@ plugins {
     id 'com.android.application'
 }
 
+// conanInstall: cross-compiles every native dependency for both Android
+// arches via the `android` Conan profile. Wrapped in doLast so it doesn't
+// fire at gradle CONFIGURATION time — that previously caused IDE sync to
+// fail before you could even browse the project. Now sync succeeds; you
+// invoke this task explicitly when you actually need to (re)build deps:
+//
+//   .\gradlew.bat conanInstall
+//
+// The `conanExe` property lets you point at a non-PATH conan binary, e.g.
+// when conan is installed via uv in ~\.local\bin. Set in either:
+//   gradle.properties:               conanExe=C:\\Users\\you\\.local\\bin\\conan.exe
+//   command line:                    .\gradlew.bat conanInstall -PconanExe=...
+//   or just put `conan` on PATH      and rely on the default below.
 task conanInstall {
-    def conanExecutable = "conan" // define the path to your conan installation
-    def buildDir = new File("app/build")
-    buildDir.mkdirs()
-    ["Debug", "Release"].each { String build_type ->
-        // ["armv7", "armv8", "x86", "x86_64"]
-        ["armv8", "x86_64"].each { String arch ->
-            def cmd = conanExecutable + " install " +
-                    "../../.. --profile android -s build_type="+ build_type +" -s arch=" + arch +
-                    " --build missing -c tools.cmake.cmake_layout:build_folder_vars=['settings.arch']"
-            print(">> ${cmd} \n")
+    doLast {
+        def conanExecutable = project.findProperty("conanExe") ?: "conan"
+        def buildDir = new File("app/build")
+        buildDir.mkdirs()
+        ["Debug", "Release"].each { String build_type ->
+            // ["armv7", "armv8", "x86", "x86_64"]
+            ["armv8", "x86_64"].each { String arch ->
+                def cmd = conanExecutable + " install " +
+                        "../../.. --profile android -s build_type="+ build_type +" -s arch=" + arch +
+                        " --build missing -c tools.cmake.cmake_layout:build_folder_vars=['settings.arch']"
+                print(">> ${cmd} \n")
 
-            def sout = new StringBuilder(), serr = new StringBuilder()
-            def proc = cmd.execute(null, buildDir)
-            proc.consumeProcessOutput(sout, serr)
-            proc.waitFor()
-            println "$sout $serr"
-            if (proc.exitValue() != 0) {
-                throw new Exception("out> $sout err> $serr" + "\nCommand: ${cmd}")
+                def sout = new StringBuilder(), serr = new StringBuilder()
+                def proc = cmd.execute(null, buildDir)
+                proc.consumeProcessOutput(sout, serr)
+                proc.waitFor()
+                println "$sout $serr"
+                if (proc.exitValue() != 0) {
+                    throw new Exception("out> $sout err> $serr" + "\nCommand: ${cmd}")
+                }
             }
         }
     }

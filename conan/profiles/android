@@ -1,0 +1,30 @@
+# Conan 2 profile for Android cross-compilation.
+#
+# Invoke per-arch (gradle does this for you, but you can run it manually
+# during the recipe audit — see docs/design/BUILDS-ANDROID.md §3.5):
+#
+#   uv run --no-project conan install . --profile android -s arch=armv8  --build=missing
+#   uv run --no-project conan install . --profile android -s arch=x86_64 --build=missing
+#
+# Required env: ANDROID_NDK_HOME pointing at the NDK install root,
+# e.g. D:\android-sdk\ndk\29.0.14206865.
+#
+# compiler.version: NDK 29.0.x ships clang 19. Bump if you upgrade the
+# NDK. Verify locally with:
+#   "$env:ANDROID_NDK_HOME\toolchains\llvm\prebuilt\windows-x86_64\bin\clang.exe" --version
+
+[settings]
+os=Android
+os.api_level=21
+arch=armv8
+compiler=clang
+compiler.version=19
+compiler.libcxx=c++_shared
+compiler.cppstd=gnu23
+build_type=Release
+
+[tool_requires]
+cmake/3.27.0
+
+[conf]
+tools.android:ndk_path={{ os.getenv("ANDROID_NDK_HOME") }}
