@@ -210,7 +210,7 @@ jobs:
   # build-macos  →  DragNDrop DMG (signed + notarized)
   # =====================================================================
   build-macos:
-    runs-on: macos-14
+    runs-on: macos-15   # Xcode 16 / clang 17 — matches macOS-arm64 profile compiler.version
     environment: installers   # gates access to MACOS_* + APPLE_* secrets
     steps:
       - uses: actions/checkout@v4
@@ -251,6 +251,10 @@ jobs:
 
       - name: Conan export + install
         run: |
+          # Force CC/CXX so autotools-based deps (ICU) find a compiler even
+          # when Conan's toolchain env isn't propagated into their ./configure.
+          export CC=$(xcrun --find clang)
+          export CXX=$(xcrun --find clang++)
           conan profile detect --force
           ./conan/export_libs.sh
           conan install . --build=missing -pr=conan/profiles/macOS-arm64
