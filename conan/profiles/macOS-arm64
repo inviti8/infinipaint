@@ -6,7 +6,7 @@ compiler.cppstd=gnu23
 compiler.libcxx=libc++
 compiler.version=17
 os=Macos
-os.version=11.0
+os.version=14.0   # bumped from 11.0 — libc++'s to_chars(long double) is marked unavailable below 13.4
 
 [tool_requires]
 cmake/3.27.0
