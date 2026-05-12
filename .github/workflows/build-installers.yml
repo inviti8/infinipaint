@@ -251,10 +251,14 @@ jobs:
 
       - name: Conan export + install
         run: |
+          # Conan's AutotoolsToolchain on macOS only emits `-isysroot $SDKROOT`
+          # when SDKROOT is set in the env. Without it, recipe conftests link
+          # without an SDK and fail with `ld: library 'System' not found`.
+          export SDKROOT=$(xcrun --show-sdk-path)
           # Resolve full clang paths and pass them via Conan's
           # tools.build:compiler_executables conf so the AutotoolsToolchain
-          # threads them all the way through to recipe subshells (the
-          # autotools-based ICU recipe didn't see plain CC/CXX env vars).
+          # threads them all the way through to recipe subshells (plain
+          # CC/CXX env vars don't survive Conan's recipe-runner).
           CC_PATH=$(xcrun --find clang)
           CXX_PATH=$(xcrun --find clang++)
           conan profile detect --force
