@@ -268,8 +268,11 @@ jobs:
           echo "=== Searching ~/.conan2 for config.log ==="
           find ~/.conan2 -name config.log -type f 2>/dev/null | while read -r f; do
             echo
-            echo "=== $f (last 200 lines) ==="
-            tail -200 "$f" || true
+            echo "=== $f ==="
+            echo "--- HEAD (conftest commands + stderr live here) ---"
+            head -400 "$f" || true
+            echo "--- TAIL (resolved variables) ---"
+            tail -120 "$f" || true
           done
 
       - name: CMake configure + build

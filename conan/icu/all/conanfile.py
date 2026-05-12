@@ -126,7 +126,10 @@ class ICUConan(ConanFile):
         env.generate()
 
         tc = AutotoolsToolchain(self)
-        if check_min_vs(self, "180", raise_invalid=False):
+        # /FS is an MSVC flag for parallel PDB writes; gate on is_msvc so it
+        # doesn't leak into apple-clang/clang/gcc flags (where `-FS` parses as
+        # `-F S` — add framework search path S — and breaks autoconf conftest).
+        if is_msvc(self) and check_min_vs(self, "180", raise_invalid=False):
             tc.extra_cflags.append("-FS")
             tc.extra_cxxflags.append("-FS")
         if Version(self.version) >= "75.1" and not self.settings.compiler.cppstd and is_msvc(self):
