@@ -3,6 +3,10 @@ runtime: org.freedesktop.Platform
 runtime-version: '25.08'
 sdk: org.freedesktop.Sdk
 command: inkternity
+# appstream-compose isn't shipped by org.freedesktop.Sdk and we don't
+# distribute via Flathub / GNOME Software for Phase 0. Skip the post-
+# build metadata step so the bundle assembly completes cleanly.
+appstream-compose: false
 build-options:
   build-args:
     - --share=network
