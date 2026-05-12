@@ -80,9 +80,14 @@ FontData::FontData()
     defaultFontMgr = SkFontMgr_New_Custom_Directory("data/fonts");
 #endif
     map["Roboto"] = defaultFontMgr->makeFromFile("data/fonts/Roboto-variable.ttf");
+    map["Manrope"] = defaultFontMgr->makeFromFile("data/fonts/Manrope-VariableFont_wght.ttf");
+    map["Outfit"] = defaultFontMgr->makeFromFile("data/fonts/Outfit-VariableFont_wght.ttf");
 
     collection = sk_make_sp<skia::textlayout::FontCollection>();
-    collection->setDefaultFontManager(defaultFontMgr, std::vector<SkString>{SkString{"Roboto"}, SkString{"Noto Emoji"}, SkString{"Amiri"}});
+    // Family priority for SkParagraph fallback. Manrope first matches the
+    // HEAVYMETA portal's body font; Outfit available for headings via
+    // SkTextStyle.setFontFamilies in callers that want display weight.
+    collection->setDefaultFontManager(defaultFontMgr, std::vector<SkString>{SkString{"Manrope"}, SkString{"Outfit"}, SkString{"Roboto"}, SkString{"Noto Emoji"}, SkString{"Amiri"}});
     if(localFontMgr)
         collection->setDynamicFontManager(localFontMgr);
     std::string s = "🙂";

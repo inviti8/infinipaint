@@ -27,14 +27,18 @@ namespace GUIStuff {
     }
 
     std::shared_ptr<Theme> get_default_dark_mode() {
+        // Colors match the "Default" dark-mode preset in the HEAVYMETA portal
+        // (heavymeta_collective/static/theme_presets.json) — purple accent +
+        // gold link on near-black, so Inkternity reads as the same product
+        // family as the portal it ships from.
         std::shared_ptr<Theme> theme(std::make_shared<Theme>());
-        theme->fillColor1 = {0.65f, 0.64f, 1.0f, 1.0f};
-        theme->fillColor2 = {0.6f, 0.6f, 0.785f, 1.0f};
-        theme->backColor0 = {0.00f, 0.00f, 0.00f, 1.0f};
-        theme->backColor1 = {0.156f, 0.156f, 0.18f, 1.0f};
-        theme->backColor2 = {0.24f, 0.24f, 0.29f, 1.0f};
-        theme->frontColor1 = {0.87f, 0.87f, 0.87f, 1.0f};
-        theme->frontColor2 = {0.64f, 0.64f, 0.64f, 1.0f};
+        theme->fillColor1 = {0.659f, 0.478f, 1.000f, 1.0f}; // #a87aff portal accent (purple)
+        theme->fillColor2 = {0.831f, 0.659f, 0.263f, 1.0f}; // #d4a843 portal link (gold)
+        theme->backColor0 = {0.102f, 0.102f, 0.102f, 1.0f}; // #1a1a1a portal bg
+        theme->backColor1 = {0.165f, 0.165f, 0.165f, 1.0f}; // #2a2a2a portal card
+        theme->backColor2 = {0.267f, 0.267f, 0.267f, 1.0f}; // #444444 portal border
+        theme->frontColor1 = {0.941f, 0.941f, 0.941f, 1.0f}; // #f0f0f0 portal text
+        theme->frontColor2 = {0.659f, 0.659f, 0.659f, 1.0f}; // derived: 70% of frontColor1
         return theme;
     }
     

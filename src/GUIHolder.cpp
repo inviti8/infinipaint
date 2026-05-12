@@ -8,7 +8,7 @@
 GUIHolder::GUIHolder(MainProgram& m):
     main(m)
 {
-    gui.io.textTypeface = main.fonts->map["Roboto"];
+    gui.io.textTypeface = main.fonts->map["Manrope"];  // matches HEAVYMETA portal body font
     gui.io.fonts = main.fonts;
     gui.io.input = &main.input;
 
