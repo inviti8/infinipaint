@@ -54,6 +54,13 @@ jobs:
           sudo flatpak install -y flathub \
             org.freedesktop.Platform//25.08 \
             org.freedesktop.Sdk//25.08
+          # flatpak-builder caches submodule sources locally and re-clones
+          # them via file:// when assembling the build tree. git >=2.38.1
+          # rejects file:// transport by default (CVE-2022-39253), which
+          # breaks the libdatachannel deps/plog clone. Re-enable file://
+          # for the runner — this only affects clones initiated from the
+          # CI workspace, not the host's user config.
+          git config --global protocol.file.allow always
 
       - name: Derive version
         id: ver
