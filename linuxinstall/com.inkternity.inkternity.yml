@@ -76,6 +76,22 @@ modules:
       - type: archive
         url: https://github.com/google/skia/archive/da51f0d60ea2b14e845a823dc11b405dbeef42d8.zip
         sha256: 1f5140d5908031d8cdd06429a633a1583b12fc43dc1c768374ed1e91ab9fa596
+  - name: json-c
+    # libmypaint serializes brush JSON via json-c. Desktop builds pull
+    # json-c/0.18 via Conan (conanfile.py:126); the flatpak path uses
+    # NO_CONAN_BUILD=ON so we vendor it here as well.
+    buildsystem: cmake-ninja
+    config-opts:
+      - -DBUILD_SHARED_LIBS=OFF
+      - -DBUILD_STATIC_LIBS=ON
+      - -DBUILD_TESTING=OFF
+      - -DBUILD_APPS=OFF
+      - -DCMAKE_BUILD_TYPE=Release
+      - -DCMAKE_POSITION_INDEPENDENT_CODE=ON
+    sources:
+      - type: git
+        tag: json-c-0.17-20230812
+        url: https://github.com/json-c/json-c.git
   - name: inkternity-x86_64
     buildsystem: cmake-ninja
     builddir: true
