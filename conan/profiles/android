@@ -33,6 +33,11 @@ cmake/3.27.0
 # Ninja generator below. Without listing it here, recipes that don't
 # tool_require ninja themselves get "CMAKE_MAKE_PROGRAM is not set".
 ninja/[>=1.11]
+# Meson 1.10 rejects the drive-root prefix ("D:/") Conan's MesonToolchain
+# emits on Windows when a recipe sets prefix="/" (freetype/2.13.2 does
+# this). Pre-1.10 meson accepted it. Pin until upstream Conan fixes
+# MesonToolchain's prefix computation on Windows.
+meson/[>=1.2.2 <1.10]
 
 [conf]
 tools.android:ndk_path={{ os.getenv("ANDROID_NDK_HOME") }}
