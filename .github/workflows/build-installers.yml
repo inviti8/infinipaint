@@ -251,13 +251,26 @@ jobs:
 
       - name: Conan export + install
         run: |
-          # Force CC/CXX so autotools-based deps (ICU) find a compiler even
-          # when Conan's toolchain env isn't propagated into their ./configure.
-          export CC=$(xcrun --find clang)
-          export CXX=$(xcrun --find clang++)
+          # Resolve full clang paths and pass them via Conan's
+          # tools.build:compiler_executables conf so the AutotoolsToolchain
+          # threads them all the way through to recipe subshells (the
+          # autotools-based ICU recipe didn't see plain CC/CXX env vars).
+          CC_PATH=$(xcrun --find clang)
+          CXX_PATH=$(xcrun --find clang++)
           conan profile detect --force
           ./conan/export_libs.sh
-          conan install . --build=missing -pr=conan/profiles/macOS-arm64
+          conan install . --build=missing -pr=conan/profiles/macOS-arm64 \
+            -c "tools.build:compiler_executables={'c': '$CC_PATH', 'cpp': '$CXX_PATH'}"
+
+      - name: Dump ICU config.log on failure
+        if: failure()
+        run: |
+          echo "=== Searching ~/.conan2 for config.log ==="
+          find ~/.conan2 -name config.log -type f 2>/dev/null | while read -r f; do
+            echo
+            echo "=== $f (last 200 lines) ==="
+            tail -200 "$f" || true
+          done
 
       - name: CMake configure + build
         run: |
