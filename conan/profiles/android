@@ -15,7 +15,11 @@
 
 [settings]
 os=Android
-os.api_level=21
+# api_level=24 (Android 7.0 Nougat) is the floor where getifaddrs /
+# freeifaddrs are declared in the NDK libc — required by usrsctp (the
+# SCTP backend libdatachannel uses for reliable datachannels). Drops
+# Android 5/6 support, ~98% of in-use devices unaffected.
+os.api_level=24
 arch=armv8
 compiler=clang
 compiler.version=19
@@ -25,6 +29,15 @@ build_type=Release
 
 [tool_requires]
 cmake/3.27.0
+# Ninja must be in PATH at build time because we force CMake to use the
+# Ninja generator below. Without listing it here, recipes that don't
+# tool_require ninja themselves get "CMAKE_MAKE_PROGRAM is not set".
+ninja/[>=1.11]
 
 [conf]
 tools.android:ndk_path={{ os.getenv("ANDROID_NDK_HOME") }}
+# Force Ninja so recipes don't fall back to "MinGW Makefiles" on Windows
+# (Conan defaults to MinGW when compiler=clang + os=Windows host, which
+# requires mingw32-make.exe on PATH — we don't ship that). Ninja is a
+# transitive tool_require already in our dep graph.
+tools.cmake.cmaketoolchain:generator=Ninja
