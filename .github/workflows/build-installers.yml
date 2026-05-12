@@ -40,7 +40,9 @@ jobs:
   # build-linux  →  Flatpak bundle
   # =====================================================================
   build-linux:
-    runs-on: ubuntu-22.04
+    # ubuntu-24.04 ships flatpak-builder 1.4 which supports
+    # --disable-appstream-compose (1.2 on 22.04 does not).
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
         with:
@@ -82,7 +84,12 @@ jobs:
 
       - name: Build Flatpak
         run: |
-          flatpak-builder --force-clean --repo=flatpak-repo build-dir \
+          # --disable-appstream-compose skips the post-build metadata step
+          # that requires appstream-compose inside the SDK sandbox (it
+          # isn't shipped by org.freedesktop.Sdk). We don't need the
+          # metadata for Phase 0 — no Flathub/GNOME Software submission.
+          flatpak-builder --force-clean --disable-appstream-compose \
+            --repo=flatpak-repo build-dir \
             linuxinstall/com.inkternity.inkternity.yml
           flatpak build-bundle flatpak-repo \
             Inkternity-${{ steps.ver.outputs.numeric }}-x86_64.flatpak \
