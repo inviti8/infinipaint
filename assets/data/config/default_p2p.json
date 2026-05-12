@@ -1,5 +1,5 @@
 {
-    "signalingServer": "wss://signalserver.infinipaint.com:8000",
+    "signalingServer": "wss://signal.hvym.link",
     "stunList": [
         "stun.l.google.com:19302",
         "stun1.l.google.com:19302",
@@ -9,10 +9,10 @@
     ],
     "turnList": [
         {
-            "url": "turn.infinipaint.com",
+            "url": "turn.hvym.link",
             "port": 3478,
-            "username": "infinipaint",
-            "credential": "infinipaintpassword"
+            "username": "inkternity",
+            "credential": "__TURN_SECRET__"
         }
     ]
 }

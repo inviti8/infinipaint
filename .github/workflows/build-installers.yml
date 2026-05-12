@@ -65,6 +65,11 @@ jobs:
           if [[ ! "$VER" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then VER="0.0.0"; fi
           echo "numeric=$VER" >> "$GITHUB_OUTPUT"
 
+      - name: Inject TURN secret into default_p2p.json
+        env:
+          TURN_SECRET: ${{ secrets.TURN_SECRET }}
+        run: python scripts/inject_turn_secret.py
+
       - name: Build Flatpak
         run: |
           flatpak-builder --force-clean --repo=flatpak-repo build-dir \
@@ -121,6 +126,11 @@ jobs:
           echo "major=${MAJ}" >> "$GITHUB_OUTPUT"
           echo "minor=${MIN}" >> "$GITHUB_OUTPUT"
           echo "patch=${PATCH}" >> "$GITHUB_OUTPUT"
+
+      - name: Inject TURN secret into default_p2p.json
+        env:
+          TURN_SECRET: ${{ secrets.TURN_SECRET }}
+        run: python scripts/inject_turn_secret.py
 
       - name: Conan export + install
         shell: cmd
@@ -233,6 +243,11 @@ jobs:
           echo "major=${MAJ}" >> "$GITHUB_OUTPUT"
           echo "minor=${MIN}" >> "$GITHUB_OUTPUT"
           echo "patch=${PATCH}" >> "$GITHUB_OUTPUT"
+
+      - name: Inject TURN secret into default_p2p.json
+        env:
+          TURN_SECRET: ${{ secrets.TURN_SECRET }}
+        run: python scripts/inject_turn_secret.py
 
       - name: Conan export + install
         run: |
