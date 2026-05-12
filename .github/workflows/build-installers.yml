@@ -49,7 +49,10 @@ jobs:
       - name: Install Flatpak + freedesktop runtime
         run: |
           sudo apt-get update
-          sudo apt-get install -y flatpak flatpak-builder
+          # appstream package provides appstream-compose, which flatpak-builder
+          # invokes during the post-build metadata step. Not present on stock
+          # ubuntu-22.04 runners; install it to unblock the bundle assembly.
+          sudo apt-get install -y flatpak flatpak-builder appstream
           sudo flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
           sudo flatpak install -y flathub \
             org.freedesktop.Platform//25.08 \
