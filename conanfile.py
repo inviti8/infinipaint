@@ -119,10 +119,8 @@ class CompressorRecipe(ConanFile):
             self.requires("libcurl/8.17.0")
 
         # libmypaint (vendored under deps/libmypaint) needs json-c for brush
-        # serialization. Desktop targets only — disabled on web and Android in
-        # Phase 1 (PHASE1.md §4 — Emscripten/web build) and (CMakeLists.txt
-        # add_subdirectory guard for Android).
-        if self.settings.os not in ("Emscripten", "Android"):
+        # serialization. Disabled on Emscripten (no web target for brushes yet).
+        if self.settings.os != "Emscripten":
             self.requires("json-c/0.18")
 
         self.requires("zstd/1.5.7")

@@ -380,9 +380,11 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv) {
 
     // M1/M2 brush bridge tests (PHASE1.md §10): drive synthetic libmypaint
     // operations and exit. Bypass normal app startup, so they must run before
-    // icu/SDL/MainProgram init.
+    // icu/SDL/MainProgram init. Gated on libmypaint since the entry points
+    // live in HVYM::Brushes — disabled on Android (and Emscripten).
     //   --mypaint-hello-dab   <out.png>  one dab on MyPaintFixedTiledSurface
     //   --mypaint-stroke-test <out.png>  multi-dab stroke on LibMyPaintSkiaSurface (M2)
+#ifdef HVYM_HAS_LIBMYPAINT
     for (int i = 1; i + 1 < argc; ++i) {
         const std::string_view flag(argv[i]);
         if (flag == "--mypaint-hello-dab") {
@@ -396,6 +398,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv) {
             return ok ? SDL_APP_SUCCESS : SDL_APP_FAILURE;
         }
     }
+#endif // HVYM_HAS_LIBMYPAINT
 
     std::vector<std::filesystem::path> listOfFilesToOpenFromCommand;
     for(int i = 1; i < argc; i++)

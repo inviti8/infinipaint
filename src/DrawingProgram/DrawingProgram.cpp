@@ -381,7 +381,9 @@ void DrawingProgram::toolbar_gui(Toolbar& t) {
 
                 // PHASE2 M3 follow-up: split MyPaint brush into two
                 // category buttons. See PhoneDrawingProgramScreen for
-                // full rationale.
+                // full rationale. Gated on HVYM_HAS_LIBMYPAINT — see
+                // BrushPresets.hpp + CMakeLists.txt libmypaint block.
+#ifdef HVYM_HAS_LIBMYPAINT
                 {
                     const auto& presets = HVYM::Brushes::curated_presets();
                     auto& cfg = world.main.toolConfig.myPaintBrush;
@@ -412,6 +414,7 @@ void DrawingProgram::toolbar_gui(Toolbar& t) {
                         .onClick = [activate_category] { activate_category(HVYM::Brushes::BrushCategory::TEXTURED); }
                     });
                 }
+#endif // HVYM_HAS_LIBMYPAINT
 
                 tool_button("Waypoint Toolbar Button", "data/icons/bookmark.svg", DrawingProgramToolType::WAYPOINT);
                 tool_button("Button Select Toolbar Button", "data/icons/button-select.svg", DrawingProgramToolType::BUTTONSELECT);

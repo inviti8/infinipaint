@@ -20,7 +20,14 @@ task conanInstall {
         def conanExecutable = project.findProperty("conanExe") ?: "conan"
         def buildDir = new File("app/build")
         buildDir.mkdirs()
-        ["Debug", "Release"].each { String build_type ->
+        // Native libs are built Release-only — even for app `assembleDebug`.
+        // Standard mobile-app pattern: your own app code carries debug
+        // symbols, the big native deps (Skia, libdatachannel, etc.) ship
+        // optimized. Saves hours of Debug-variant Skia rebuilds and
+        // matches what most production Android apps do. The toolchain
+        // wrapper at conan_android_toolchain.cmake hardcodes the Release
+        // sub-path to align with this.
+        ["Release"].each { String build_type ->
             // ["armv7", "armv8", "x86", "x86_64"]
             ["armv8", "x86_64"].each { String arch ->
                 // -pr:h= and -pr:b= take PATH-relative profile files (not

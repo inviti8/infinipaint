@@ -553,6 +553,12 @@ void PhoneDrawingProgramScreen::bottom_toolbar_gui() {
     // jumps to the first preset of its category if the current preset
     // is on the wrong side. The brush picker (in tool_settings_popup)
     // filters to the active category.
+    //
+    // libmypaint is disabled on Android (and Emscripten) — the
+    // HVYM::Brushes namespace is gated on HVYM_HAS_LIBMYPAINT in
+    // BrushPresets.hpp, so these MyPaint-specific buttons are hidden
+    // when the engine isn't compiled in.
+#ifdef HVYM_HAS_LIBMYPAINT
     {
         const auto& presets = HVYM::Brushes::curated_presets();
         auto& cfg = main.toolConfig.myPaintBrush;
@@ -587,6 +593,7 @@ void PhoneDrawingProgramScreen::bottom_toolbar_gui() {
             .onClick = [activate_category] { activate_category(HVYM::Brushes::BrushCategory::TEXTURED); }
         });
     }
+#endif // HVYM_HAS_LIBMYPAINT
 
     tool_button("Waypoint Toolbar Button", "data/icons/bookmark.svg", DrawingProgramToolType::WAYPOINT);
     tool_button("Button Select Toolbar Button", "data/icons/button-select.svg", DrawingProgramToolType::BUTTONSELECT);

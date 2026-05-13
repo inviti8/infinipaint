@@ -69,10 +69,12 @@ extern "C"
 JNIEXPORT void JNICALL
 Java_com_erroratline0_infinipaint_InfiniPaintTextBoxInputConnection_nativeSetTextBoxCursor(
         JNIEnv *env, jclass clazz, jint cursor_begin, jint cursor_end) {
-    if(globalInputManager) {
-        std::scoped_lock a{globalCallMutex};
-        globalInputManager->main.input_android_text_box_set_cursor(cursor_begin, cursor_end);
-    }
+    // TODO(android-text-input): wire to MainProgram once text-box editing
+    // is supported on Android. Phase 0 ships as viewer-only on mobile,
+    // so the soft-keyboard cursor reporting has no consumer yet. Keep
+    // the symbol so the Java side's nativeSetTextBoxCursor declaration
+    // still resolves at JNI registration time.
+    (void)env; (void)clazz; (void)cursor_begin; (void)cursor_end;
 }
 
 #endif

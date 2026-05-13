@@ -2,6 +2,17 @@ cmake_minimum_required(VERSION 3.22.0)  # Android SDK Manager's stable CMake (3.
 set(CMAKE_CXX_STANDARD 23)
 project(infinipaint)
 
+# Android ships only Release-built native deps (Skia etc), even for
+# Debug app builds — see android-project/app/build.gradle's conanInstall
+# task. Conan-generated imported targets gate their include dirs and
+# link libs on $<CONFIG:Release>, so a Debug consumer sees empty
+# INTERFACE_INCLUDE_DIRECTORIES from those targets. Mapping Debug
+# imports to Release fixes propagation without rebuilding all natives
+# for Debug.
+if(ANDROID)
+    set(CMAKE_MAP_IMPORTED_CONFIG_DEBUG Release)
+endif()
+
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Options to set
@@ -238,7 +249,7 @@ else()
     find_package(SDL3 REQUIRED CONFIG REQUIRED COMPONENTS SDL3-static)
 endif()
 
-if((NOT EMSCRIPTEN) AND (NOT APPLE))
+if((NOT EMSCRIPTEN) AND (NOT APPLE) AND (NOT ANDROID))
     find_package(TBB REQUIRED)
 endif()
 
@@ -368,11 +379,18 @@ else()
 endif()
 
 if(NOT EMSCRIPTEN AND ((GRAPHICS_BACKEND STREQUAL "OpenGL3.3") OR (GRAPHICS_BACKEND STREQUAL "OpenGLES3.0") OR (GRAPHICS_BACKEND STREQUAL "OpenGL2.1")))
-    find_package(OpenGL REQUIRED)
-    if(GRAPHICS_BACKEND STREQUAL "OpenGLES3.0")
-        target_link_libraries(main OpenGL::GLES3)
+    if(ANDROID)
+        # Android: GLES + EGL come from the NDK directly. CMake's
+        # FindOpenGL hunts for desktop libGL / opengl32 / GLX and fails
+        # against the NDK sysroot — link the NDK libraries by name.
+        target_link_libraries(main GLESv3 EGL)
     else()
-        target_link_libraries(main OpenGL::GL)
+        find_package(OpenGL REQUIRED)
+        if(GRAPHICS_BACKEND STREQUAL "OpenGLES3.0")
+            target_link_libraries(main OpenGL::GLES3)
+        else()
+            target_link_libraries(main OpenGL::GL)
+        endif()
     endif()
 endif()
 
@@ -396,11 +414,10 @@ if((NOT EMSCRIPTEN) AND WIN32)
     target_link_libraries(main clip)
 endif()
 
-# libmypaint — natural-media brush engine, scoped to ink/markers in Phase 1.
-# Disabled on Emscripten and Android in Phase 1 (PHASE1.md §4). Wrapper
-# CMakeLists.txt lives in cmake/libmypaint/ so the deps/libmypaint submodule
-# stays untouched.
-if((NOT EMSCRIPTEN) AND (NOT ANDROID))
+# libmypaint — natural-media brush engine. Disabled on Emscripten only;
+# Android cross-compiles cleanly via Conan's json-c + the in-tree CMake
+# wrapper (pure C99, no glib/autotools dependency).
+if(NOT EMSCRIPTEN)
     add_subdirectory(cmake/libmypaint)
     target_link_libraries(main mypaint)
     target_compile_definitions(main PRIVATE HVYM_HAS_LIBMYPAINT)

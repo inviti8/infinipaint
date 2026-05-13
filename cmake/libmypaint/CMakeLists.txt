@@ -31,14 +31,49 @@ configure_file(
 )
 
 # --- Generated brush settings headers (run upstream generate.py) ---
-find_package(Python3 REQUIRED COMPONENTS Interpreter)
+# generate.py runs at configure/build time on the *host*. We don't need
+# Python dev headers, just an interpreter — so we use find_program rather
+# than find_package(Python3). This sidesteps two issues:
+#   1. Android cross-compile: the NDK toolchain restricts find_program to
+#      the sysroot, hiding host Python entirely.
+#   2. Windows + pyenv-win: pyenv installs python.bat shims, not python.exe,
+#      and CMake's Python3 module won't pick up .bat files.
+if(ANDROID)
+    set(_libmypaint_saved_find_program "${CMAKE_FIND_ROOT_PATH_MODE_PROGRAM}")
+    set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
+endif()
+if(NOT LIBMYPAINT_PYTHON)
+    find_program(LIBMYPAINT_PYTHON
+        NAMES python python3 py python.bat python3.bat
+    )
+    # Resolve shim/launcher to the real interpreter path so add_custom_command
+    # gets a stable, directly-executable file (avoids .bat quoting issues).
+    if(LIBMYPAINT_PYTHON)
+        execute_process(
+            COMMAND "${LIBMYPAINT_PYTHON}" -c "import sys; print(sys.executable)"
+            OUTPUT_VARIABLE _libmypaint_real_python
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+            RESULT_VARIABLE _libmypaint_python_result
+        )
+        if(_libmypaint_python_result EQUAL 0 AND _libmypaint_real_python)
+            set(LIBMYPAINT_PYTHON "${_libmypaint_real_python}" CACHE FILEPATH "Python interpreter for libmypaint codegen" FORCE)
+        endif()
+    endif()
+endif()
+if(ANDROID)
+    set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM "${_libmypaint_saved_find_program}")
+endif()
+if(NOT LIBMYPAINT_PYTHON)
+    message(FATAL_ERROR "libmypaint: no python interpreter found on PATH (override with -DLIBMYPAINT_PYTHON=<path>)")
+endif()
+message(STATUS "libmypaint: using Python ${LIBMYPAINT_PYTHON}")
 
 set(LIBMYPAINT_GEN_PUBLIC  "${LIBMYPAINT_GEN_DIR}/mypaint-brush-settings-gen.h")
 set(LIBMYPAINT_GEN_PRIVATE "${LIBMYPAINT_GEN_DIR}/brushsettings-gen.h")
 
 add_custom_command(
     OUTPUT "${LIBMYPAINT_GEN_PUBLIC}" "${LIBMYPAINT_GEN_PRIVATE}"
-    COMMAND ${Python3_EXECUTABLE}
+    COMMAND "${LIBMYPAINT_PYTHON}"
             "${LIBMYPAINT_SRC_DIR}/generate.py"
             "${LIBMYPAINT_GEN_PUBLIC}"
             "${LIBMYPAINT_GEN_PRIVATE}"
