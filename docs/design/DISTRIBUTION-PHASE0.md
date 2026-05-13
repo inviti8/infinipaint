@@ -517,4 +517,49 @@ The promise of Phase 0: *every line of code we write here is reusable in the ful
 - **What's the Stripe Connect application-fee policy for Inkternity sales?** Match commissions (0% paid tier, 5% free)? Or new tier?
 - **Branding: what does the artist's buy page look like?** Inherits portal styling? Custom per-canvas hero image? Phase 0: minimal; the artist's title + description + price + Pay button is enough.
 - **Does HEAVYMETA already have a VPS we should reuse?** hvym_tunnler is deployed at `tunnel.hvym.link`. If that VPS has spare capacity, signaling + coturn can co-locate cheaply. If not, fresh small VPS is fine.
+
+## 12. Post-launch refinements (supersedes §C / §5 where it conflicts)
+
+Two changes since the original Phase-0 design were necessary before production:
+
+### 12.1 Two explicit hosting modes (replaces implicit `canvas_id`-based switch)
+
+Original design (§C bullet 5): "When the canvas has a non-null `canvas_id` AND the artist hosts it, the host runs in subscriber-only mode."
+
+Problem: the artist's *intent* at hosting time was inferred from file metadata. There was no way to host a published canvas in COLLAB mode (e.g., a quick session with a fellow artist on a canvas that's *also* sold to subscribers), and no way to surface the mode in the host UI so the artist could see what they were doing.
+
+Resolution: host mode is now an explicit `enum HostMode { COLLAB, SUBSCRIPTION }` on `World`, chosen via a radio toggle in the Host menu (`Toolbar.cpp` HOST_MENU case + `PhoneDrawingProgramScreen.cpp` PhoneNetMenu::HOST case) and passed into `World::start_hosting(mode, netSource, serverLocalID)`.
+
+- **COLLAB** — no token check; every joiner gets `isViewer = false`. Default for canvases without subscription metadata.
+- **SUBSCRIPTION** — every joiner must present a token that passes the five-check verification; valid joiners get `isViewer = true`. Only selectable when `World::has_subscription_metadata()` returns true (all three of `canvasId`, `artistMemberPubkey`, `appPubkeyAtPublish` populated).
+
+The "Subscription" button in the host menu is rendered but inert when metadata is missing, with a "(Publish via portal first to enable Subscription)" note. The default mode at menu-open time is `SUBSCRIPTION` for published canvases (the likely intent) and `COLLAB` otherwise. Mode is chosen once per session — no mid-session switching (kicking all clients to switch modes would be a worse UX than reconnecting cleanly).
+
+The defensive fallback in `start_hosting`: if a caller asks for SUBSCRIPTION but metadata is empty (UI gating bypassed or programmatic caller), the host logs a USERINFO warning and degrades to COLLAB rather than running a token-check that can never pass.
+
+### 12.2 Host-side wire enforcement of `isViewer`
+
+Original design (§D bullet "Viewer mode UI gating"): "All canvas input handlers: skip mutation paths if `is_viewer()`. Defense-in-depth even though the UI shouldn't expose them."
+
+Problem: that's *client-side* enforcement only. A modified client can ignore the flag and still emit `SERVER_UPDATE_NETWORK_OBJECT` / `SERVER_TRANSFORM_MANY_COMPONENTS` / `CLIENT_NEW_RESOURCE_DATA` messages. The host accepted them. Subscribers could draw on the canvas with a trivial client patch.
+
+Resolution: the host now drops write-side messages from clients flagged `isViewer = true`, via `World::is_origin_viewer(NetServer::ClientData)`. The gate is applied at five recv-callback sites:
+
+- `World.cpp` `SERVER_UPDATE_NETWORK_OBJECT` — per-target gate: allows self-targeted updates (cursor, camera, chat, display name on the viewer's own ClientData) so presence still works, drops everything else.
+- `World.cpp` `SERVER_UPDATE_MANY_NETWORK_OBJECTS` — full-batch drop. Multi-update batches are produced by canvas-mutation paths (layer reorders, multi-component edits, bookmarks); a legitimate viewer client never sends them.
+- `DrawingProgram.cpp` `SERVER_TRANSFORM_MANY_COMPONENTS` — full drop. Transforms are canvas mutations.
+- `ResourceManager.cpp` `CLIENT_NEW_RESOURCE_ID` / `CLIENT_NEW_RESOURCE_DATA` — full drop. Resource uploads bypass NetObj and need their own gate.
+
+The per-target gate on single updates required a small refactor of `NetObjManager::read_update_message` — split into a public `dispatch_update_message(id, archive, client)` that the recv callback calls after peeking the target ID. The whole-batch drop on multi-updates is a pragmatic choice: per-entry filtering would require running each entry's `readUpdateFunc` to know its target, which defeats the gate.
+
+Drops are silent (no error sent back to the client) — the user explicitly chose this over a graceful "you're in viewer mode" toast. The client-side UI continues to hide the buttons; the host's drop is purely defense-in-depth against a misbehaving client.
+
+### 12.3 What's still deferred
+
+The original §10 deferral list stands. Additionally:
+
+- **Per-client mode mixing** — one session hosting collaborators (write) and subscribers (view) simultaneously. Would need separate collab + subscriber tokens and per-client capability negotiation. Useful eventually; defer until artists ask.
+- **Mode-tagged lobby URLs** — subscribers' clients currently have no way to know what mode the host is in before connecting. Cosmetic; the host's mode is authoritative and the client adapts on `CLIENT_INITIAL_DATA`.
+- **Command-level inspection of self-targeted updates** — a viewer that targets their own ClientData can still send any of its commands (set cursor, set camera, send chat, set grid size, change display name). All of those are presence/identity ops that don't mutate shared canvas state, so the surface is benign — but a future hardening pass could whitelist specific commands.
+
 - **App-keypair re-derivation if user reinstalls?** First run after a clean install regenerates a fresh app pubkey, which the artist must re-register on the portal (and re-issue tokens for active subscribers). Acceptable for Phase 0; document clearly in artist onboarding. Phase 0.5 could store the app keypair in the portal-encrypted credential bundle so reinstalls preserve it.

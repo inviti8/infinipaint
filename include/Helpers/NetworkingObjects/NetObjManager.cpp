@@ -12,6 +12,9 @@ namespace NetworkingObjects {
     void NetObjManager::read_update_message(cereal::PortableBinaryInputArchive& a, const std::shared_ptr<NetServer::ClientData>& clientReceivedFrom) {
         NetObjID id;
         a(id);
+        dispatch_update_message(id, a, clientReceivedFrom);
+    }
+    void NetObjManager::dispatch_update_message(NetObjID id, cereal::PortableBinaryInputArchive& a, const std::shared_ptr<NetServer::ClientData>& clientReceivedFrom) {
         auto it = objectData.find(id);
         if(it == objectData.end())
             return;

@@ -58,6 +58,10 @@ class PhoneDrawingProgramScreen : public DrawingProgramScreen {
         // vanilla collab joins; non-empty when joining a published
         // canvas as a subscriber.
         std::string phoneNetSubscriberToken;
+        // Selected hosting mode for the HOST menu. Set when the menu
+        // opens (SUBSCRIPTION if canvas has portal metadata, COLLAB
+        // otherwise) and passed into World::start_hosting on confirm.
+        HostMode phoneHostMode = HostMode::COLLAB;
         void main_menu_popup(GUIStuff::Element* triggerButton);
         void network_menu_popup();
         struct ColorPickerPopupData {

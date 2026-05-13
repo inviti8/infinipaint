@@ -297,6 +297,7 @@ void DrawingProgram::read_components_client(cereal::PortableBinaryInputArchive& 
 
 void DrawingProgram::init_server_callbacks() {
     world.netServer->add_recv_callback(SERVER_TRANSFORM_MANY_COMPONENTS, [&](std::shared_ptr<NetServer::ClientData> client, cereal::PortableBinaryInputArchive& message) {
+        if(world.is_origin_viewer(client)) return;  // viewer-mode: silently drop transforms
         std::vector<std::pair<NetworkingObjects::NetObjID, CoordSpaceHelper>> transforms;
         message(transforms);
 

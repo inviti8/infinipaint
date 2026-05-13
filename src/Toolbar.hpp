@@ -1,4 +1,5 @@
 #pragma once
+#include "HostMode.hpp"
 #include "GUIStuff/Elements/ScrollArea.hpp"
 #include "DrawData.hpp"
 #include "TimePoint.hpp"
@@ -208,6 +209,10 @@ class Toolbar {
 
         std::string serverToConnectTo;
         std::string serverLocalID;
+        // Selected hosting mode for the HOST_MENU dialog. Defaulted when
+        // the menu opens (SUBSCRIPTION if the canvas has portal metadata,
+        // COLLAB otherwise) and passed into World::start_hosting on Host.
+        HostMode hostMenuMode = HostMode::COLLAB;
 
         MainProgram& main;
 };

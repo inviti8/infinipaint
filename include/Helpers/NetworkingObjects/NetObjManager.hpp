@@ -21,6 +21,11 @@ namespace NetworkingObjects {
         public:
             NetObjManager(bool initIsServer);
             void read_update_message(cereal::PortableBinaryInputArchive& a, const std::shared_ptr<NetServer::ClientData>& clientReceivedFrom);
+            // Same as read_update_message, but takes a pre-read target ID.
+            // Lets callers peek the target before deciding whether to apply
+            // (used by the host-side viewer gate to allow self-targeted
+            // ClientData updates while blocking everything else).
+            void dispatch_update_message(NetObjID id, cereal::PortableBinaryInputArchive& a, const std::shared_ptr<NetServer::ClientData>& clientReceivedFrom);
             void read_many_update_message(cereal::PortableBinaryInputArchive& a, const std::shared_ptr<NetServer::ClientData>& clientReceivedFrom);
             void set_client(std::shared_ptr<NetClient> initClient, MessageCommandType initUpdateCommandID, MessageCommandType initMultiUpdateCommandID);
             void set_server(std::shared_ptr<NetServer> initServer, MessageCommandType initUpdateCommandID, MessageCommandType initMultiUpdateCommandID);

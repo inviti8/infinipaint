@@ -425,18 +425,15 @@ void World::ensure_display_name_unique(std::string& displayName) {
     displayName = ensure_string_unique(strList, displayName);
 }
 
-void World::start_hosting(const std::string& initNetSource, const std::string& serverLocalID) {
-    // P0-C-DEV: dev-mode auto-publish. When dev keys carry a full
-    // mock-portal triple (member pubkey + canvas_id + app pubkey) AND
-    // this canvas hasn't been published yet, populate the subscription
-    // fields so the host runs in subscriber-only mode and accepts
-    // dev-minted tokens. After P0-C1 partial, an Inkternity install
-    // can have a locally-generated app keypair WITHOUT yet having a
-    // member pubkey + canvas_id (the latter come from dev_mint_token
-    // /the future portal); in that interim state, hosting falls back
-    // to vanilla collab mode. Production replaces this with the
-    // explicit Publish-for-Subscribers UI (P0-C4).
-    if (!is_published_for_subscribers() &&
+void World::start_hosting(HostMode mode, const std::string& initNetSource, const std::string& serverLocalID) {
+    hostMode = mode;
+
+    // Dev-mode auto-publish for SUBSCRIPTION hosting when the file has
+    // no portal metadata yet — populate from dev keys so dev-minted
+    // tokens validate. Production artists publish via the portal first,
+    // which writes the metadata into the .inkternity file and makes
+    // SUBSCRIPTION the natural default at host time.
+    if (hostMode == HostMode::SUBSCRIPTION && !has_subscription_metadata() &&
         !main.devKeys.member_pubkey().empty() &&
         !main.devKeys.canvas_id().empty() &&
         !main.devKeys.app_pubkey().empty()) {
@@ -444,7 +441,16 @@ void World::start_hosting(const std::string& initNetSource, const std::string& s
         artistMemberPubkey  = main.devKeys.member_pubkey();
         appPubkeyAtPublish  = main.devKeys.app_pubkey();
         Logger::get().log("USERINFO",
-            "DevKeys: hosting this canvas in subscriber-only mode (canvas " + canvasId + ")");
+            "DevKeys: populated subscription metadata for SUBSCRIPTION host (canvas " + canvasId + ")");
+    }
+
+    // Defensive: if the caller asked for SUBSCRIPTION but no metadata
+    // is available (UI grey-out failed, or programmatic caller), degrade
+    // to COLLAB rather than running a token-check that can never pass.
+    if (hostMode == HostMode::SUBSCRIPTION && !has_subscription_metadata()) {
+        Logger::get().log("USERINFO",
+            "SUBSCRIPTION host requested but canvas has no subscription metadata — falling back to COLLAB");
+        hostMode = HostMode::COLLAB;
     }
 
     main.init_net_library();
@@ -462,11 +468,12 @@ void World::start_hosting(const std::string& initNetSource, const std::string& s
         message(newClientData.displayName, subscriberToken);
         ensure_display_name_unique(newClientData.displayName);
 
-        // P0-C5/C6/C7: in subscriber-only mode, run the five-check token
-        // verification. Reject the connection cleanly on failure (the
+        // In SUBSCRIPTION host mode, run the five-check token verification
+        // (TokenVerifier). Reject the connection cleanly on failure (the
         // subscriber sees a disconnect and an INVALID-token log on the
-        // host).
-        if (is_published_for_subscribers()) {
+        // host). COLLAB mode skips this entirely — anyone with the lobby
+        // address joins as a full collaborator.
+        if (hostMode == HostMode::SUBSCRIPTION) {
             Subscription::TokenPayload payload;
             const auto r = Subscription::verify_token_for_host(subscriberToken, *this, payload);
             if (r != Subscription::VerifyResult::OK) {
@@ -509,9 +516,24 @@ void World::start_hosting(const std::string& initNetSource, const std::string& s
         }
     });
     netServer->add_recv_callback(SERVER_UPDATE_NETWORK_OBJECT, [&](std::shared_ptr<NetServer::ClientData> client, cereal::PortableBinaryInputArchive& message) {
-        netObjMan.read_update_message(message, client);
+        // Viewer gate: allow self-targeted ClientData updates (cursor,
+        // camera, chat, display name) so presence/chat still work; drop
+        // anything that mutates other NetObjs (strokes, layers, bookmarks,
+        // canvas theme, etc.). The peek+dispatch split avoids re-reading
+        // the ID inside NetObjManager.
+        NetworkingObjects::NetObjID id;
+        message(id);
+        if(is_origin_viewer(client) && id.data != client->customID) return;
+        netObjMan.dispatch_update_message(id, message, client);
     });
     netServer->add_recv_callback(SERVER_UPDATE_MANY_NETWORK_OBJECTS, [&](std::shared_ptr<NetServer::ClientData> client, cereal::PortableBinaryInputArchive& message) {
+        // Multi-update batches are produced by canvas-mutation paths
+        // (layer reorders, multi-component edits, bookmarks) — none of
+        // which a legitimate viewer client triggers. Drop the whole
+        // batch from a viewer rather than try to skip individual entries
+        // (the wire format doesn't allow per-entry skipping without
+        // running each readUpdateFunc, which would defeat the gate).
+        if(is_origin_viewer(client)) return;
         netObjMan.read_many_update_message(message, client);
     });
     netServer->add_recv_callback(SERVER_KEEP_ALIVE, [&](std::shared_ptr<NetServer::ClientData> client, cereal::PortableBinaryInputArchive& message) {
@@ -521,6 +543,18 @@ void World::start_hosting(const std::string& initNetSource, const std::string& s
         idToErase.data = client->customID;
         clients->erase(clients, idToErase);
     });
+}
+
+bool World::is_origin_viewer(const std::shared_ptr<NetServer::ClientData>& netClient) {
+    // Only meaningful on the host. On a client, netServer is null and we
+    // never receive these callbacks anyway. Defensive return = false so
+    // a misuse on the client side fails open to the local user (their
+    // own ops always apply locally — only the *host* enforces viewer-ness).
+    if(!netClient) return false;
+    auto clientData = netObjMan.get_obj_temporary_ref_from_id<ClientData>(
+        NetworkingObjects::NetObjID(netClient->customID));
+    if(!clientData) return false;  // entry already gone (mid-disconnect race)
+    return clientData->is_viewer();
 }
 
 void World::autosave_to_directory(const std::filesystem::path& directoryToSaveAt) {

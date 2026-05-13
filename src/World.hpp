@@ -19,6 +19,7 @@
 #include <chrono>
 #include <filesystem>
 #include "ClientData.hpp"
+#include "HostMode.hpp"
 
 class MainProgram;
 
@@ -57,7 +58,19 @@ class World {
 
         std::string netSource;
 
-        void start_hosting(const std::string& initNetSource, const std::string& serverLocalID);
+        // Two explicit hosting modes (DISTRIBUTION-PHASE0.md §C):
+        //   COLLAB       — anyone with the lobby address can join with full
+        //                  write access; no token check. Default for canvases
+        //                  without portal subscription metadata.
+        //   SUBSCRIPTION — every joiner must present a portal-issued (or
+        //                  dev-minted) subscriber token that passes the five
+        //                  checks in TokenVerifier; valid joiners are flagged
+        //                  isViewer = true and the wire-side viewer gate
+        //                  (World::is_origin_viewer) drops their write ops.
+        // Mode is chosen at start_hosting time and cannot change mid-session.
+        HostMode hostMode = HostMode::COLLAB;
+
+        void start_hosting(HostMode mode, const std::string& initNetSource, const std::string& serverLocalID);
 
         void send_chat_message(const std::string& message);
         void add_chat_message(const std::string& name, const std::string& message, Toolbar::ChatMessage::Type type);
@@ -100,11 +113,15 @@ class World {
         //                          install that published this canvas.
         //                          The host's own app pubkey must match.
         //
-        // Host runs in subscriber-only mode iff !canvasId.empty().
+        // Subscription metadata. Eligibility for SUBSCRIPTION host mode
+        // requires all three fields to be set (portal publish populates
+        // them; dev-keys mode can substitute them at start_hosting time).
         std::string canvasId;
         std::string artistMemberPubkey;
         std::string appPubkeyAtPublish;
-        bool is_published_for_subscribers() const { return !canvasId.empty(); }
+        bool has_subscription_metadata() const {
+            return !canvasId.empty() && !artistMemberPubkey.empty() && !appPubkeyAtPublish.empty();
+        }
 
         NetworkingObjects::NetObjTemporaryPtr<ClientData> ownClientData;
         NetworkingObjects::NetObjOwnerPtr<NetworkingObjects::NetObjUnorderedSet<ClientData>> clients;
@@ -123,6 +140,15 @@ class World {
 
         std::shared_ptr<NetServer> netServer;
         std::shared_ptr<NetClient> netClient;
+
+        // Host-side viewer gate. Looks up the ClientData entry behind a
+        // NetServer::ClientData via the customID stamped at handshake time
+        // (World.cpp SERVER_INITIAL_DATA), and returns true iff that
+        // entry's isViewer flag is set. Used by write-side recv callbacks
+        // to silently drop mutation attempts from subscriber clients —
+        // the client-side UI already hides the buttons, but a modified
+        // client could still send the wire op, so the host must enforce.
+        bool is_origin_viewer(const std::shared_ptr<NetServer::ClientData>& netClient);
 
         void input_add_file_to_canvas_callback(const CustomEvents::AddFileToCanvasEvent& addFile);
         void input_paste_callback(const CustomEvents::PasteEvent& paste);

@@ -41,11 +41,13 @@ void ResourceManager::init_client_callbacks() {
 
 void ResourceManager::init_server_callbacks() {
     world.netServer->add_recv_callback(CLIENT_NEW_RESOURCE_ID, [&](std::shared_ptr<NetServer::ClientData> client, cereal::PortableBinaryInputArchive& message) {
+        if(world.is_origin_viewer(client)) return;  // viewer-mode: drop resource uploads
         NetworkingObjects::NetObjID idBeingRetrieved;
         message(idBeingRetrieved);
         resourcesBeingRetrieved.emplace(idBeingRetrieved, client);
     });
     world.netServer->add_recv_callback(CLIENT_NEW_RESOURCE_DATA, [&](std::shared_ptr<NetServer::ClientData> client, cereal::PortableBinaryInputArchive& message) {
+        if(world.is_origin_viewer(client)) return;
         ResourceData newResource;
         message(newResource);
         auto it = std::find_if(resourcesBeingRetrieved.begin(), resourcesBeingRetrieved.end(), [&client](auto& p) {

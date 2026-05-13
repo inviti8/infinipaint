@@ -349,6 +349,8 @@ void PhoneDrawingProgramScreen::main_menu_popup(Element* triggerButton) {
                     // before confirming. Mirrors Toolbar.cpp:577-580.
                     phoneNetLocalID = NetLibrary::get_random_server_local_id();
                     phoneNetLobbyAddress = NetLibrary::get_global_id() + phoneNetLocalID;
+                    phoneHostMode = main.world->has_subscription_metadata()
+                        ? HostMode::SUBSCRIPTION : HostMode::COLLAB;
                     phoneNetMenu = PhoneNetMenu::HOST;
                 });
                 menu_item("phone connect", "Connect", [&] {
@@ -393,6 +395,31 @@ void PhoneDrawingProgramScreen::network_menu_popup() {
                 switch (phoneNetMenu) {
                     case PhoneNetMenu::HOST: {
                         text_label_centered(gui, "Host this canvas");
+                        // Hosting-mode toggle. SUBSCRIPTION is greyed out
+                        // unless the canvas has portal-issued metadata
+                        // (same rule as the desktop host menu).
+                        const bool subEligible = main.world->has_subscription_metadata();
+                        text_label(gui, "Mode:");
+                        left_to_right_line_layout(gui, [&]() {
+                            text_button(gui, "phone host mode collab", "Collab", {
+                                .isSelected = (phoneHostMode == HostMode::COLLAB),
+                                .wide = true,
+                                .onClick = [&] { phoneHostMode = HostMode::COLLAB; }
+                            });
+                            text_button(gui, "phone host mode sub", "Subscription", {
+                                .drawType = subEligible
+                                    ? SelectableButton::DrawType::FILLED
+                                    : SelectableButton::DrawType::TRANSPARENT_ALL,
+                                .isSelected = (phoneHostMode == HostMode::SUBSCRIPTION),
+                                .wide = true,
+                                .onClick = subEligible
+                                    ? std::function<void()>([&] { phoneHostMode = HostMode::SUBSCRIPTION; })
+                                    : std::function<void()>{}
+                            });
+                        });
+                        if(!subEligible) {
+                            text_label(gui, "(Publish via portal to enable Subscription)");
+                        }
                         input_text_field(gui, "phone host lobby field", "Lobby", &phoneNetLobbyAddress);
                         left_to_right_line_layout(gui, [&]() {
                             text_button(gui, "phone host copy", "Copy Address", {
@@ -402,7 +429,7 @@ void PhoneDrawingProgramScreen::network_menu_popup() {
                             text_button(gui, "phone host confirm", "Host", {
                                 .wide = true,
                                 .onClick = [&] {
-                                    main.world->start_hosting(phoneNetLobbyAddress, phoneNetLocalID);
+                                    main.world->start_hosting(phoneHostMode, phoneNetLobbyAddress, phoneNetLocalID);
                                     phoneNetMenu = PhoneNetMenu::NONE;
                                 }
                             });

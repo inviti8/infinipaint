@@ -576,6 +576,11 @@ void Toolbar::top_toolbar() {
                                 menu_popup_text_button("start hosting", "Host", [&] {
                                     serverLocalID = NetLibrary::get_random_server_local_id();
                                     serverToConnectTo = NetLibrary::get_global_id() + serverLocalID;
+                                    // Default to SUBSCRIPTION when the canvas is portal-published —
+                                    // that's the artist's likely intent for a published canvas — and
+                                    // COLLAB otherwise. Artist can still flip in the menu.
+                                    hostMenuMode = main.world->has_subscription_metadata()
+                                        ? HostMode::SUBSCRIPTION : HostMode::COLLAB;
                                     optionsMenuOpen = true;
                                     optionsMenuType = HOST_MENU;
                                 });
@@ -1531,13 +1536,39 @@ void Toolbar::options_menu() {
     switch(optionsMenuType) {
         case HOST_MENU: {
             center_obstructing_window_gui("host menu", CLAY_SIZING_FIT(650), CLAY_SIZING_FIT(0), [&] {
+                // Hosting-mode selector. SUBSCRIPTION is only clickable
+                // when the canvas has portal metadata; otherwise the
+                // button is rendered but inert + a note explains why.
+                const bool subEligible = main.world->has_subscription_metadata();
+                text_label(gui, "Hosting mode:");
+                left_to_right_line_layout(gui, [&]() {
+                    text_button(gui, "collab mode", "Collab", {
+                        .isSelected = (hostMenuMode == HostMode::COLLAB),
+                        .wide = true,
+                        .onClick = [&] { hostMenuMode = HostMode::COLLAB; }
+                    });
+                    text_button(gui, "sub mode", "Subscription", {
+                        .drawType = subEligible
+                            ? SelectableButton::DrawType::FILLED
+                            : SelectableButton::DrawType::TRANSPARENT_ALL,
+                        .isSelected = (hostMenuMode == HostMode::SUBSCRIPTION),
+                        .wide = true,
+                        .onClick = subEligible
+                            ? std::function<void()>([&] { hostMenuMode = HostMode::SUBSCRIPTION; })
+                            : std::function<void()>{}
+                    });
+                });
+                if(!subEligible) {
+                    text_label(gui, "(Publish via portal first to enable Subscription mode)");
+                }
+
                 input_text_field(gui, "lobby", "Lobby", &serverToConnectTo);
                 left_to_right_line_layout(gui, [&]() {
                     text_button_wide("copy lobby address", "Copy Lobby Address", [&] {
                         main.input.set_clipboard_str(serverToConnectTo);
                     });
                     text_button_wide("host file", "Host", [&] {
-                        main.world->start_hosting(serverToConnectTo, serverLocalID);
+                        main.world->start_hosting(hostMenuMode, serverToConnectTo, serverLocalID);
                         optionsMenuOpen = false;
                     });
                     text_button_wide("cancel", "Cancel", [&] {
