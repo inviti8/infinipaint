@@ -738,8 +738,13 @@ class ConanSkia(ConanFile):
         mkdir(self, "out/conan")
         save(self, "out/conan/args.gn", args)
 
-        if self.settings.os == "Windows":
-            self.run("bin\gn gen out/conan")
+        # Use settings_build.os so the right path separator is chosen by the
+        # BUILD machine (where the shell is invoked), not the TARGET. Without
+        # this, Windows-host → Android-target cross-builds use "bin/gn"
+        # which cmd.exe parses as command "bin" with arg "/gn" → fails.
+        build_os = getattr(self, "settings_build", self.settings).os
+        if build_os == "Windows":
+            self.run("bin\\gn gen out/conan")
         else:
             self.run("bin/gn gen out/conan")
 

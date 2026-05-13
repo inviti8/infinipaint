@@ -8,7 +8,7 @@
 # See PHASE1.md §4 and the decisions log entry from 2026-05-07 for why
 # libmypaint is vendored here rather than packaged via Conan.
 
-cmake_minimum_required(VERSION 3.27.0)
+cmake_minimum_required(VERSION 3.22.0)
 
 # Wrapper lives in cmake/libmypaint/ so the deps/libmypaint git submodule
 # stays pristine (untouched by us — easier upgrades).

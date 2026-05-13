@@ -23,8 +23,14 @@ task conanInstall {
         ["Debug", "Release"].each { String build_type ->
             // ["armv7", "armv8", "x86", "x86_64"]
             ["armv8", "x86_64"].each { String arch ->
+                // -pr:h= and -pr:b= take PATH-relative profile files (not
+                // named profiles in $CONAN_HOME/profiles). cwd is app/build,
+                // so ../../../conan/profiles/<name> resolves to <repo>/conan/profiles/<name>.
+                // Build profile = win-x86_64 (our desktop profile, has C++23
+                // available which the build-machine ICU recipe needs).
                 def cmd = conanExecutable + " install " +
-                        "../../.. --profile android -s build_type="+ build_type +" -s arch=" + arch +
+                        "../../.. -pr:h=../../../conan/profiles/android -pr:b=../../../conan/profiles/win-x86_64 " +
+                        "-s build_type="+ build_type +" -s arch=" + arch +
                         " --build missing -c tools.cmake.cmake_layout:build_folder_vars=['settings.arch']"
                 print(">> ${cmd} \n")
 
@@ -44,6 +50,11 @@ task conanInstall {
 android {
     namespace = "com.erroratline0.infinipaint"
     compileSdk 35
+    // Pin to an installed build-tools version so AGP doesn't try to
+    // auto-download 34.0.0 (its default for AGP 8.7.x). The auto-download
+    // path fails on Windows with DirectoryNotEmptyException mid-unzip,
+    // likely from antivirus scanning partial extracts.
+    buildToolsVersion = "36.1.0"
     ndkVersion = "29.0.14206865"
     defaultConfig {
         applicationId 'com.erroratline0.InfiniPaint'
@@ -93,7 +104,7 @@ android {
     }
     externalNativeBuild {
         cmake {
-            version "3.31.6"
+            version "3.22.1"
             path '../../CMakeLists.txt'
         }
     }

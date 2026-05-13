@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.27.0)
+cmake_minimum_required(VERSION 3.22.0)  # Android SDK Manager's stable CMake (3.22.1) needs to satisfy this; desktop's Conan cmake/3.27.0 still works.
 set(CMAKE_CXX_STANDARD 23)
 project(infinipaint)
 
