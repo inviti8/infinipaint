@@ -12,11 +12,9 @@
         <color type="primary" scheme_preference="dark">#325652</color>
     </branding>
 
-    <!-- TODO: replace with Inkternity / HEAVYMETA-owned URLs once they exist.
-         Upstream InfiniPaint URLs left in as placeholders. -->
-    <url type="homepage">https://infinipaint.com</url>
-    <url type="vcs-browser">https://github.com/ErrorAtLine0/infinipaint</url>
-    <url type="bugtracker">https://github.com/ErrorAtLine0/infinipaint/issues</url>
+    <url type="homepage">https://github.com/inviti8/inkternity</url>
+    <url type="vcs-browser">https://github.com/inviti8/inkternity</url>
+    <url type="bugtracker">https://github.com/inviti8/inkternity/issues</url>
 
     <developer id="com.heavymeta">
         <name>HEAVYMETA LCA</name>
@@ -194,35 +192,35 @@
 
     <screenshots>
         <screenshot type="default">
-            <image>https://raw.githubusercontent.com/erroratline0/com.infinipaint.infinipaint/master/screenshots/zoom.png</image>
-            <caption>Welcome to InfiniPaint!</caption>
+            <image>https://raw.githubusercontent.com/inviti8/inkternity/main/screenshots/zoom.png</image>
+            <caption>Welcome to Inkternity!</caption>
         </screenshot>
         <screenshot>
-            <image>https://raw.githubusercontent.com/erroratline0/com.infinipaint.infinipaint/master/screenshots/tablet.png</image>
+            <image>https://raw.githubusercontent.com/inviti8/inkternity/main/screenshots/tablet.png</image>
             <caption>Drawing tablet support</caption>
         </screenshot>
         <screenshot>
-            <image>https://raw.githubusercontent.com/erroratline0/com.infinipaint.infinipaint/master/screenshots/collab.png</image>
+            <image>https://raw.githubusercontent.com/inviti8/inkternity/main/screenshots/collab.png</image>
             <caption>Host online lobbies</caption>
         </screenshot>
         <screenshot>
-            <image>https://raw.githubusercontent.com/erroratline0/com.infinipaint.infinipaint/master/screenshots/pictures.png</image>
+            <image>https://raw.githubusercontent.com/inviti8/inkternity/main/screenshots/pictures.png</image>
             <caption>Place images</caption>
         </screenshot>
         <screenshot>
-            <image>https://raw.githubusercontent.com/erroratline0/com.infinipaint.infinipaint/master/screenshots/layers.png</image>
+            <image>https://raw.githubusercontent.com/inviti8/inkternity/main/screenshots/layers.png</image>
             <caption>Layers with blend modes</caption>
         </screenshot>
         <screenshot>
-            <image>https://raw.githubusercontent.com/erroratline0/com.infinipaint.infinipaint/master/screenshots/bookmark.png</image>
+            <image>https://raw.githubusercontent.com/inviti8/inkternity/main/screenshots/bookmark.png</image>
             <caption>Create bookmarks</caption>
         </screenshot>
         <screenshot>
-            <image>https://raw.githubusercontent.com/erroratline0/com.infinipaint.infinipaint/master/screenshots/rotate.png</image>
+            <image>https://raw.githubusercontent.com/inviti8/inkternity/main/screenshots/rotate.png</image>
             <caption>Right click quick menu</caption>
         </screenshot>
         <screenshot>
-            <image>https://raw.githubusercontent.com/erroratline0/com.infinipaint.infinipaint/master/screenshots/textbox.png</image>
+            <image>https://raw.githubusercontent.com/inviti8/inkternity/main/screenshots/textbox.png</image>
             <caption>Textbox element</caption>
         </screenshot>
     </screenshots>

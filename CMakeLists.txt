@@ -2,6 +2,23 @@ cmake_minimum_required(VERSION 3.22.0)  # Android SDK Manager's stable CMake (3.
 set(CMAKE_CXX_STANDARD 23)
 project(infinipaint)
 
+# Single source of truth for the build's version triple. Defaults match
+# src/VersionConstants.hpp::CURRENT_VERSION_STRING; the release workflow
+# overrides these via -DCPACK_PACKAGE_VERSION_* at configure time
+# (parsed from the git tag, e.g. v0.11.0-rc15 → MAJ=0 MIN=11 PATCH=0).
+# Used downstream by both CPack (Windows NSIS, macOS DragNDrop) and the
+# macOS .app Info.plist (MACOSX_BUNDLE_*).
+if(NOT DEFINED CPACK_PACKAGE_VERSION_MAJOR)
+    set(CPACK_PACKAGE_VERSION_MAJOR "0")
+endif()
+if(NOT DEFINED CPACK_PACKAGE_VERSION_MINOR)
+    set(CPACK_PACKAGE_VERSION_MINOR "11")
+endif()
+if(NOT DEFINED CPACK_PACKAGE_VERSION_PATCH)
+    set(CPACK_PACKAGE_VERSION_PATCH "0")
+endif()
+set(INKTERNITY_VERSION_STRING "${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}")
+
 # Android ships only Release-built native deps (Skia etc), even for
 # Debug app builds — see android-project/app/build.gradle's conanInstall
 # task. Conan-generated imported targets gate their include dirs and
@@ -278,13 +295,22 @@ elseif(APPLE)
     if(MACOS_MAKE_BUNDLE)
         target_compile_definitions(main PRIVATE MACOS_MAKE_BUNDLE)
         set_target_properties(main PROPERTIES MACOSX_BUNDLE TRUE)
+        # Generate Info.plist from the template, substituting
+        # @INKTERNITY_VERSION_STRING@ with the version triple. CMake copies
+        # MACOSX_BUNDLE_INFO_PLIST verbatim into the .app, so we point it
+        # at the configured copy rather than the source template.
+        configure_file(
+            "${CMAKE_SOURCE_DIR}/macosinstall/Info.plist"
+            "${CMAKE_CURRENT_BINARY_DIR}/Info.plist"
+            @ONLY
+        )
         set_target_properties(main PROPERTIES
             BUNDLE True
             MACOSX_BUNDLE_GUI_IDENTIFIER com.inkternity.inkternity
             MACOSX_BUNDLE_BUNDLE_NAME inkternity
-            MACOSX_BUNDLE_BUNDLE_VERSION "0.4.1"
-            MACOSX_BUNDLE_SHORT_VERSION_STRING "0.4.1"
-            MACOSX_BUNDLE_INFO_PLIST ${CMAKE_SOURCE_DIR}/macosinstall/Info.plist
+            MACOSX_BUNDLE_BUNDLE_VERSION "${INKTERNITY_VERSION_STRING}"
+            MACOSX_BUNDLE_SHORT_VERSION_STRING "${INKTERNITY_VERSION_STRING}"
+            MACOSX_BUNDLE_INFO_PLIST ${CMAKE_CURRENT_BINARY_DIR}/Info.plist
         )
         add_custom_command(TARGET main POST_BUILD
           COMMAND ${CMAKE_COMMAND} -E copy_directory
@@ -501,12 +527,10 @@ if(APPLE OR WIN32)
     install(TARGETS main DESTINATION .)
 
     set(CPACK_PACKAGE_NAME "inkternity")
-    set(CPACK_PACKAGE_VERSION_MAJOR "0")
-    set(CPACK_PACKAGE_VERSION_MINOR "4")
-    set(CPACK_PACKAGE_VERSION_PATCH "1")
+    # CPACK_PACKAGE_VERSION_* are set at the top of this file so the
+    # workflow's -DCPACK_PACKAGE_VERSION_* overrides don't get clobbered.
     set(CPACK_PACKAGE_VENDOR "HEAVYMETA LCA")
-    # TODO: set CONTACT to a HEAVYMETA-owned email before publishing.
-    set(CPACK_PACKAGE_CONTACT "erroratline0@gmail.com")
+    set(CPACK_PACKAGE_CONTACT "support@heavymeta.art")
     set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_SOURCE_DIR}/LICENSE")
 endif()
 
@@ -525,8 +549,7 @@ elseif(WIN32)
     set(CPACK_NSIS_UNINSTALL_NAME "Inkternity Uninstall")
     set(CPACK_NSIS_WELCOME_TITLE "Welcome to Inkternity Installer")
     set(CPACK_NSIS_EXECUTABLES_DIRECTORY .)
-    # TODO: replace with Inkternity's homepage once one exists.
-    set(CPACK_NSIS_URL_INFO_ABOUT "https://infinipaint.com")
+    set(CPACK_NSIS_URL_INFO_ABOUT "https://github.com/inviti8/inkternity")
     set(CPACK_NSIS_MENU_LINKS "inkternity.exe" "Inkternity")
     set(CPACK_NSIS_INSTALLED_ICON_NAME "inkternity.exe")
     set(CPACK_NSIS_MUI_ICON "${CMAKE_SOURCE_DIR}/windowsinstall/icon.ico")

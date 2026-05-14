@@ -13,9 +13,9 @@
 	<key>CFBundleSpokenName</key>
 	<string>Inkternity</string>
 	<key>CFBundleVersion</key>
-	<string>0.4.1</string>
+	<string>@INKTERNITY_VERSION_STRING@</string>
 	<key>CFBundleShortVersionString</key>
-	<string>0.4.1</string>
+	<string>@INKTERNITY_VERSION_STRING@</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>NSHumanReadableCopyright</key>
