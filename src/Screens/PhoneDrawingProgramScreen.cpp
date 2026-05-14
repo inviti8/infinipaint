@@ -347,10 +347,15 @@ void PhoneDrawingProgramScreen::main_menu_popup(Element* triggerButton) {
                 menu_item("phone host", "Host", [&] {
                     // Pre-generate the lobby address so the user sees it
                     // before confirming. Mirrors Toolbar.cpp:577-580.
-                    phoneNetLocalID = NetLibrary::get_random_server_local_id();
-                    phoneNetLobbyAddress = NetLibrary::get_global_id() + phoneNetLocalID;
                     phoneHostMode = main.world->has_subscription_metadata()
                         ? HostMode::SUBSCRIPTION : HostMode::COLLAB;
+                    if (phoneHostMode == HostMode::SUBSCRIPTION) {
+                        // Persistent lobby code derived from canvas_id.
+                        phoneNetLocalID = NetLibrary::deterministic_local_id_from_seed(main.world->canvasId);
+                    } else {
+                        phoneNetLocalID = NetLibrary::get_random_server_local_id();
+                    }
+                    phoneNetLobbyAddress = NetLibrary::get_global_id() + phoneNetLocalID;
                     phoneNetMenu = PhoneNetMenu::HOST;
                 });
                 menu_item("phone connect", "Connect", [&] {
@@ -404,7 +409,13 @@ void PhoneDrawingProgramScreen::network_menu_popup() {
                             text_button(gui, "phone host mode collab", "Collab", {
                                 .isSelected = (phoneHostMode == HostMode::COLLAB),
                                 .wide = true,
-                                .onClick = [&] { phoneHostMode = HostMode::COLLAB; }
+                                .onClick = [&] {
+                                    if (phoneHostMode != HostMode::COLLAB) {
+                                        phoneHostMode = HostMode::COLLAB;
+                                        phoneNetLocalID = NetLibrary::get_random_server_local_id();
+                                        phoneNetLobbyAddress = NetLibrary::get_global_id() + phoneNetLocalID;
+                                    }
+                                }
                             });
                             text_button(gui, "phone host mode sub", "Subscription", {
                                 .drawType = subEligible
@@ -413,7 +424,13 @@ void PhoneDrawingProgramScreen::network_menu_popup() {
                                 .isSelected = (phoneHostMode == HostMode::SUBSCRIPTION),
                                 .wide = true,
                                 .onClick = subEligible
-                                    ? std::function<void()>([&] { phoneHostMode = HostMode::SUBSCRIPTION; })
+                                    ? std::function<void()>([&] {
+                                        if (phoneHostMode != HostMode::SUBSCRIPTION) {
+                                            phoneHostMode = HostMode::SUBSCRIPTION;
+                                            phoneNetLocalID = NetLibrary::deterministic_local_id_from_seed(main.world->canvasId);
+                                            phoneNetLobbyAddress = NetLibrary::get_global_id() + phoneNetLocalID;
+                                        }
+                                    })
                                     : std::function<void()>{}
                             });
                         });

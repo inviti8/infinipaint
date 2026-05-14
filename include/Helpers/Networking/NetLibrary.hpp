@@ -25,6 +25,11 @@ class NetLibrary {
         static void copy_default_p2p_config_to_path(const std::filesystem::path& newP2PConfigPath);
         static void update();
         static std::string get_random_server_local_id();
+        // Project a stable seed (e.g. canvas_id UUID) down to a LOCALID_LEN
+        // alphanumeric string. Same seed → same id every time. Used for
+        // SUBSCRIPTION-mode hosting so the lobby code stays constant
+        // across the artist's hosting sessions.
+        static std::string deterministic_local_id_from_seed(std::string_view seed);
         static const std::string& get_global_id();
 
         static void register_server(std::shared_ptr<NetServer> server);

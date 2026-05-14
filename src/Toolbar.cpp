@@ -574,13 +574,20 @@ void Toolbar::top_toolbar() {
                                     });
                                 }
                                 menu_popup_text_button("start hosting", "Host", [&] {
-                                    serverLocalID = NetLibrary::get_random_server_local_id();
-                                    serverToConnectTo = NetLibrary::get_global_id() + serverLocalID;
                                     // Default to SUBSCRIPTION when the canvas is portal-published —
                                     // that's the artist's likely intent for a published canvas — and
                                     // COLLAB otherwise. Artist can still flip in the menu.
                                     hostMenuMode = main.world->has_subscription_metadata()
                                         ? HostMode::SUBSCRIPTION : HostMode::COLLAB;
+                                    if (hostMenuMode == HostMode::SUBSCRIPTION) {
+                                        // Stable lobby code: derived from canvas_id so the
+                                        // address is the same across hosting sessions.
+                                        serverLocalID = NetLibrary::deterministic_local_id_from_seed(main.world->canvasId);
+                                    } else {
+                                        // Ephemeral: fresh random for ad-hoc collab sessions.
+                                        serverLocalID = NetLibrary::get_random_server_local_id();
+                                    }
+                                    serverToConnectTo = NetLibrary::get_global_id() + serverLocalID;
                                     optionsMenuOpen = true;
                                     optionsMenuType = HOST_MENU;
                                 });
@@ -1545,7 +1552,14 @@ void Toolbar::options_menu() {
                     text_button(gui, "collab mode", "Collab", {
                         .isSelected = (hostMenuMode == HostMode::COLLAB),
                         .wide = true,
-                        .onClick = [&] { hostMenuMode = HostMode::COLLAB; }
+                        .onClick = [&] {
+                            if (hostMenuMode != HostMode::COLLAB) {
+                                hostMenuMode = HostMode::COLLAB;
+                                // Switching to COLLAB → fresh ephemeral lobby code.
+                                serverLocalID = NetLibrary::get_random_server_local_id();
+                                serverToConnectTo = NetLibrary::get_global_id() + serverLocalID;
+                            }
+                        }
                     });
                     text_button(gui, "sub mode", "Subscription", {
                         .drawType = subEligible
@@ -1554,7 +1568,14 @@ void Toolbar::options_menu() {
                         .isSelected = (hostMenuMode == HostMode::SUBSCRIPTION),
                         .wide = true,
                         .onClick = subEligible
-                            ? std::function<void()>([&] { hostMenuMode = HostMode::SUBSCRIPTION; })
+                            ? std::function<void()>([&] {
+                                if (hostMenuMode != HostMode::SUBSCRIPTION) {
+                                    hostMenuMode = HostMode::SUBSCRIPTION;
+                                    // Switching to SUBSCRIPTION → persistent lobby code from canvas_id.
+                                    serverLocalID = NetLibrary::deterministic_local_id_from_seed(main.world->canvasId);
+                                    serverToConnectTo = NetLibrary::get_global_id() + serverLocalID;
+                                }
+                            })
                             : std::function<void()>{}
                     });
                 });

@@ -197,6 +197,24 @@ std::string NetLibrary::get_random_server_local_id() {
     return Random::get().alphanumeric_str(LOCALID_LEN);
 }
 
+std::string NetLibrary::deterministic_local_id_from_seed(std::string_view seed) {
+    // Take alphanumeric chars from the seed in order (skipping dashes etc),
+    // lowercase, until we hit LOCALID_LEN. Pads with '0' if the seed is
+    // shorter than LOCALID_LEN alnum chars (defensive — UUIDs always
+    // exceed this). Hex-from-UUID gives 40 bits of entropy, far more than
+    // any one artist's canvas set will ever collide on.
+    std::string out;
+    out.reserve(LOCALID_LEN);
+    for (char c : seed) {
+        if (out.size() == LOCALID_LEN) break;
+        if (c >= '0' && c <= '9') out.push_back(c);
+        else if (c >= 'a' && c <= 'z') out.push_back(c);
+        else if (c >= 'A' && c <= 'Z') out.push_back(static_cast<char>(c + ('a' - 'A')));
+    }
+    while (out.size() < LOCALID_LEN) out.push_back('0');
+    return out;
+}
+
 const std::string& NetLibrary::get_global_id() {
     if(globalID.empty())
         globalID = Random::get().alphanumeric_str(GLOBALID_LEN);

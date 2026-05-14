@@ -454,11 +454,25 @@ void World::start_hosting(HostMode mode, const std::string& initNetSource, const
     }
 
     main.init_net_library();
-    netServer = std::make_shared<NetServer>(serverLocalID);
+
+    // SUBSCRIPTION hosting binds the lobby's local id to the canvas, so
+    // the lobby address is stable across hosting sessions. The caller
+    // (HOST_MENU UI) should already pass the derived value, but we
+    // recompute here so programmatic callers and any UI-bypass paths
+    // can't accidentally start a SUBSCRIPTION session on a random local
+    // id (which would invalidate every subscriber's saved address).
+    std::string effectiveLocalID = serverLocalID;
+    std::string effectiveNetSource = initNetSource;
+    if (hostMode == HostMode::SUBSCRIPTION) {
+        effectiveLocalID = NetLibrary::deterministic_local_id_from_seed(canvasId);
+        effectiveNetSource = NetLibrary::get_global_id() + effectiveLocalID;
+    }
+
+    netServer = std::make_shared<NetServer>(effectiveLocalID);
     lastKeepAliveSent = std::chrono::steady_clock::now();
     NetLibrary::register_server(netServer);
     netObjMan.set_server(netServer, CLIENT_UPDATE_NETWORK_OBJECT, CLIENT_UPDATE_MANY_NETWORK_OBJECTS);
-    netSource = initNetSource;
+    netSource = effectiveNetSource;
     rMan.init_server_callbacks();
     drawProg.init_server_callbacks();
     netServer->add_recv_callback(SERVER_INITIAL_DATA, [&](std::shared_ptr<NetServer::ClientData> client, cereal::PortableBinaryInputArchive& message) {

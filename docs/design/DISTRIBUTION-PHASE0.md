@@ -554,10 +554,34 @@ The per-target gate on single updates required a small refactor of `NetObjManage
 
 Drops are silent (no error sent back to the client) — the user explicitly chose this over a graceful "you're in viewer mode" toast. The client-side UI continues to hide the buttons; the host's drop is purely defense-in-depth against a misbehaving client.
 
-### 12.3 What's still deferred
+### 12.3 Persistent lobby code for SUBSCRIPTION hosting
+
+Original design (implicit): every Host click generated a fresh random `server_local_id`, so the full lobby address (`global_id + local_id`) changed each session. Fine for ad-hoc collab; broken for paid subscriptions where the artist can't realistically re-share the address every time they go live.
+
+Resolution: when `hostMode == SUBSCRIPTION`, the `local_id` is derived deterministically from `canvas_id` instead of randomized:
+
+```cpp
+NetLibrary::deterministic_local_id_from_seed(canvasId)
+```
+
+Strips non-alphanumeric chars from the UUID, lowercases, takes the first `LOCALID_LEN` (10) chars. Same canvas → same local_id forever (40 bits of entropy, no collision risk within an artist's canvas set).
+
+`COLLAB` mode is unchanged — random `local_id` per host, still ephemeral. This is what you want for one-off collab sessions.
+
+Behavior:
+- Host menu open with SUBSCRIPTION default → lobby field shows the persistent address.
+- User toggles to COLLAB in the menu → lobby field switches to a fresh random address.
+- User toggles back to SUBSCRIPTION → lobby field returns to the same persistent address.
+- `World::start_hosting` enforces this server-side too (recomputes `serverLocalID` for SUBSCRIPTION regardless of what the caller passed) — no UI bypass can accidentally start a SUBSCRIPTION session on a random address that would invalidate every subscriber's saved URL.
+
+The artist still has to share the lobby address with subscribers once. After that, it's permanent. (Until the artist reinstalls Inkternity — see 12.4.)
+
+### 12.4 What's still deferred
 
 The original §10 deferral list stands. Additionally:
 
+- **Per-install `global_id` persistence** — `NetLibrary::get_global_id()` generates a fresh random 40-char id on first launch and stores it locally. A reinstall produces a new `global_id` → invalidates the persistent lobby code from §12.3. Fix: derive `global_id` from a recoverable secret (the artist's app keypair, restorable from a portal-stored mnemonic, the same crypto-style persistence pattern used by `glasswing`'s Andromica). Then a reinstall just restores the keypair → the same `global_id` → the lobby code stays stable across reinstalls. Phase 1 work.
+- **Subscriber single-field paste** — currently the subscriber pastes both lobby address + token. The token contains `canvas_id`, so the local_id portion is derivable client-side. The `global_id` portion isn't (it's the artist's network identity, not in the token). Solving that needs either (a) `global_id` stamped into the token at portal publish time, or (b) portal-mediated discovery (`canvas_id` → current `global_id` lookup). Defer with the global_id work above.
 - **Per-client mode mixing** — one session hosting collaborators (write) and subscribers (view) simultaneously. Would need separate collab + subscriber tokens and per-client capability negotiation. Useful eventually; defer until artists ask.
 - **Mode-tagged lobby URLs** — subscribers' clients currently have no way to know what mode the host is in before connecting. Cosmetic; the host's mode is authoritative and the client adapts on `CLIENT_INITIAL_DATA`.
 - **Command-level inspection of self-targeted updates** — a viewer that targets their own ClientData can still send any of its commands (set cursor, set camera, send chat, set grid size, change display name). All of those are presence/identity ops that don't mutate shared canvas state, so the surface is benign — but a future hardening pass could whitelist specific commands.
