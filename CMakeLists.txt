@@ -18,6 +18,13 @@ if(NOT DEFINED CPACK_PACKAGE_VERSION_PATCH)
     set(CPACK_PACKAGE_VERSION_PATCH "0")
 endif()
 set(INKTERNITY_VERSION_STRING "${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}")
+# Force CPACK_PACKAGE_VERSION explicitly so CPack doesn't auto-compose
+# something like "0.11.0.0.0" (which we saw in v0.11.0-rc15 — CPack
+# appended phantom TWEAK and PROJECT_VERSION components when only
+# MAJ/MIN/PATCH were passed). Also feeds Apple's CFBundleVersion via
+# the configured Info.plist; Apple's notary service rejects malformed
+# version strings.
+set(CPACK_PACKAGE_VERSION "${INKTERNITY_VERSION_STRING}")
 
 # Android ships only Release-built native deps (Skia etc), even for
 # Debug app builds — see android-project/app/build.gradle's conanInstall

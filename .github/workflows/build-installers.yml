@@ -413,12 +413,29 @@ jobs:
           APPLE_TEAM_ID:  ${{ secrets.APPLE_TEAM_ID }}
           APPLE_PW:       ${{ secrets.APPLE_ID_APP_PW }}
         run: |
+          set -o pipefail
           DMG=$(ls build/Release/*.dmg | head -1)
-          xcrun notarytool submit "$DMG" \
+          # Capture submit output as JSON so we can pull submission_id
+          # and status programmatically; a rejected submission still
+          # returns a valid id, which we then feed to `notarytool log`
+          # to dump Apple's actual diagnostics into the workflow log.
+          SUBMIT_JSON=$(xcrun notarytool submit "$DMG" \
             --apple-id "$APPLE_ID" \
             --team-id "$APPLE_TEAM_ID" \
             --password "$APPLE_PW" \
-            --wait --timeout 1200
+            --wait --timeout 1200 --output-format json)
+          echo "$SUBMIT_JSON"
+          SUBMISSION_ID=$(echo "$SUBMIT_JSON" | python3 -c "import json,sys; print(json.load(sys.stdin)['id'])")
+          STATUS=$(echo "$SUBMIT_JSON" | python3 -c "import json,sys; print(json.load(sys.stdin)['status'])")
+          echo "Submission $SUBMISSION_ID → $STATUS"
+          if [[ "$STATUS" != "Accepted" ]]; then
+            echo "::error::Notarization status: $STATUS — fetching diagnostic log"
+            xcrun notarytool log "$SUBMISSION_ID" \
+              --apple-id "$APPLE_ID" \
+              --team-id "$APPLE_TEAM_ID" \
+              --password "$APPLE_PW" || true
+            exit 1
+          fi
           xcrun stapler staple "$DMG"
 
       - uses: actions/upload-artifact@v4
