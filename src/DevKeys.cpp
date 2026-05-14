@@ -79,9 +79,10 @@ bool DevKeys::load(const std::filesystem::path& configPath) {
 
     try {
         auto j = nlohmann::json::parse(fileData);
-        memberPub = j.value("member_pub", "");
-        appPub    = j.value("app_pub",    "");
-        canvasId  = j.value("canvas_id",  "");
+        memberPub = j.value("member_pub",    "");
+        appPub    = j.value("app_pub",       "");
+        appSecret = j.value("app_secret",    "");
+        canvasId  = j.value("canvas_id",     "");
     } catch (const std::exception& e) {
         Logger::get().log("USERINFO", std::string("DevKeys: parse failed: ") + e.what());
         return false;

@@ -1,4 +1,5 @@
 #include "World.hpp"
+#include <Helpers/CanvasShareId.hpp>
 #include <Helpers/HsvRgb.hpp>
 #include <Helpers/MathExtras.hpp>
 #include <Helpers/Networking/ByteStream.hpp>
@@ -453,18 +454,49 @@ void World::start_hosting(HostMode mode, const std::string& initNetSource, const
         hostMode = HostMode::COLLAB;
     }
 
+    // SUBSCRIPTION hosting derives BOTH halves of the lobby address from
+    // (app_secret, canvas_id) via HMAC-SHA-512/256 so the artist's share
+    // code is stable across sessions and (with Phase 1 key restoration)
+    // across reinstalls — see DISTRIBUTION-PHASE0.md §12.5. We install
+    // the derived globalID on NetLibrary BEFORE init_net_library() so the
+    // WSS connection opens on the stable path instead of the random one
+    // get_global_id() would otherwise lazily generate.
+    //
+    // The HOST_MENU UI should already have computed and passed the same
+    // value via initNetSource, but we recompute here too so programmatic
+    // or UI-bypass callers can't accidentally start a SUBSCRIPTION session
+    // on a random address that would invalidate every subscriber's saved
+    // URL. Missing app_secret falls through to the random path (degraded
+    // behavior, logged) rather than aborting the host attempt.
+    if (hostMode == HostMode::SUBSCRIPTION) {
+        const std::string& appSec = main.devKeys.app_secret();
+        if (!appSec.empty()) {
+            const auto derivedGlobal = CanvasShareId::derive_global_id(appSec, canvasId);
+            if (!derivedGlobal.empty()) {
+                NetLibrary::set_global_id(derivedGlobal);
+            } else {
+                Logger::get().log("USERINFO",
+                    "SUBSCRIPTION host: derive_global_id returned empty (malformed app_secret?) — "
+                    "falling back to random globalID; share code WILL change across launches");
+            }
+        } else {
+            Logger::get().log("USERINFO",
+                "SUBSCRIPTION host: no app_secret available — falling back to random globalID; "
+                "share code WILL change across launches");
+        }
+    }
+
     main.init_net_library();
 
-    // SUBSCRIPTION hosting binds the lobby's local id to the canvas, so
-    // the lobby address is stable across hosting sessions. The caller
-    // (HOST_MENU UI) should already pass the derived value, but we
-    // recompute here so programmatic callers and any UI-bypass paths
-    // can't accidentally start a SUBSCRIPTION session on a random local
-    // id (which would invalidate every subscriber's saved address).
     std::string effectiveLocalID = serverLocalID;
     std::string effectiveNetSource = initNetSource;
     if (hostMode == HostMode::SUBSCRIPTION) {
         effectiveLocalID = NetLibrary::deterministic_local_id_from_seed(canvasId);
+        const std::string& appSec = main.devKeys.app_secret();
+        if (!appSec.empty()) {
+            const auto derivedLocal = CanvasShareId::derive_local_id(appSec, canvasId);
+            if (!derivedLocal.empty()) effectiveLocalID = derivedLocal;
+        }
         effectiveNetSource = NetLibrary::get_global_id() + effectiveLocalID;
     }
 

@@ -221,6 +221,10 @@ const std::string& NetLibrary::get_global_id() {
     return globalID;
 }
 
+void NetLibrary::set_global_id(const std::string& id) {
+    globalID = id;
+}
+
 void NetLibrary::register_server(std::shared_ptr<NetServer> server) {
     std::scoped_lock serverListLock(serverListMutex);
     servers.emplace_back(server);

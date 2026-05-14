@@ -48,11 +48,17 @@ class DevKeys {
         bool is_loaded()                    const { return loaded; }
         const std::string& member_pubkey()  const { return memberPub; }
         const std::string& app_pubkey()     const { return appPub; }
+        // Hex-encoded ed25519 secret key (128 hex chars = 64 bytes: seed || pubkey).
+        // Consumed by Kdf::derive_canvas_share_ids to compute the artist's
+        // stable per-canvas share code (DISTRIBUTION-PHASE0.md §12.5). Never
+        // sent over the wire and never leaves this process.
+        const std::string& app_secret()     const { return appSecret; }
         const std::string& canvas_id()      const { return canvasId; }
 
     private:
         bool loaded = false;
         std::string memberPub;
         std::string appPub;
+        std::string appSecret;
         std::string canvasId;
 };

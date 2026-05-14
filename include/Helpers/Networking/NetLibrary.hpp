@@ -32,6 +32,13 @@ class NetLibrary {
         static std::string deterministic_local_id_from_seed(std::string_view seed);
         static const std::string& get_global_id();
 
+        // SUBSCRIPTION-mode hosting installs a per-canvas globalID derived
+        // from (app_secret, canvas_id) here BEFORE init() so the host's
+        // WSS path is stable across sessions / reinstalls. Pass an empty
+        // string to clear and fall back to the random get_global_id() path.
+        // See DISTRIBUTION-PHASE0.md §12.5.
+        static void set_global_id(const std::string& id);
+
         static void register_server(std::shared_ptr<NetServer> server);
         static void register_client(std::shared_ptr<NetClient> client);
 

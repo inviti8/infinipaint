@@ -3,6 +3,7 @@
 #include "../Waypoints/TreeView.hpp"
 #include "../ReaderMode/ReaderMode.hpp"
 #include "DrawingProgramScreen.hpp"
+#include "Helpers/CanvasShareId.hpp"
 #include "Helpers/ConvertVec.hpp"
 #include "../GUIStuff/Elements/GridScrollArea.hpp"
 #include "../GUIStuff/Elements/DropDown.hpp"
@@ -346,16 +347,27 @@ void PhoneDrawingProgramScreen::main_menu_popup(Element* triggerButton) {
                 }
                 menu_item("phone host", "Host", [&] {
                     // Pre-generate the lobby address so the user sees it
-                    // before confirming. Mirrors Toolbar.cpp:577-580.
+                    // before confirming. Mirrors Toolbar.cpp host action.
                     phoneHostMode = main.world->has_subscription_metadata()
                         ? HostMode::SUBSCRIPTION : HostMode::COLLAB;
                     if (phoneHostMode == HostMode::SUBSCRIPTION) {
-                        // Persistent lobby code derived from canvas_id.
-                        phoneNetLocalID = NetLibrary::deterministic_local_id_from_seed(main.world->canvasId);
+                        // DISTRIBUTION-PHASE0.md §12.5: stable share code
+                        // derived from (app_secret, canvas_id).
+                        const std::string& appSec = main.devKeys.app_secret();
+                        std::string previewGlobal;
+                        if (!appSec.empty()) {
+                            previewGlobal = CanvasShareId::derive_global_id(appSec, main.world->canvasId);
+                            phoneNetLocalID = CanvasShareId::derive_local_id(appSec, main.world->canvasId);
+                        }
+                        if (previewGlobal.empty() || phoneNetLocalID.empty()) {
+                            previewGlobal = NetLibrary::get_global_id();
+                            phoneNetLocalID = NetLibrary::deterministic_local_id_from_seed(main.world->canvasId);
+                        }
+                        phoneNetLobbyAddress = previewGlobal + phoneNetLocalID;
                     } else {
                         phoneNetLocalID = NetLibrary::get_random_server_local_id();
+                        phoneNetLobbyAddress = NetLibrary::get_global_id() + phoneNetLocalID;
                     }
-                    phoneNetLobbyAddress = NetLibrary::get_global_id() + phoneNetLocalID;
                     phoneNetMenu = PhoneNetMenu::HOST;
                 });
                 menu_item("phone connect", "Connect", [&] {
@@ -427,8 +439,18 @@ void PhoneDrawingProgramScreen::network_menu_popup() {
                                     ? std::function<void()>([&] {
                                         if (phoneHostMode != HostMode::SUBSCRIPTION) {
                                             phoneHostMode = HostMode::SUBSCRIPTION;
-                                            phoneNetLocalID = NetLibrary::deterministic_local_id_from_seed(main.world->canvasId);
-                                            phoneNetLobbyAddress = NetLibrary::get_global_id() + phoneNetLocalID;
+                                            // DISTRIBUTION-PHASE0.md §12.5
+                                            const std::string& appSec = main.devKeys.app_secret();
+                                            std::string previewGlobal;
+                                            if (!appSec.empty()) {
+                                                previewGlobal = CanvasShareId::derive_global_id(appSec, main.world->canvasId);
+                                                phoneNetLocalID = CanvasShareId::derive_local_id(appSec, main.world->canvasId);
+                                            }
+                                            if (previewGlobal.empty() || phoneNetLocalID.empty()) {
+                                                previewGlobal = NetLibrary::get_global_id();
+                                                phoneNetLocalID = NetLibrary::deterministic_local_id_from_seed(main.world->canvasId);
+                                            }
+                                            phoneNetLobbyAddress = previewGlobal + phoneNetLocalID;
                                         }
                                     })
                                     : std::function<void()>{}

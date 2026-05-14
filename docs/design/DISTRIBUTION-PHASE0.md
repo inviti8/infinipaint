@@ -574,16 +574,50 @@ Behavior:
 - User toggles back to SUBSCRIPTION → lobby field returns to the same persistent address.
 - `World::start_hosting` enforces this server-side too (recomputes `serverLocalID` for SUBSCRIPTION regardless of what the caller passed) — no UI bypass can accidentally start a SUBSCRIPTION session on a random address that would invalidate every subscriber's saved URL.
 
-The artist still has to share the lobby address with subscribers once. After that, it's permanent. (Until the artist reinstalls Inkternity — see 12.4.)
+The artist still has to share the lobby address with subscribers once. After that, it's permanent — including across reinstalls, see §12.5.
 
-### 12.4 What's still deferred
+### 12.5 Cryptographically derived canvas share codes
+
+§12.3 stabilized the `local_id` half of the lobby address but left the `global_id` half random per-launch, so the artist's published share address still rotated every app start. That's a hard blocker for paid subscriptions — the share address has to be one-and-forever.
+
+Resolution: when `hostMode == SUBSCRIPTION`, BOTH halves of the lobby address are derived deterministically from the artist's persistent `app_secret` and the canvas's `canvas_id`, via HMAC-SHA-512/256 with domain-separated labels:
+
+```
+PRK         = first 32 bytes of app_secret  (ed25519 seed half, already persisted in
+                                             inkternity_dev_keys.json via DevKeys::ensure_app_keypair)
+global_id   = base32lower( HMAC-SHA-512/256(PRK, "inkternity:canvas-globalid:v1|" || canvas_id) )
+              truncated to 40 chars
+local_id    = base32lower( HMAC-SHA-512/256(PRK, "inkternity:canvas-localid:v1|"  || canvas_id) )
+              truncated to 10 chars
+share_code  = global_id || local_id        (same 40+10 = 50-char shape the existing UI expects)
+```
+
+`HMAC-SHA-512/256` is the existing `crypto_auth_hmacsha512256` primitive already linked from tweetnacl — no new crypto dependency. base32-lowercase (RFC 4648 alphabet, lowercased: `a–z2–7`) is a strict subset of the alphanumeric set the signaling server already accepts as a routing key, so the wire shape is unchanged.
+
+`COLLAB` mode is unchanged — random `global_id` per app launch + random `local_id` per host. Ephemeral by design.
+
+Properties this gives Phase 0:
+- Same artist + same canvas → same share code every hosting session, across reboots, **across reinstalls** (assuming `app_secret` is restored — see Phase 1 below).
+- Different canvas → different share code, even on the same install.
+- `app_secret` never leaves the artist's machine; the share code is a public derivative.
+- Subscribers cannot reverse a share code to recover anything about `app_secret` (HMAC pre-image resistance) or to enumerate the artist's other canvases (different `canvas_id` → uncorrelated output).
+- The signaling server's behavior is unchanged: it sees a 40-char path string and routes by it, exactly as before.
+
+Implementation surfaces:
+- `include/Helpers/CanvasShareId.{hpp,cpp}` — HMAC-SHA-512/256 wrapper + base32-lowercase encoder + the two derivation functions.
+- `src/DevKeys.{hpp,cpp}` — store `appSecret` (currently dropped after `ensure_app_keypair`) and expose via `app_secret()` accessor.
+- `include/Helpers/Networking/NetLibrary.{hpp,cpp}` — `derive_canvas_global_id(app_secret_hex, canvas_id) -> std::string(40)`; `set_global_id(std::string)` so SUBSCRIPTION hosting can install the derived value before `init`.
+- `src/World.cpp::start_hosting` — when entering SUBSCRIPTION mode, compute the derived `global_id` and `local_id` from `(main.devKeys.app_secret(), canvasId)` and install them before constructing `netSource`. Mirrors the existing recompute-on-the-host-side defense.
+- `src/Toolbar.cpp` HOST_MENU — same derivation when previewing the lobby address in the host menu so the UI matches what the server will actually use.
+
+No server-side, portal-side, or token-format change required for the basic stability win. The portal *can* still optionally embed the artist's `app_pub` + `canvas_id` into subscriber tokens (which it already does for the §B verification flow), so subscribers' clients could in principle re-derive the share code themselves — except subscribers don't have `app_secret`, so the share code must still be communicated out-of-band (artist → subscriber) until the portal can stamp the derived `global_id` into the token at publish time. That portal-side enhancement is the only remaining piece of "subscriber single-field paste" (was §12.4) and is a one-line portal change once §12.5 ships client-side.
+
+### 12.6 What's still deferred
 
 The original §10 deferral list stands. Additionally:
 
-- **Per-install `global_id` persistence** — `NetLibrary::get_global_id()` generates a fresh random 40-char id on first launch and stores it locally. A reinstall produces a new `global_id` → invalidates the persistent lobby code from §12.3. Fix: derive `global_id` from a recoverable secret (the artist's app keypair, restorable from a portal-stored mnemonic, the same crypto-style persistence pattern used by `glasswing`'s Andromica). Then a reinstall just restores the keypair → the same `global_id` → the lobby code stays stable across reinstalls. Phase 1 work.
-- **Subscriber single-field paste** — currently the subscriber pastes both lobby address + token. The token contains `canvas_id`, so the local_id portion is derivable client-side. The `global_id` portion isn't (it's the artist's network identity, not in the token). Solving that needs either (a) `global_id` stamped into the token at portal publish time, or (b) portal-mediated discovery (`canvas_id` → current `global_id` lookup). Defer with the global_id work above.
+- **Phase 1 app-keypair restoration** — `app_secret` currently regenerates on a clean reinstall, which invalidates every share code derived in §12.5. The fix is the Andromica/glasswing pattern: portal stores an encrypted credential bundle that the user restores on a fresh install, recovering the *same* `app_secret`. Then every share code the artist has ever published re-resolves to the same lobby address. Phase 1 work; the §12.5 derivation is designed so this restoration is a drop-in (the input that's restored is exactly the input the KDF consumes).
+- **Portal-side share-code stamping for subscriber tokens** — once §12.5 ships, the portal can compute `global_id` at canvas-publish time (the portal knows `app_pub` and `canvas_id`; if the artist supplies the share code at publish time, the portal stores it) and embed it in the token payload. Subscribers' clients then derive `local_id` from `canvas_id` and read `global_id` from the token → single-field paste. Defer until §12.5 has been live for a release cycle.
 - **Per-client mode mixing** — one session hosting collaborators (write) and subscribers (view) simultaneously. Would need separate collab + subscriber tokens and per-client capability negotiation. Useful eventually; defer until artists ask.
 - **Mode-tagged lobby URLs** — subscribers' clients currently have no way to know what mode the host is in before connecting. Cosmetic; the host's mode is authoritative and the client adapts on `CLIENT_INITIAL_DATA`.
 - **Command-level inspection of self-targeted updates** — a viewer that targets their own ClientData can still send any of its commands (set cursor, set camera, send chat, set grid size, change display name). All of those are presence/identity ops that don't mutate shared canvas state, so the surface is benign — but a future hardening pass could whitelist specific commands.
-
-- **App-keypair re-derivation if user reinstalls?** First run after a clean install regenerates a fresh app pubkey, which the artist must re-register on the portal (and re-issue tokens for active subscribers). Acceptable for Phase 0; document clearly in artist onboarding. Phase 0.5 could store the app keypair in the portal-encrypted credential bundle so reinstalls preserve it.

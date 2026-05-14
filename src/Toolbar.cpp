@@ -7,6 +7,7 @@
 #include "GUIStuff/ElementHelpers/PopupHelpers.hpp"
 #include "GUIStuff/ElementHelpers/RadioButtonHelpers.hpp"
 #include "GUIStuff/Elements/ManyElementScrollArea.hpp"
+#include "Helpers/CanvasShareId.hpp"
 #include "Helpers/ConvertVec.hpp"
 #include "Helpers/FileDownloader.hpp"
 #include "Helpers/MathExtras.hpp"
@@ -580,14 +581,29 @@ void Toolbar::top_toolbar() {
                                     hostMenuMode = main.world->has_subscription_metadata()
                                         ? HostMode::SUBSCRIPTION : HostMode::COLLAB;
                                     if (hostMenuMode == HostMode::SUBSCRIPTION) {
-                                        // Stable lobby code: derived from canvas_id so the
-                                        // address is the same across hosting sessions.
-                                        serverLocalID = NetLibrary::deterministic_local_id_from_seed(main.world->canvasId);
+                                        // DISTRIBUTION-PHASE0.md §12.5: stable share code derived
+                                        // from (app_secret, canvas_id). World::start_hosting will
+                                        // install the same globalID on NetLibrary before connect,
+                                        // so the preview here matches the actual WSS path.
+                                        const std::string& appSec = main.devKeys.app_secret();
+                                        std::string previewGlobal;
+                                        if (!appSec.empty()) {
+                                            previewGlobal = CanvasShareId::derive_global_id(appSec, main.world->canvasId);
+                                            serverLocalID = CanvasShareId::derive_local_id(appSec, main.world->canvasId);
+                                        }
+                                        if (previewGlobal.empty() || serverLocalID.empty()) {
+                                            // Fallback: degraded path with localID-only stability
+                                            // (matches pre-§12.5 behavior). World::start_hosting
+                                            // logs why; the lobby code will rotate per launch.
+                                            previewGlobal = NetLibrary::get_global_id();
+                                            serverLocalID = NetLibrary::deterministic_local_id_from_seed(main.world->canvasId);
+                                        }
+                                        serverToConnectTo = previewGlobal + serverLocalID;
                                     } else {
                                         // Ephemeral: fresh random for ad-hoc collab sessions.
                                         serverLocalID = NetLibrary::get_random_server_local_id();
+                                        serverToConnectTo = NetLibrary::get_global_id() + serverLocalID;
                                     }
-                                    serverToConnectTo = NetLibrary::get_global_id() + serverLocalID;
                                     optionsMenuOpen = true;
                                     optionsMenuType = HOST_MENU;
                                 });
@@ -1571,9 +1587,20 @@ void Toolbar::options_menu() {
                             ? std::function<void()>([&] {
                                 if (hostMenuMode != HostMode::SUBSCRIPTION) {
                                     hostMenuMode = HostMode::SUBSCRIPTION;
-                                    // Switching to SUBSCRIPTION → persistent lobby code from canvas_id.
-                                    serverLocalID = NetLibrary::deterministic_local_id_from_seed(main.world->canvasId);
-                                    serverToConnectTo = NetLibrary::get_global_id() + serverLocalID;
+                                    // DISTRIBUTION-PHASE0.md §12.5: stable share code derived
+                                    // from (app_secret, canvas_id); preview-only here, install
+                                    // on NetLibrary happens in World::start_hosting.
+                                    const std::string& appSec = main.devKeys.app_secret();
+                                    std::string previewGlobal;
+                                    if (!appSec.empty()) {
+                                        previewGlobal = CanvasShareId::derive_global_id(appSec, main.world->canvasId);
+                                        serverLocalID = CanvasShareId::derive_local_id(appSec, main.world->canvasId);
+                                    }
+                                    if (previewGlobal.empty() || serverLocalID.empty()) {
+                                        previewGlobal = NetLibrary::get_global_id();
+                                        serverLocalID = NetLibrary::deterministic_local_id_from_seed(main.world->canvasId);
+                                    }
+                                    serverToConnectTo = previewGlobal + serverLocalID;
                                 }
                             })
                             : std::function<void()>{}
