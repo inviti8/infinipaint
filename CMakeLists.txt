@@ -531,7 +531,51 @@ if(HAS_DEPRECATED_DECLARATIONS)
 endif()
 
 if(APPLE OR WIN32)
+    # Apple: build the binary with its install-time RPATHs already baked
+    # in so `cmake --install` doesn't relink (which would rewrite the
+    # binary content and invalidate any codesign signature we apply to
+    # the build/Release/inkternity.app copy). This is the root cause of
+    # the rc17 notarization rejection — the build-tree signature was
+    # valid on disk, but cpack's internal install step relinked the
+    # binary before DMG'ing it.
+    if(APPLE)
+        set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
+    endif()
+
     install(TARGETS main DESTINATION .)
+
+    # Apple: codesign the *staged* .app from inside the install step so
+    # signing is the last thing that touches the binary before CPack
+    # wraps it in a DMG. Workflow passes the Developer ID Application
+    # SHA-1 hash as INKTERNITY_CODESIGN_IDENTITY at configure time;
+    # when that's empty (local dev builds, missing-cert CI runs) the
+    # install just skips signing without erroring.
+    if(APPLE)
+        install(CODE "
+            set(_id \"${INKTERNITY_CODESIGN_IDENTITY}\")
+            if(NOT _id STREQUAL \"\")
+                set(_app \"\${CMAKE_INSTALL_PREFIX}/inkternity.app\")
+                message(STATUS \"Codesigning \${_app} with \${_id}\")
+                execute_process(
+                    COMMAND codesign --force --options runtime --timestamp --deep
+                            --sign \${_id} \${_app}
+                    RESULT_VARIABLE _sign_rc
+                )
+                if(NOT _sign_rc EQUAL 0)
+                    message(FATAL_ERROR \"codesign failed (exit \${_sign_rc})\")
+                endif()
+                execute_process(
+                    COMMAND codesign --verify --strict --deep --verbose=2 \${_app}
+                    RESULT_VARIABLE _verify_rc
+                )
+                if(NOT _verify_rc EQUAL 0)
+                    message(FATAL_ERROR \"codesign verify failed (exit \${_verify_rc})\")
+                endif()
+            else()
+                message(STATUS \"INKTERNITY_CODESIGN_IDENTITY not set — skipping bundle codesign\")
+            endif()
+        ")
+    endif()
 
     set(CPACK_PACKAGE_NAME "inkternity")
     # CPACK_PACKAGE_VERSION_* are set at the top of this file so the

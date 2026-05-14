@@ -133,7 +133,11 @@ jobs:
           VER="${BUILD_VERSION#v}"
           VER="${VER%%-*}"
           if [[ ! "$VER" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then VER="0.0.0"; fi
-          IFS=. read -r MAJ MIN PATCH <<< "${VER}.0.0"
+          # The trailing JUNK var is critical: with `read -r MAJ MIN PATCH`
+          # alone, bash joins ANY extra fields (with IFS) into the last var,
+          # so VER=0.11.0 + ".0.0" padding lands PATCH=0.0.0 instead of 0.
+          # JUNK absorbs the padding leftover; MAJ/MIN/PATCH stay single ints.
+          IFS=. read -r MAJ MIN PATCH JUNK <<< "${VER}.0.0"
           echo "numeric=$VER" >> "$GITHUB_OUTPUT"
           echo "major=${MAJ}" >> "$GITHUB_OUTPUT"
           echo "minor=${MIN}" >> "$GITHUB_OUTPUT"
@@ -250,7 +254,11 @@ jobs:
           VER="${BUILD_VERSION#v}"
           VER="${VER%%-*}"
           if [[ ! "$VER" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then VER="0.0.0"; fi
-          IFS=. read -r MAJ MIN PATCH <<< "${VER}.0.0"
+          # The trailing JUNK var is critical: with `read -r MAJ MIN PATCH`
+          # alone, bash joins ANY extra fields (with IFS) into the last var,
+          # so VER=0.11.0 + ".0.0" padding lands PATCH=0.0.0 instead of 0.
+          # JUNK absorbs the padding leftover; MAJ/MIN/PATCH stay single ints.
+          IFS=. read -r MAJ MIN PATCH JUNK <<< "${VER}.0.0"
           echo "numeric=$VER" >> "$GITHUB_OUTPUT"
           echo "major=${MAJ}" >> "$GITHUB_OUTPUT"
           echo "minor=${MIN}" >> "$GITHUB_OUTPUT"
@@ -291,18 +299,6 @@ jobs:
             tail -120 "$f" || true
           done
 
-      - name: CMake configure + build
-        run: |
-          cd build/Release
-          source generators/conanbuild.sh
-          cmake ../.. \
-            -DCMAKE_TOOLCHAIN_FILE=generators/conan_toolchain.cmake \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCPACK_PACKAGE_VERSION_MAJOR=${{ steps.ver.outputs.major }} \
-            -DCPACK_PACKAGE_VERSION_MINOR=${{ steps.ver.outputs.minor }} \
-            -DCPACK_PACKAGE_VERSION_PATCH=${{ steps.ver.outputs.patch }}
-          cmake --build .
-
       - name: Check for signing cert
         id: mac_sign_check
         env:
@@ -341,30 +337,32 @@ jobs:
           echo "SIGN_IDENTITY=$IDENTITY" >> "$GITHUB_ENV"
           rm -f "$P12"
 
-      - name: Code-sign .app (before DMG)
-        if: steps.mac_sign_check.outputs.have_cert == 'true'
+      - name: CMake configure + build
         run: |
-          # Sign the .app produced by `cmake --build` BEFORE cpack runs.
-          # The previous flow was: cpack → sign cpack-staged copy → re-run
-          # cpack — which re-staged the unsigned source .app and threw
-          # away our signature, producing an Invalid notarization (rc15).
-          # Sign-then-cpack guarantees the DMG wraps a signed bundle.
-          APP="build/Release/inkternity.app"
-          if [[ ! -d "$APP" ]]; then
-            APP=$(find build -name "*.app" -maxdepth 4 -type d | head -1)
-          fi
-          if [[ -z "$APP" || ! -d "$APP" ]]; then
-            echo "ERROR: could not locate built .app for signing"
-            ls -la build/Release/ || true
-            exit 1
-          fi
-          echo "Signing $APP"
-          codesign --force --options runtime --timestamp --deep \
-            --sign "$SIGN_IDENTITY" "$APP"
-          codesign --verify --strict --deep --verbose=2 "$APP"
+          cd build/Release
+          source generators/conanbuild.sh
+          # SIGN_IDENTITY is empty when no cert was provisioned; the
+          # install(CODE) hook in CMakeLists.txt skips signing in that
+          # case (matches the glasswing-style soft-fail posture).
+          cmake ../.. \
+            -DCMAKE_TOOLCHAIN_FILE=generators/conan_toolchain.cmake \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCPACK_PACKAGE_VERSION_MAJOR=${{ steps.ver.outputs.major }} \
+            -DCPACK_PACKAGE_VERSION_MINOR=${{ steps.ver.outputs.minor }} \
+            -DCPACK_PACKAGE_VERSION_PATCH=${{ steps.ver.outputs.patch }} \
+            -DINKTERNITY_CODESIGN_IDENTITY="${SIGN_IDENTITY:-}"
+          cmake --build .
 
       - name: CPack DragNDrop DMG
         run: |
+          # CPack DragNDrop runs `cmake --install` to its staging dir
+          # before assembling the DMG. CMakeLists.txt's install(CODE ...)
+          # hook codesigns the staged .app at that point — i.e. AFTER
+          # any rpath relinking the install step does, so the signature
+          # is the last thing applied to the binary before it goes into
+          # the DMG. This is the lesson from rc17: signing the build-
+          # tree .app and letting cpack re-stage breaks the signature
+          # because cmake --install relinks rpaths.
           cd build/Release
           cpack -G DragNDrop
 
