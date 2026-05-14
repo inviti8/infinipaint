@@ -303,11 +303,6 @@ jobs:
             -DCPACK_PACKAGE_VERSION_PATCH=${{ steps.ver.outputs.patch }}
           cmake --build .
 
-      - name: CPack DragNDrop DMG
-        run: |
-          cd build/Release
-          cpack -G DragNDrop
-
       - name: Check for signing cert
         id: mac_sign_check
         env:
@@ -320,58 +315,66 @@ jobs:
             echo "have_cert=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Code-sign .app + DMG
+      - name: Set up signing keychain + import cert
         if: steps.mac_sign_check.outputs.have_cert == 'true'
         env:
           MAC_P12: ${{ secrets.MACOS_APPLICATION_P12 }}
           MAC_PW:  ${{ secrets.MACOS_CERT_PW }}
         run: |
-          # Set up a temp keychain so we don't pollute the runner default
           KEYCHAIN="$RUNNER_TEMP/inkternity.keychain-db"
           KEYCHAIN_PW="$(uuidgen)"
+          echo "KEYCHAIN=$KEYCHAIN" >> "$GITHUB_ENV"
+          echo "KEYCHAIN_PW=$KEYCHAIN_PW" >> "$GITHUB_ENV"
           security create-keychain -p "$KEYCHAIN_PW" "$KEYCHAIN"
           security set-keychain-settings -lut 7200 "$KEYCHAIN"
           security unlock-keychain -p "$KEYCHAIN_PW" "$KEYCHAIN"
-
-          # Import the Developer ID Application cert
           P12="$RUNNER_TEMP/inkternity.p12"
           echo "$MAC_P12" | base64 -d > "$P12"
           security import "$P12" -P "$MAC_PW" -A -t cert -f pkcs12 -k "$KEYCHAIN"
           security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PW" "$KEYCHAIN"
           security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | sed s/\"//g)
-
           IDENTITY=$(security find-identity -v -p codesigning "$KEYCHAIN" | grep "Developer ID Application" | head -1 | awk '{print $2}')
           if [[ -z "$IDENTITY" ]]; then
             echo "ERROR: no Developer ID Application identity found in keychain"
             exit 1
           fi
+          echo "SIGN_IDENTITY=$IDENTITY" >> "$GITHUB_ENV"
+          rm -f "$P12"
 
-          # Sign the .app inside the DMG flow:
-          # CPack DragNDrop already produced the DMG, but signing must
-          # happen on the .app contents BEFORE DMG creation in strict
-          # flows. CPack's bundling assembles the .app under
-          # build/Release/_CPack_Packages/.../*.app — sign that and
-          # re-run cpack to repackage. (Slight rework vs signing in-DMG.)
-          APP=$(find build/Release/_CPack_Packages -name "*.app" -maxdepth 6 -type d | head -1)
-          if [[ -z "$APP" ]]; then
+      - name: Code-sign .app (before DMG)
+        if: steps.mac_sign_check.outputs.have_cert == 'true'
+        run: |
+          # Sign the .app produced by `cmake --build` BEFORE cpack runs.
+          # The previous flow was: cpack → sign cpack-staged copy → re-run
+          # cpack — which re-staged the unsigned source .app and threw
+          # away our signature, producing an Invalid notarization (rc15).
+          # Sign-then-cpack guarantees the DMG wraps a signed bundle.
+          APP="build/Release/inkternity.app"
+          if [[ ! -d "$APP" ]]; then
+            APP=$(find build -name "*.app" -maxdepth 4 -type d | head -1)
+          fi
+          if [[ -z "$APP" || ! -d "$APP" ]]; then
             echo "ERROR: could not locate built .app for signing"
+            ls -la build/Release/ || true
             exit 1
           fi
+          echo "Signing $APP"
           codesign --force --options runtime --timestamp --deep \
-            --sign "$IDENTITY" "$APP"
+            --sign "$SIGN_IDENTITY" "$APP"
+          codesign --verify --strict --deep --verbose=2 "$APP"
 
-          # Re-pack the DMG so the signed .app is the one shipped
+      - name: CPack DragNDrop DMG
+        run: |
           cd build/Release
-          rm -f Inkternity-*.dmg inkternity-*.dmg
           cpack -G DragNDrop
-          cd ../..
 
-          # Sign the outer DMG too
+      - name: Code-sign DMG wrapper
+        if: steps.mac_sign_check.outputs.have_cert == 'true'
+        run: |
           DMG=$(ls build/Release/*.dmg | head -1)
           codesign --force --options runtime --timestamp \
-            --sign "$IDENTITY" "$DMG"
-
-          rm -f "$P12"
+            --sign "$SIGN_IDENTITY" "$DMG"
+          codesign --verify --strict --verbose=2 "$DMG"
 
       - name: Check for notarization secrets
         id: mac_notarize_check
