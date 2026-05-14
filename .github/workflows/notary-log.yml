@@ -1,0 +1,30 @@
+name: Fetch notary log
+
+# Manual one-off: given an Apple notarization submission id, dump the
+# diagnostic log Apple returns. Useful when the main build-installers
+# workflow rejects with status: Invalid and you want to know why
+# without waiting for another full release-tag rebuild.
+
+on:
+  workflow_dispatch:
+    inputs:
+      submission_id:
+        description: 'Apple notarization submission UUID (from "id:" in the build-installers log)'
+        required: true
+        type: string
+
+jobs:
+  fetch:
+    runs-on: macos-14
+    environment: installers
+    steps:
+      - name: notarytool log ${{ inputs.submission_id }}
+        env:
+          APPLE_ID:      ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_PW:      ${{ secrets.APPLE_ID_APP_PW }}
+        run: |
+          xcrun notarytool log "${{ inputs.submission_id }}" \
+            --apple-id "$APPLE_ID" \
+            --team-id "$APPLE_TEAM_ID" \
+            --password "$APPLE_PW"
