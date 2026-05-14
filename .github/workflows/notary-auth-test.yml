@@ -1,0 +1,45 @@
+name: Notary auth test
+
+# Quickly validate APPLE_ID + APPLE_TEAM_ID + APPLE_ID_APP_PW without
+# the 30-50 minute round-trip of a full release-tag rebuild. Calls
+# `xcrun notarytool history`, which is a read-only endpoint — no
+# upload, no submission. Returns "Successfully received submissions
+# list" on auth-OK, or HTTP 401 on bad credentials.
+#
+# Run with:
+#   gh workflow run notary-auth-test.yml
+# (or via the Actions tab → "Notary auth test" → "Run workflow")
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  auth:
+    runs-on: macos-14
+    environment: installers
+    steps:
+      - name: notarytool history (auth probe)
+        env:
+          APPLE_ID:      ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_PW:      ${{ secrets.APPLE_ID_APP_PW }}
+        run: |
+          if [[ -z "$APPLE_ID" ]]; then echo "::error::APPLE_ID secret is empty"; exit 1; fi
+          if [[ -z "$APPLE_TEAM_ID" ]]; then echo "::error::APPLE_TEAM_ID secret is empty"; exit 1; fi
+          if [[ -z "$APPLE_PW" ]]; then echo "::error::APPLE_ID_APP_PW secret is empty"; exit 1; fi
+
+          # Basic shape sanity (don't print the values; just lengths and presence
+          # of the hyphens that app-specific passwords have).
+          echo "APPLE_ID length: ${#APPLE_ID}"
+          echo "APPLE_TEAM_ID length: ${#APPLE_TEAM_ID} (expected 10)"
+          echo "APPLE_PW length: ${#APPLE_PW} (expected 19 incl. hyphens)"
+          if [[ "$APPLE_PW" != *-*-*-* ]]; then
+            echo "::warning::APPLE_ID_APP_PW does not contain three hyphens — app-specific passwords are formatted xxxx-xxxx-xxxx-xxxx. Likely a typo or pasted without hyphens."
+          fi
+
+          echo
+          echo "Calling xcrun notarytool history..."
+          xcrun notarytool history \
+            --apple-id "$APPLE_ID" \
+            --team-id "$APPLE_TEAM_ID" \
+            --password "$APPLE_PW"
