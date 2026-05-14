@@ -1,6 +1,7 @@
 #include "ImageDisplay.hpp"
 #include "../GUIManager.hpp"
 #include <include/codec/SkJpegDecoder.h>
+#include <include/codec/SkPngDecoder.h>
 #include <include/core/SkRRect.h>
 
 namespace GUIStuff {
@@ -14,9 +15,18 @@ void ImageDisplay::layout(const Clay_ElementId& id, const Data& data) {
         try {
             imgData = read_file_to_string(data.imgPath);
             auto codec = SkCodec::MakeFromData(SkData::MakeWithoutCopy(imgData.c_str(), imgData.size()), {
-                SkJpegDecoder::Decoder()
+                SkJpegDecoder::Decoder(),
+                SkPngDecoder::Decoder()
             });
-            img = std::get<0>(codec->getImage());
+            // MakeFromData returns nullptr when no registered decoder
+            // recognizes the bytes. Without this guard, the next line
+            // dereferences a null unique_ptr — crashes hard (try/catch
+            // can't see it). Triggered the rc20 startup crash when a PNG
+            // was first dropped into the title-bar CTA.
+            if(codec)
+                img = std::get<0>(codec->getImage());
+            else
+                img = nullptr;
         } catch(...) {
             img = nullptr;
         }

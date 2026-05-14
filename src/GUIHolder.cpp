@@ -25,6 +25,11 @@ void GUIHolder::load_icons_at(const std::filesystem::path& pathToLoad) {
     if(filesInPath) {
         for(int i = 0; i < globCount; i++) {
             std::filesystem::path filePath = pathToLoad / std::filesystem::path(filesInPath[i]);
+            // Only SVG files are GUI icons. PNG/JPG dropped into this dir
+            // (e.g. brand logos consumed via ImageDisplay rather than the
+            // svg-icon path) would otherwise fail the SkSVGDOM parse below
+            // and crash startup.
+            if(filePath.extension() != ".svg") continue;
             SDL_PathInfo fileInfo;
             if(SDL_GetPathInfo(filePath.string().c_str(), &fileInfo) && fileInfo.type == SDL_PATHTYPE_FILE) {
                 std::string iconRelativePath = filePath.relative_path().string();

@@ -16,6 +16,7 @@
 #include "../World.hpp"
 #include "Helpers/StringHelpers.hpp"
 #include "PhoneDrawingProgramScreen.hpp"
+#include <SDL3/SDL_misc.h>
 #include <SDL3/SDL_time.h>
 #include <SDL3/SDL_timer.h>
 
@@ -496,6 +497,51 @@ void FileSelectScreen::title_bar() {
                             .sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_GROW(0)},
                         }
                     }) {}
+
+                    // "$$ publish your art" CTA — links to heavymeta.art portal
+                    // where artists enroll in the cooperative + publish canvases
+                    // for paid subscription distribution. Uses the hvym_logo PNG
+                    // (ImageDisplay rather than SVGIcon) to match HEAVYMETA
+                    // branding. Persistently visible across Files/Trash/Settings.
+                    gui.new_id("hvym publish cta", [&] {
+                        SelectableButton::Data publishData;
+                        publishData.drawType = SelectableButton::DrawType::TRANSPARENT_BORDER;
+                        publishData.onClick = [] { SDL_OpenURL("https://heavymeta.art"); };
+                        publishData.innerContent = [&gui] (const SelectableButton::InnerContentCallbackParameters&) {
+                            gui.element<LayoutElement>("publish cta inner", [&] (LayoutElement* l, const Clay_ElementId& lId) {
+                                CLAY(lId, {
+                                    .layout = {
+                                        .sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_GROW(0)},
+                                        .padding = { 8, 8, 0, 0 },
+                                        .childGap = gui.io.theme->childGap1,
+                                        .childAlignment = {.x = CLAY_ALIGN_X_CENTER, .y = CLAY_ALIGN_Y_CENTER}
+                                    }
+                                }) {
+                                    if (l->get_bb().has_value()) {
+                                        const float iconSize = l->get_bb().value().height() - 4.0f;
+                                        CLAY_AUTO_ID({
+                                            .layout = {.sizing = {.width = CLAY_SIZING_FIXED(iconSize), .height = CLAY_SIZING_FIXED(iconSize)}},
+                                            .aspectRatio = {.aspectRatio = 1.0f}
+                                        }) {
+                                            gui.element<ImageDisplay>("hvym logo", ImageDisplay::Data{
+                                                .imgPath = "data/icons/hvym_logo.png"
+                                            });
+                                        }
+                                    }
+                                    text_label(gui, "$$ publish your art");
+                                }
+                            });
+                        };
+                        CLAY_AUTO_ID({
+                            .layout = {
+                                .sizing = {.width = CLAY_SIZING_FIT(0), .height = CLAY_SIZING_GROW(0)},
+                                .childAlignment = {.x = CLAY_ALIGN_X_CENTER, .y = CLAY_ALIGN_Y_CENTER}
+                            }
+                        }) {
+                            gui.element<SelectableButton>("button", publishData);
+                        }
+                    });
+
                     if(selectedMenu == SelectedMenu::FILES || selectedMenu == SelectedMenu::TRASH) {
                         SelectableButton* moreButton = svg_icon_button(gui, "more settings button", "data/icons/RemixIcon/more-2-fill.svg", {
                             .drawType = SelectableButton::DrawType::TRANSPARENT_ALL,
