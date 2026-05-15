@@ -59,7 +59,22 @@ class FileSelectScreen : public Screen {
         // loaded; instructions to set up dev keys when not. Lives on
         // the Settings tab because the keypair is per-install (not
         // per-canvas) and persists across all canvases.
+        //
+        // DISTRIBUTION-PHASE1.md §3.3 added two on-demand sub-sections
+        // gated by exportKeyOpen / restoreKeyOpen — Export App Key
+        // (reveal S... + mnemonic) and Restore App Key (paste S... or
+        // mnemonic, destructive overwrite). Both stay collapsed by
+        // default per the crypto-averse UX direction.
         void settings_view();
+        void export_app_key_section();
+        void restore_app_key_section();
+        bool exportKeyOpen = false;
+        bool restoreKeyOpen = false;
+        std::string restoreKeyInput;
+        bool restoreConfirmStage = false;
+        // Transient feedback after a Restore attempt — shown until
+        // the artist closes/reopens the section.
+        std::string restoreFeedback;
         void create_file_button();
         void file_view_edit();
         void menu_black_box();

@@ -64,6 +64,21 @@ class DevKeys {
         // [USERINFO] on success/failure either way.
         bool load(const std::filesystem::path& configPath);
 
+        // Phase 1 (DISTRIBUTION-PHASE1.md §3.3) — Restore App Key.
+        // `input` is either an S... strkey (56 chars, single token) or a
+        // 12/24-word BIP-39 English mnemonic (whitespace-separated).
+        // Auto-detects which. Re-derives the keypair, overwrites
+        // inkternity_dev_keys.json, and reloads in-memory state. Returns
+        // true on success. False on: malformed S... (bad checksum or
+        // version), invalid mnemonic (bad words or bad checksum), or
+        // file write failure.
+        //
+        // DESTRUCTIVE: replaces the on-disk identity. Callers MUST gate
+        // this on an explicit user confirmation since share codes from
+        // the previous identity become unreachable.
+        bool restore_from_input(const std::string& input,
+                                const std::filesystem::path& configPath);
+
         bool is_loaded()                    const { return loaded; }
         const std::string& member_pubkey()  const { return memberPub; }
 

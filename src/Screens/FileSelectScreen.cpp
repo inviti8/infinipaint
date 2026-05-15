@@ -219,8 +219,160 @@ void FileSelectScreen::settings_view() {
                     main.input.set_clipboard_str(main.devKeys.app_pubkey());
                 }
             });
+
+            // DISTRIBUTION-PHASE1.md §3.3 — on-demand crypto surface.
+            // Per [[feedback-crypto-averse-users]] these stay collapsed by
+            // default; toggling either button expands its inline section.
+            text_button(gui, "toggle export app key",
+                exportKeyOpen ? "Hide secret" : "Export App Key", {
+                .wide = true,
+                .onClick = [this] {
+                    exportKeyOpen = !exportKeyOpen;
+                    if (exportKeyOpen) {
+                        // Mutual exclusion — collapse the other section so
+                        // the artist isn't looking at both at once.
+                        restoreKeyOpen = false;
+                        restoreConfirmStage = false;
+                    }
+                }
+            });
+            if (exportKeyOpen) export_app_key_section();
+
+            text_button(gui, "toggle restore app key",
+                restoreKeyOpen ? "Cancel restore" : "Restore App Key", {
+                .wide = true,
+                .onClick = [this] {
+                    restoreKeyOpen = !restoreKeyOpen;
+                    if (restoreKeyOpen) {
+                        exportKeyOpen = false;
+                        restoreConfirmStage = false;
+                        restoreFeedback.clear();
+                    } else {
+                        restoreKeyInput.clear();
+                        restoreConfirmStage = false;
+                    }
+                }
+            });
+            if (restoreKeyOpen) restore_app_key_section();
         } else {
             text_label(gui, "Not configured. Set up via your Heavymeta Portal settings.");
+        }
+    }
+}
+
+void FileSelectScreen::export_app_key_section() {
+    auto& gui = main.g.gui;
+    auto& io = gui.io;
+
+    CLAY_AUTO_ID({
+        .layout = {
+            .sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_FIT(0)},
+            .padding = CLAY_PADDING_ALL(io.theme->padding1),
+            .childGap = io.theme->childGap1,
+            .childAlignment = { .x = CLAY_ALIGN_X_LEFT, .y = CLAY_ALIGN_Y_TOP },
+            .layoutDirection = CLAY_TOP_TO_BOTTOM,
+        },
+        .backgroundColor = convert_vec4<Clay_Color>(io.theme->backColor1),
+    }) {
+        text_label(gui,
+            "Your private key. Anyone with this can host canvases as you. "
+            "Keep it safe; treat it like a password.");
+
+        std::string secret = main.devKeys.app_secret();
+        input_text_field(gui, "app secret display", "Secret key (S...)", &secret, {
+            .immutable = true
+        });
+        text_button(gui, "copy app secret", "Copy secret key", {
+            .wide = true,
+            .onClick = [this] {
+                main.input.set_clipboard_str(main.devKeys.app_secret());
+            }
+        });
+
+        if (!main.devKeys.app_mnemonic().empty()) {
+            text_label(gui, "Recovery phrase (12 words):");
+            std::string mnemo = main.devKeys.app_mnemonic();
+            input_text_field(gui, "app mnemonic display", "Mnemonic", &mnemo, {
+                .immutable = true
+            });
+            text_button(gui, "copy app mnemonic", "Copy recovery phrase", {
+                .wide = true,
+                .onClick = [this] {
+                    main.input.set_clipboard_str(main.devKeys.app_mnemonic());
+                }
+            });
+        } else {
+            // Migrated-from-hex installs never had a mnemonic generated.
+            // Surface this so the artist isn't confused by its absence.
+            text_label(gui,
+                "(No recovery phrase — this identity predates mnemonic "
+                "generation. The secret key above is your only backup.)");
+        }
+    }
+}
+
+void FileSelectScreen::restore_app_key_section() {
+    auto& gui = main.g.gui;
+    auto& io = gui.io;
+
+    CLAY_AUTO_ID({
+        .layout = {
+            .sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_FIT(0)},
+            .padding = CLAY_PADDING_ALL(io.theme->padding1),
+            .childGap = io.theme->childGap1,
+            .childAlignment = { .x = CLAY_ALIGN_X_LEFT, .y = CLAY_ALIGN_Y_TOP },
+            .layoutDirection = CLAY_TOP_TO_BOTTOM,
+        },
+        .backgroundColor = convert_vec4<Clay_Color>(io.theme->backColor1),
+    }) {
+        text_label(gui,
+            "Paste a secret key (S...) or a 12-word recovery phrase. "
+            "This will REPLACE your current identity — the share codes "
+            "for canvases hosted under your current keys will become "
+            "unreachable until you restore those keys again.");
+
+        input_text_field(gui, "restore key input",
+            "Secret key (S...) or 12-word phrase",
+            &restoreKeyInput);
+
+        if (!restoreFeedback.empty()) {
+            text_label(gui, restoreFeedback.c_str());
+        }
+
+        if (!restoreConfirmStage) {
+            text_button(gui, "restore app key step 1", "Restore (continue)", {
+                .wide = true,
+                .onClick = [this] {
+                    if (restoreKeyInput.empty()) {
+                        restoreFeedback = "Paste a secret key or recovery phrase first.";
+                        return;
+                    }
+                    restoreConfirmStage = true;
+                    restoreFeedback.clear();
+                }
+            });
+        } else {
+            text_label(gui,
+                "Confirm: replace the current app keypair with the one "
+                "derived from the input above? This cannot be undone.");
+            text_button(gui, "restore app key confirm", "Yes, replace my keys", {
+                .wide = true,
+                .onClick = [this] {
+                    const bool ok = main.devKeys.restore_from_input(
+                        restoreKeyInput, main.conf.configPath);
+                    if (ok) {
+                        restoreFeedback = "Restored. New app pubkey: " +
+                            main.devKeys.app_pubkey();
+                        restoreKeyInput.clear();
+                        restoreConfirmStage = false;
+                    } else {
+                        restoreFeedback =
+                            "Restore failed. Input did not parse as a "
+                            "valid S... key or 12/24-word BIP-39 phrase.";
+                        restoreConfirmStage = false;
+                    }
+                }
+            });
         }
     }
 }

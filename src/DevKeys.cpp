@@ -162,6 +162,97 @@ bool DevKeys::ensure_app_keypair(const std::filesystem::path& configPath) {
     return true;
 }
 
+namespace {
+
+// Trim leading + trailing whitespace. The user pastes from a clipboard
+// which often carries stray spaces/newlines.
+std::string trim(const std::string& s) {
+    auto isWs = [](char c) { return c == ' ' || c == '\t' || c == '\n' || c == '\r'; };
+    size_t lo = 0, hi = s.size();
+    while (lo < hi && isWs(s[lo])) ++lo;
+    while (hi > lo && isWs(s[hi - 1])) --hi;
+    return s.substr(lo, hi - lo);
+}
+
+// True if `s` looks like a single S... strkey (no internal whitespace,
+// 56 chars, leading 'S'). Validation of the actual checksum happens
+// downstream in Stellar::decode_seed.
+bool is_single_token_strkey_seed(const std::string& s) {
+    if (!Stellar::looks_like_seed_strkey(s)) return false;
+    for (char c : s) {
+        if (c == ' ' || c == '\t' || c == '\n' || c == '\r') return false;
+    }
+    return true;
+}
+
+}  // namespace
+
+bool DevKeys::restore_from_input(const std::string& rawInput,
+                                  const std::filesystem::path& configPath) {
+    const std::string input = trim(rawInput);
+    if (input.empty()) return false;
+
+    // Auto-detect: a 56-char single-token S... is the strkey path; anything
+    // with whitespace (or different length) is treated as a mnemonic.
+    Stellar::Seed seed{};
+    std::string newMnemonic;  // empty unless we restore from a mnemonic
+
+    if (is_single_token_strkey_seed(input)) {
+        if (!Stellar::decode_seed(input, seed)) return false;
+        // Restoring from raw S... — no mnemonic to record. The artist is
+        // expected to have the S... saved elsewhere; we deliberately do
+        // NOT generate a fresh mnemonic for them (would be wrong — there's
+        // no mnemonic that derives this specific seed via SEP-0005).
+    } else {
+        if (!Stellar::mnemonic_valid(input)) return false;
+        Stellar::Bip39Seed master{};
+        if (!Stellar::mnemonic_to_seed(input, "", master)) return false;
+        Stellar::sep0005_derive(master, /*account=*/0, seed);
+        newMnemonic = input;  // canonicalize to whatever the user pasted
+        std::fill(master.begin(), master.end(), uint8_t{0});
+    }
+
+    Stellar::PubKey pub{};
+    Stellar::seed_to_pubkey(seed, pub);
+    const std::string newPub    = Stellar::encode_pubkey(pub);
+    const std::string newSecret = Stellar::encode_seed(seed);
+    std::fill(seed.begin(), seed.end(), uint8_t{0});
+
+    // Read whatever's there so we preserve member_pub / member_secret /
+    // canvas_id (these aren't ours — they belong to dev_mint_token.py /
+    // future portal-issued credentials). Only the app_* triple changes.
+    const auto path = configPath / "inkternity_dev_keys.json";
+    nlohmann::json j;
+    try {
+        j = nlohmann::json::parse(read_file_to_string(path));
+    } catch (...) {
+        j = nlohmann::json::object();
+    }
+    j["app_pub"]      = newPub;
+    j["app_secret"]   = newSecret;
+    if (newMnemonic.empty()) {
+        j.erase("app_mnemonic");
+    } else {
+        j["app_mnemonic"] = newMnemonic;
+    }
+
+    try {
+        std::ofstream(path) << j.dump(2);
+    } catch (const std::exception& e) {
+        Logger::get().log("USERINFO",
+            std::string("DevKeys: restore failed to write file: ") + e.what());
+        return false;
+    }
+
+    Logger::get().log("USERINFO",
+        "DevKeys: restored app keypair via " +
+        std::string(newMnemonic.empty() ? "S... strkey" : "mnemonic") +
+        " — pub=" + newPub.substr(0, 8) + "...");
+
+    // Reload in-memory state from the now-canonical file.
+    return load(configPath);
+}
+
 bool DevKeys::load(const std::filesystem::path& configPath) {
     const auto path = configPath / "inkternity_dev_keys.json";
     std::string fileData;
