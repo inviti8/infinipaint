@@ -15,6 +15,8 @@
 #include <vector>
 
 #include "../PublishedCanvases.hpp"
+#include "SideInstances.hpp"
+#include <Helpers/Logger.hpp>
 
 #ifdef _WIN32
     #ifndef WIN32_LEAN_AND_MEAN
@@ -580,6 +582,165 @@ int test_host_only_roundtrip(const std::filesystem::path& canvas_path,
     return 0;
 }
 
+// Exercise the SideInstances manager directly: construct, spawn for
+// one real canvas, verify lock is taken by the child + is_alive +
+// is_managing, sleep idle, stop_all via dtor scope, verify lock and
+// process are both gone. Distinct from --test-host-only-roundtrip
+// (which exercises just the side-instance binary): this one exercises
+// the *manager* code path the main process will use at launch.
+int test_side_instances(const std::filesystem::path& canvas_path,
+                        int idle_seconds) {
+    log("=== test_side_instances path=" + canvas_path.string() +
+        " idle=" + std::to_string(idle_seconds) + "s ===");
+    if (!std::filesystem::exists(canvas_path)) {
+        log("FAIL: canvas does not exist: " + canvas_path.string());
+        return 1;
+    }
+    PublishedCanvases::release_lock(canvas_path);
+    std::error_code ec;
+    std::filesystem::remove(canvas_path.string() + ".lock", ec);
+
+    // SideInstances logs through Logger, which throws if no handler
+    // for the log type is registered. In normal startup MainProgram
+    // wires WORLDFATAL/USERINFO/CHAT; INFO is wired by main.cpp's
+    // init_logs and FATAL by Logger users elsewhere. In test mode
+    // those handlers aren't installed because we bypass MainProgram —
+    // wire fallback stderr handlers so SideInstances logs don't throw.
+    Logger::get().add_log("INFO", [](const std::string& s) {
+        std::cerr << "[INFO] " << s << std::endl;
+    });
+    Logger::get().add_log("WORLDFATAL", [](const std::string& s) {
+        std::cerr << "[WORLDFATAL] " << s << std::endl;
+    });
+
+    int rc = 0;
+    {
+        SideInstances mgr(g_self_exe);
+        if (!mgr.spawn(canvas_path)) {
+            log("FAIL: spawn returned false");
+            return 1;
+        }
+        if (!mgr.is_managing(canvas_path)) {
+            log("FAIL: is_managing returned false after spawn");
+            return 1;
+        }
+        log("manager reports is_managing=true");
+
+
+        // Side-instance needs ~1-2s to acquire its lock (Logger +
+        // FontData + DevKeys + try_acquire_lock chain). Poll for up
+        // to 5s.
+        auto deadline = std::chrono::steady_clock::now() +
+                        std::chrono::seconds(5);
+        bool lock_held = false;
+        while (std::chrono::steady_clock::now() < deadline) {
+            if (PublishedCanvases::is_locked_by_anyone(canvas_path)) {
+                lock_held = true;
+                break;
+            }
+            sleep_ms(100);
+        }
+        if (!lock_held) {
+            log("FAIL: side-instance did not acquire lock within 5s");
+            return 1;
+        }
+        log("side-instance acquired lock");
+        if (!mgr.is_alive(canvas_path)) {
+            log("FAIL: is_alive returned false after lock acquired");
+            return 1;
+        }
+        sleep_ms(idle_seconds * 1000);
+        if (!mgr.is_alive(canvas_path)) {
+            log("FAIL: side-instance died during idle");
+            return 1;
+        }
+        log("manager state stable through " +
+            std::to_string(idle_seconds) + "s idle");
+        // Leaving scope -> mgr.~SideInstances() -> stop_all().
+    }
+
+    // Post-dtor: lock should be released, no managed processes left.
+    sleep_ms(200);
+    if (PublishedCanvases::is_locked_by_anyone(canvas_path)) {
+        log("FAIL: lock still held after manager dtor");
+        rc = 1;
+    } else {
+        log("manager dtor released lock cleanly");
+    }
+    if (rc == 0) log("PASS");
+    return rc;
+}
+
+// Exercise the launch-time scan-and-spawn flow: scan a saves dir,
+// spawn a side-instance for each unlocked marker, verify all became
+// alive + locked, idle, then dtor stops all.
+//
+// Requires the caller to have set up <savesDir> with the canvases +
+// .publish markers ahead of time. Use the Toolbar's "Publish" toggle
+// in the running app to create markers, or `touch` them next to the
+// canvas files for a synthetic test.
+int test_scan_and_spawn(const std::filesystem::path& saves_dir,
+                        int idle_seconds) {
+    log("=== test_scan_and_spawn dir=" + saves_dir.string() +
+        " idle=" + std::to_string(idle_seconds) + "s ===");
+    if (!std::filesystem::is_directory(saves_dir)) {
+        log("FAIL: not a directory: " + saves_dir.string());
+        return 1;
+    }
+    // Register Logger fallbacks (same reason as test_side_instances).
+    Logger::get().add_log("INFO", [](const std::string& s) {
+        std::cerr << "[INFO] " << s << std::endl;
+    });
+    Logger::get().add_log("WORLDFATAL", [](const std::string& s) {
+        std::cerr << "[WORLDFATAL] " << s << std::endl;
+    });
+
+    int rc = 0;
+    {
+        SideInstances mgr(g_self_exe);
+        const size_t spawned = mgr.scan_and_spawn(saves_dir);
+        if (spawned == 0) {
+            log("FAIL: scan_and_spawn returned 0 — no markers in " +
+                saves_dir.string() + "? (Create one via the Toolbar "
+                "Publish toggle, or touch a .publish sidecar)");
+            return 1;
+        }
+        log("scan_and_spawn spawned " + std::to_string(spawned) +
+            " side-instance(s)");
+
+        // Wait for each managed canvas to acquire its lock.
+        auto deadline = std::chrono::steady_clock::now() +
+                        std::chrono::seconds(10);
+        for (const auto& canvasPath : mgr.managed()) {
+            while (std::chrono::steady_clock::now() < deadline) {
+                if (PublishedCanvases::is_locked_by_anyone(canvasPath)) break;
+                sleep_ms(100);
+            }
+            if (!PublishedCanvases::is_locked_by_anyone(canvasPath)) {
+                log("FAIL: " + canvasPath.filename().string() +
+                    " never acquired lock");
+                return 1;
+            }
+            log("locked: " + canvasPath.filename().string());
+        }
+
+        sleep_ms(idle_seconds * 1000);
+        for (const auto& canvasPath : mgr.managed()) {
+            if (!mgr.is_alive(canvasPath)) {
+                log("FAIL: " + canvasPath.filename().string() +
+                    " died during idle");
+                return 1;
+            }
+        }
+        log("all side-instances alive after " +
+            std::to_string(idle_seconds) + "s idle");
+        // Leaving scope → dtor → stop_all.
+    }
+    sleep_ms(200);
+    log("PASS");
+    return rc;
+}
+
 int test_all_spawn() {
     log("=== test_all_spawn (deterministic suite) ===");
     int rc = 0;
@@ -687,6 +848,24 @@ std::optional<int> dispatch(int argc, char** argv) {
         }
         int idle = (argc >= 4) ? std::atoi(argv[3]) : 2;
         return test_host_only_roundtrip(argv[2], idle);
+    }
+    if (flag == "--test-side-instances") {
+        if (argc < 3) {
+            log("usage: --test-side-instances <canvas-path> "
+                "[<idle-seconds>]");
+            return 2;
+        }
+        int idle = (argc >= 4) ? std::atoi(argv[3]) : 2;
+        return test_side_instances(argv[2], idle);
+    }
+    if (flag == "--test-scan-and-spawn") {
+        if (argc < 3) {
+            log("usage: --test-scan-and-spawn <saves-dir> "
+                "[<idle-seconds>]");
+            return 2;
+        }
+        int idle = (argc >= 4) ? std::atoi(argv[3]) : 2;
+        return test_scan_and_spawn(argv[2], idle);
     }
     if (flag == "--test-all-spawn") return test_all_spawn();
 

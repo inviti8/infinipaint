@@ -24,6 +24,17 @@
 //                              spawn the real --host-only side-instance,
 //                              wait for READY, idle N seconds, STOP,
 //                              verify clean exit + lock released
+//     --test-side-instances <canvas-path> [<idle-seconds>]
+//                              exercise the SideInstances manager: spawn
+//                              one side-instance, verify lock + is_alive
+//                              + is_managing, idle, verify dtor stops it
+//                              and releases the lock
+//     --test-scan-and-spawn <saves-dir> [<idle-seconds>]
+//                              launch-time flow: scan saves-dir for
+//                              .publish markers, spawn a side-instance
+//                              for each unlocked marker, verify all are
+//                              alive + locked, idle, verify dtor stops
+//                              all and releases all locks
 //     --test-all-spawn         (runs the deterministic non-orphan suite)
 //
 //   Child-side (run by the harness, not invoked manually):

@@ -258,34 +258,39 @@ void FileSelectScreen::settings_view() {
             text_label(gui, "Not configured. Set up via your Heavymeta Portal settings.");
         }
 
-        // DISTRIBUTION-PHASE1.md §4 — auto-hosting status.
+        // DISTRIBUTION-PHASE1.md §4.3 — auto-hosting status.
         //
-        // With per-canvas markers there's no central "what is published"
-        // state on MainProgram — the marker travels with each canvas
-        // file. We surface two pieces here:
-        //   - what THIS instance has locked at startup (hostedCanvasPath)
-        //   - the count of all canvases marked published in saves/
-        // Per-file detail is in the file-list badge.
+        // Each marked canvas gets its own headless `--host-only`
+        // side-instance OS process, managed by `main.sideInstances`.
+        // We surface:
+        //   - how many side-instances this Inkternity currently runs
+        //     (per-canvas detail is in the file-list badges)
+        //   - total marker count in saves/, to clarify the
+        //     "we run K of N" case
         text_label_centered(gui, "Auto-hosting");
-        if (main.hostedCanvasPath) {
-            text_label(gui, ("This instance hosts: " +
-                main.hostedCanvasPath->filename().string()).c_str());
-            text_label_light(gui,
-                "(Background hosting wiring is still pending — the canvas "
-                "is locked but not yet served. Open it manually + Host for "
-                "now.)");
+        const auto managed = main.sideInstances
+            ? main.sideInstances->managed()
+            : std::vector<std::filesystem::path>{};
+        if (!managed.empty()) {
+            text_label(gui, ("This Inkternity hosts " +
+                std::to_string(managed.size()) +
+                " canvas(es) via side-instances:").c_str());
+            for (const auto& p : managed) {
+                text_label_light(gui,
+                    ("  - " + p.filename().string()).c_str());
+            }
         } else {
-            text_label(gui, "This instance hosts: nothing");
+            text_label(gui, "This Inkternity hosts: nothing");
         }
         const auto allPublished = PublishedCanvases::scan_published(savePath);
         if (!allPublished.empty()) {
             text_label_light(gui,
                 ("Marked published in saves/: " +
                  std::to_string(allPublished.size()) + " canvas(es).").c_str());
-            if (!main.hostedCanvasPath) {
+            if (managed.size() < allPublished.size()) {
                 text_label_light(gui,
-                    "All published canvases are already locked by other "
-                    "Inkternity instances. Close one to free a slot.");
+                    "Some markers are already locked by another running "
+                    "Inkternity (or by a stale side-instance still flushing).");
             }
         } else {
             text_label(gui,

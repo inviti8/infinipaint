@@ -491,18 +491,21 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv) {
         mS.m->devKeys.ensure_app_keypair(mS.m->conf.configPath);
         mS.m->devKeys.load(mS.m->conf.configPath);
 
-        // DISTRIBUTION-PHASE1.md §4 — claim a published canvas for this
-        // instance to auto-host. Per-canvas marker (lives next to the
-        // file) + per-canvas PID lock; first instance to launch grabs the
-        // first published canvas, second instance grabs the next, etc.
-        // Just records the claim here; the runtime World spawning is the
-        // deferred piece (see MainProgram::backgroundHost).
-        mS.m->hostedCanvasPath = PublishedCanvases::claim_first_available(
+        // DISTRIBUTION-PHASE1.md §4.3 — auto-host every published
+        // canvas via a `--host-only` side-instance OS process. Each
+        // marker in `saves/` whose lock isn't already held gets its
+        // own headless child; the main process retains no in-process
+        // host state (cap-1-per-process from NetLibrary still applies
+        // to *this* process, but every side-instance is its own
+        // process with its own NetLibrary).
+        mS.m->sideInstances = std::make_unique<SideInstances>(
+            ProcessTests::self_exe_path());
+        const size_t spawned = mS.m->sideInstances->scan_and_spawn(
             mS.m->conf.configPath / "saves");
-        if (mS.m->hostedCanvasPath) {
+        if (spawned > 0) {
             Logger::get().log("USERINFO",
-                "Auto-host: claimed " + mS.m->hostedCanvasPath->string() +
-                " (background hosting wiring is pending)");
+                "Auto-host: spawned " + std::to_string(spawned) +
+                " side-instance(s) for published canvas(es)");
         }
         #ifdef __EMSCRIPTEN__
             emscripten_set_beforeunload_callback((void*)mSPtr, emscripten_before_unload);

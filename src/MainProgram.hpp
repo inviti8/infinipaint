@@ -18,6 +18,7 @@
 #include "GlobalConfig.hpp"
 #include "DevKeys.hpp"
 #include "PublishedCanvases.hpp"
+#include "Distribution/SideInstances.hpp"
 #include <optional>
 #include "Screens/Screen.hpp"
 
@@ -142,25 +143,17 @@ class MainProgram {
         // DISTRIBUTION-PHASE1.md §4 — tagged-file auto-hosting.
         //
         // Per-canvas state lives next to the canvas file (publish marker
-        // sidecar + lock file). See PublishedCanvases.hpp for the model.
-        // No central registry on MainProgram — `hostedCanvasPath` records
-        // the *one* canvas this process has locked at startup (cap-1 per
-        // process is structural; cap-N globally falls out from launching
-        // N Inkternity instances, each grabbing a different published
-        // canvas via PublishedCanvases::claim_first_available).
+        // sidecar + lock file); each canvas with a marker gets hosted
+        // by its own `--host-only` child OS process spawned + managed
+        // by this `SideInstances`. The map keys are canonical canvas
+        // paths; values are SDL_Process handles + stdin pipes for
+        // graceful shutdown.
         //
-        // Empty when this instance hosts nothing (no published canvases
-        // marked, or all of them already locked by other instances).
-        std::optional<std::filesystem::path> hostedCanvasPath;
-
-        // Future-spawned background World for `hostedCanvasPath` — the
-        // foreground editing surface (`world`) coexists with this once
-        // the runtime auto-host work lands. Distinct from `world`; the
-        // main loop only renders `world`. Currently unused (the runtime
-        // spawning is the deferred piece of B); the lock acquisition
-        // already lands so the multi-instance coordination is provable
-        // even before the World wiring exists.
-        std::shared_ptr<World> backgroundHost;
+        // Constructed early in main.cpp (after MainProgram + DevKeys
+        // are up); torn down by the MainProgram dtor, which signals
+        // STOP to every side-instance and waits for clean exit (with
+        // a force-kill backstop on timeout).
+        std::unique_ptr<SideInstances> sideInstances;
 
         std::optional<unsigned> keybindWaiting;
         void input_add_file_to_canvas_callback(const CustomEvents::AddFileToCanvasEvent& addFile);
