@@ -102,6 +102,7 @@
 #include "Brushes/LibMyPaintBridgeTest.hpp"
 #include "Brushes/LibMyPaintStrokeTest.hpp"
 #include "Distribution/ProcessTests.hpp"
+#include "Distribution/HostOnly.hpp"
 
 // Use dedicated graphics card on Windows
 #ifdef _WIN32
@@ -408,6 +409,14 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv) {
     // full flag list.
     ProcessTests::set_self_exe_path(ProcessTests::resolve_self_exe(argv[0]));
     if (auto rc = ProcessTests::dispatch(argc, argv)) {
+        return *rc == 0 ? SDL_APP_SUCCESS : SDL_APP_FAILURE;
+    }
+
+    // DP1-B `--host-only` side-instance entry (DISTRIBUTION-PHASE1.md
+    // §4.3). Headless host process spawned by the main Inkternity for
+    // each published canvas. Must dispatch before SDL_INIT_VIDEO /
+    // window setup — the side-instance is window-less.
+    if (auto rc = HostOnly::dispatch(argc, argv)) {
         return *rc == 0 ? SDL_APP_SUCCESS : SDL_APP_FAILURE;
     }
 

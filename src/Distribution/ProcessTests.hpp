@@ -20,6 +20,10 @@
 //     --test-spawn-orphan-detect <result-file>
 //     --verify-orphan-detect <child-pid> <result-file> [<timeout-sec>]
 //     --test-lock-handoff <canvas-path>
+//     --test-host-only-roundtrip <canvas-path> [<idle-seconds>]
+//                              spawn the real --host-only side-instance,
+//                              wait for READY, idle N seconds, STOP,
+//                              verify clean exit + lock released
 //     --test-all-spawn         (runs the deterministic non-orphan suite)
 //
 //   Child-side (run by the harness, not invoked manually):

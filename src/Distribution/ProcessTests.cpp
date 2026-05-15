@@ -17,8 +17,12 @@
 #include "../PublishedCanvases.hpp"
 
 #ifdef _WIN32
-    #define WIN32_LEAN_AND_MEAN
-    #define NOMINMAX
+    #ifndef WIN32_LEAN_AND_MEAN
+        #define WIN32_LEAN_AND_MEAN
+    #endif
+    #ifndef NOMINMAX
+        #define NOMINMAX
+    #endif
     #include <windows.h>
     #include <process.h>
 #else
@@ -474,6 +478,108 @@ int test_lock_handoff(const std::filesystem::path& canvas_path) {
     return 0;
 }
 
+// Spawn the real --host-only side-instance against a canvas file,
+// drive it through the READY → idle → STOP → STOPPING → exit
+// lifecycle, and verify the lock was released cleanly. This is the
+// smoke test for the actual hosting code path (NetLibrary::init,
+// World::start_hosting, idle loop, graceful shutdown) — distinct
+// from --test-lock-handoff which only verifies the lock primitive
+// against a stub child.
+int test_host_only_roundtrip(const std::filesystem::path& canvas_path,
+                             int idle_seconds) {
+    log("=== test_host_only_roundtrip path=" + canvas_path.string() +
+        " idle=" + std::to_string(idle_seconds) + "s ===");
+    if (!std::filesystem::exists(canvas_path)) {
+        log("FAIL: canvas file does not exist: " + canvas_path.string());
+        return 1;
+    }
+    // Defensive: clear any stale lock from a prior aborted run.
+    PublishedCanvases::release_lock(canvas_path);
+    std::error_code ec;
+    std::filesystem::remove(canvas_path.string() + ".lock", ec);
+
+    SDL_Process* p = spawn_self({
+        "--host-only",
+        canvas_path.string()
+    }, true);
+    if (!p) return 1;
+    SDL_IOStream* in  = SDL_GetProcessInput(p);
+    SDL_IOStream* out = SDL_GetProcessOutput(p);
+    if (!in || !out) {
+        log("FAIL: no stdio");
+        SDL_KillProcess(p, true);
+        SDL_DestroyProcess(p);
+        return 1;
+    }
+
+    // Phase 1: wait for READY (host has start_hosting'd successfully).
+    auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(30);
+    std::string acc = read_until(out, "READY", deadline);
+    if (acc.find("READY") == std::string::npos) {
+        log("FAIL: never saw READY within 30s. stdout: " + acc);
+        SDL_KillProcess(p, true);
+        SDL_DestroyProcess(p);
+        return 1;
+    }
+    log("host reported READY (start_hosting succeeded)");
+
+    // Verify the lock is held by the side-instance.
+    if (!PublishedCanvases::is_locked_by_anyone(canvas_path)) {
+        log("FAIL: is_locked_by_anyone returned false after READY");
+        SDL_KillProcess(p, true);
+        SDL_DestroyProcess(p);
+        return 1;
+    }
+    log("lock confirmed held by side-instance");
+
+    // Phase 2: let it idle so NetLibrary::update / world->update tick
+    // for a while. Real subscriber-paint testing happens externally;
+    // this just verifies the loop doesn't crash on no-traffic ticks.
+    log("idling " + std::to_string(idle_seconds) + "s to exercise the loop");
+    sleep_ms(idle_seconds * 1000);
+    {
+        int dummy;
+        if (SDL_WaitProcess(p, false, &dummy)) {
+            log("FAIL: side-instance unexpectedly exited during idle "
+                "(exit_code=" + std::to_string(dummy) + ")");
+            SDL_DestroyProcess(p);
+            return 1;
+        }
+    }
+
+    // Phase 3: send STOP, expect STOPPING + clean exit.
+    const std::string stop = "STOP\n";
+    if (SDL_WriteIO(in, stop.data(), stop.size()) != stop.size()) {
+        log("FAIL: write stdin");
+        SDL_KillProcess(p, true);
+        SDL_DestroyProcess(p);
+        return 1;
+    }
+    SDL_FlushIO(in);
+
+    deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+    acc = read_until(out, "STOPPING", deadline);
+    int exit_code = -1;
+    SDL_WaitProcess(p, true, &exit_code);
+    SDL_DestroyProcess(p);
+
+    if (acc.find("STOPPING") == std::string::npos) {
+        log("FAIL: never saw STOPPING after STOP. stdout: " + acc);
+        return 1;
+    }
+    if (exit_code != 0) {
+        log("FAIL: host exit_code=" + std::to_string(exit_code));
+        return 1;
+    }
+    sleep_ms(200);
+    if (PublishedCanvases::is_locked_by_anyone(canvas_path)) {
+        log("FAIL: lock still held after side-instance exited");
+        return 1;
+    }
+    log("PASS");
+    return 0;
+}
+
 int test_all_spawn() {
     log("=== test_all_spawn (deterministic suite) ===");
     int rc = 0;
@@ -572,6 +678,15 @@ std::optional<int> dispatch(int argc, char** argv) {
             return 2;
         }
         return test_lock_handoff(argv[2]);
+    }
+    if (flag == "--test-host-only-roundtrip") {
+        if (argc < 3) {
+            log("usage: --test-host-only-roundtrip <canvas-path> "
+                "[<idle-seconds>]");
+            return 2;
+        }
+        int idle = (argc >= 4) ? std::atoi(argv[3]) : 2;
+        return test_host_only_roundtrip(argv[2], idle);
     }
     if (flag == "--test-all-spawn") return test_all_spawn();
 
