@@ -5,7 +5,14 @@
     <name>Inkternity</name>
     <summary>Comic creation on an infinite canvas</summary>
     <metadata_license>CC0-1.0</metadata_license>
-    <project_license>MIT</project_license>
+    <!-- Inkternity itself is BUSL-1.1 (see /LICENSE). Some inherited
+         code from upstream InfiniPaint remains under MIT — see
+         /NOTICE and assets/data/third_party_licenses/InfiniPaint/.
+         appstream uses an SPDX expression for project_license;
+         BUSL-1.1 isn't yet in the universally-shipped SPDX list, so
+         declare it via LicenseRef so older appstream toolchains
+         don't reject the metainfo. -->
+    <project_license>LicenseRef-BUSL-1.1</project_license>
 
     <branding>
         <color type="primary" scheme_preference="light">#83b9b2</color>

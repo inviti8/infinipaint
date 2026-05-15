@@ -7,7 +7,7 @@
 		<a href="docs/design/PHASE1.md">🗺️ Phase 1 Design</a>
 	</p>
 	<p>
-		<a href="https://opensource.org/license/mit"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-blue"/></a>
+		<a href="LICENSE"><img alt="BUSL-1.1 License" src="https://img.shields.io/badge/license-BUSL--1.1-blue"/></a>
 	</p>
 </div>
 
@@ -19,7 +19,9 @@ On top of that canvas Inkternity adds a directed *waypoint graph* that captures 
 
 ### A fork of InfiniPaint
 
-Inkternity is a fork of [ErrorAtLine0/infinipaint](https://github.com/ErrorAtLine0/infinipaint) — the infinite-canvas drawing app it inherits everything else from. The canvas, the rendering pipeline, layers, collaboration, the file format, the existing tool set: all of it is InfiniPaint's work. Inkternity layers a comic-production workflow on top, and stays MIT just like upstream.
+Inkternity is a fork of [ErrorAtLine0/infinipaint](https://github.com/ErrorAtLine0/infinipaint) — the infinite-canvas drawing app it inherits everything else from. The canvas, the rendering pipeline, layers, collaboration, the file format, the existing tool set: all of it is InfiniPaint's work. Inkternity layers a comic-production workflow on top.
+
+Inkternity and upstream InfiniPaint diverged in 2026: upstream is now GPL-3.0, Inkternity is BUSL-1.1 (with a 2029 transition to AGPL-3.0). See the License section below + `NOTICE` for the lineage and the MIT-era code Inkternity carries from before the divergence.
 
 Files saved by Inkternity use the `.inkternity` extension; existing `.infpnt` files from InfiniPaint load read-only-on-disk, and the next save migrates them to `.inkternity` (the original `.infpnt` is left in place — no destructive auto-rename).
 
@@ -59,4 +61,8 @@ Issue reports (bugs and feature requests) welcome. For pull requests of any mean
 
 ## License
 
-Inkternity is MIT licensed, matching InfiniPaint upstream. Third-party components retain their respective licenses; see the `About` menu in-app for the full list.
+Inkternity is distributed under the [Business Source License 1.1](LICENSE) (BUSL-1.1). Non-production use — development, testing, education, academic research, personal non-commercial use — is permitted today; members of the HEAVYMETA cooperative get the production-use grant via their Membership Agreement. The license converts to AGPL-3.0 on the change date (2029-03-09) or on the fourth anniversary of any specific version's first publication, whichever comes first.
+
+Inkternity carries code originally licensed under MIT by Yousef Khadadeh as InfiniPaint upstream; the MIT grant for that code is perpetual and the verbatim notice is preserved at `assets/data/third_party_licenses/InfiniPaint/LICENSE.txt`. Upstream relicensed its master branch to GPL-3.0 on 2026-05-11 — Inkternity's fork point predates that, so we carry no GPL-3.0 obligation, but we also don't pull post-relicense upstream changes (BUSL and GPL-3.0 aren't compatible in a single distribution). See `NOTICE` for the full lineage.
+
+Third-party components retain their respective licenses; see the `About` menu in-app for the full list.
