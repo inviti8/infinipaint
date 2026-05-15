@@ -473,6 +473,43 @@ void Toolbar::top_toolbar() {
                 }
             });
 
+            // Inline canvas-rename field. Bound to `canvasNameInput`;
+            // when not focused, we mirror the current canvas's filename
+            // stem each frame. Pressing Enter commits the rename via
+            // World::rename_on_disk (moves the .inkternity + every
+            // sidecar). Pressing Escape or clicking away discards the
+            // pending edit (the per-frame sync restores the field).
+            // Hosted canvases (collab/subscription) aren't renamable —
+            // moving the file out from under live subscribers is unsafe.
+            if (!main.world->clientStillConnecting && !main.world->netServer && !main.world->netClient) {
+                if (!canvasNameInputFocused) {
+                    canvasNameInput = main.world->filePath.empty()
+                        ? main.world->name
+                        : main.world->filePath.stem().string();
+                }
+                input_text(gui, "canvas filename", &canvasNameInput, {
+                    .emptyText = "Canvas name",
+                    .onEnter = [&] {
+                        if (!main.world->rename_on_disk(canvasNameInput)) {
+                            // Failure: revert the input to the current
+                            // on-disk name so the user sees what's
+                            // actually persisted, not their failed try.
+                            canvasNameInput = main.world->filePath.empty()
+                                ? main.world->name
+                                : main.world->filePath.stem().string();
+                        }
+                        canvasNameInputFocused = false;
+                    },
+                    .onSelect = [&] { canvasNameInputFocused = true; },
+                    .onDeselect = [&] {
+                        // Discard pending edit on focus loss without
+                        // Enter — the next frame's sync will reset the
+                        // buffer to the on-disk stem.
+                        canvasNameInputFocused = false;
+                    },
+                });
+            }
+
             if(!main.world->clientStillConnecting) {
                 if(main.world->netObjMan.is_connected()) {
                     icon_button_top_toolbar("Player List Toggle Button", "data/icons/list.svg", playerMenuOpen, [&] {

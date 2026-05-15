@@ -90,6 +90,22 @@ class World {
         void save_to_file(const std::filesystem::path& filePathToSaveAt, bool disableThumbnailSaving = false);
         void load_from_file(const std::filesystem::path& filePathToLoadFrom, std::string_view buffer);
 
+        // Rename the canvas file on disk to `newStem.inkternity` in the
+        // same directory, carrying every sidecar (thumbnail, publish
+        // marker, lock if held by us) with it. Updates filePath + name
+        // on success. Coordinates with main.sideInstances to stop any
+        // side-instance hosting the old path before the move, so the
+        // lock file is released and the move can succeed.
+        //
+        // Returns true on success. Returns false on:
+        //   - empty newStem
+        //   - newStem same as current stem (no-op)
+        //   - destination file already exists
+        //   - filesystem error during the move
+        // Caller is responsible for surfacing failure to the user; this
+        // method only logs.
+        bool rename_on_disk(const std::string& newStem);
+
         void undo_with_checks();
         void redo_with_checks();
 

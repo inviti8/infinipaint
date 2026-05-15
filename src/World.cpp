@@ -9,6 +9,8 @@
 #include <Helpers/NetworkingObjects/NetObjGenericSerializedClass.hpp>
 #include <Helpers/NetworkingObjects/DelayUpdateSerializedClassManager.hpp>
 #include "Subscription/TokenVerifier.hpp"
+#include "PublishedCanvases.hpp"
+#include "MainProgram.hpp"
 #include <cereal/types/string.hpp>
 #include <cereal/types/unordered_map.hpp>
 #include "DrawingProgram/Layers/DrawingProgramLayerListItem.hpp"
@@ -760,6 +762,95 @@ void World::load_file(cereal::PortableBinaryInputArchive& a, VersionNumber versi
         a(appPubkeyAtPublish);
     }
     // Older files default to empty (unpublished) — exactly what we want.
+}
+
+bool World::rename_on_disk(const std::string& newStem) {
+    if (newStem.empty()) {
+        Logger::get().log("WORLDFATAL",
+            "Rename failed: new name is empty");
+        return false;
+    }
+    if (filePath.empty()) {
+        Logger::get().log("WORLDFATAL",
+            "Rename failed: canvas hasn't been saved yet (use Save As)");
+        return false;
+    }
+    // Filenames can't contain these on Windows + are generally a bad
+    // idea on POSIX too. Reject up front rather than letting the move
+    // partially succeed across a half-renamed sidecar set.
+    static constexpr std::string_view forbidden = "<>:\"/\\|?*";
+    if (newStem.find_first_of(forbidden) != std::string::npos) {
+        Logger::get().log("WORLDFATAL",
+            "Rename failed: name contains invalid characters (" +
+            std::string(forbidden) + ")");
+        return false;
+    }
+    const auto oldPath = filePath;
+    if (oldPath.stem().string() == newStem) {
+        // No-op rename — silently succeed.
+        return true;
+    }
+    const auto newPath = oldPath.parent_path() /
+                         (newStem + std::string(DOT_FILE_EXTENSION));
+    std::error_code ec;
+    if (std::filesystem::exists(newPath, ec)) {
+        Logger::get().log("WORLDFATAL",
+            "Rename failed: " + newPath.filename().string() +
+            " already exists");
+        return false;
+    }
+
+    // Stop any side-instance hosting this canvas under the old name so
+    // the .lock file is released and the .inkternity file is no longer
+    // open for write. No-op if nothing is managing this path.
+    if (main.sideInstances) {
+        main.sideInstances->stop(oldPath);
+    }
+    // If we (this foreground process) hold the lock, release it too.
+    PublishedCanvases::release_lock(oldPath);
+
+    // The canvas itself + every sidecar that lives at <oldPath>.<suffix>.
+    // We rename whatever exists today; missing sidecars are silently
+    // skipped (e.g. a never-published canvas has no .publish sidecar).
+    const std::vector<std::string> sidecarSuffixes = {
+        ".jpg",       // thumbnail (saved next to the canvas)
+        ".publish",   // PublishedCanvases marker
+        ".lock",      // PublishedCanvases PID lock (defensive — we
+                      // released ours above, but a stale one from a
+                      // crashed prior process could still be on disk)
+    };
+
+    std::filesystem::rename(oldPath, newPath, ec);
+    if (ec) {
+        Logger::get().log("WORLDFATAL",
+            "Rename failed for " + oldPath.filename().string() +
+            " -> " + newPath.filename().string() + ": " + ec.message());
+        return false;
+    }
+    for (const auto& suffix : sidecarSuffixes) {
+        const auto oldSidecar = std::filesystem::path(
+            oldPath.string() + suffix);
+        if (!std::filesystem::exists(oldSidecar, ec)) continue;
+        const auto newSidecar = std::filesystem::path(
+            newPath.string() + suffix);
+        std::filesystem::rename(oldSidecar, newSidecar, ec);
+        if (ec) {
+            // Non-fatal: the canvas file did move; only the sidecar
+            // failed. Log and continue. Worst case the artist
+            // re-publishes / a stale .lock gets reclaimed by stale-PID
+            // detection.
+            Logger::get().log("WORLDFATAL",
+                "Sidecar " + oldSidecar.filename().string() +
+                " could not move: " + ec.message());
+            ec.clear();
+        }
+    }
+
+    filePath = newPath;
+    set_name(newStem);
+    Logger::get().log("USERINFO",
+        "Canvas renamed to " + newPath.filename().string());
+    return true;
 }
 
 WorldScalar World::calculate_zoom_from_uniform_zoom(WorldScalar uniformZoom, WorldVec oldWindowSize) {
