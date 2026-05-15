@@ -26,6 +26,11 @@ modules:
   - name: zstd
     buildsystem: cmake-ninja
     subdir: build/cmake
+    config-opts:
+      # cmake-ninja's GNUInstallDirs defaults to lib64 on 64-bit Linux,
+      # but the freedesktop runtime's ld.so.cache only searches /app/lib.
+      # Force lib so the resulting .so lands where the linker looks.
+      - -DCMAKE_INSTALL_LIBDIR=lib
     sources:
       - type: git
         tag: v1.5.7
@@ -35,6 +40,7 @@ modules:
     config-opts:
       - -DNO_MEDIA=ON
       - -DCMAKE_BUILD_TYPE=Release
+      - -DCMAKE_INSTALL_LIBDIR=lib
     sources:
       - type: git
         tag: v0.23.2
@@ -43,6 +49,7 @@ modules:
     buildsystem: cmake-ninja
     config-opts:
       - -DTBB_TEST=OFF
+      - -DCMAKE_INSTALL_LIBDIR=lib
     sources:
       - type: git
         tag: v2022.0.0
@@ -59,6 +66,7 @@ modules:
         - -DSDL_INSTALL_TESTS=OFF
         - -DSDL_WAYLAND=OFF
         - -DSDL_X11=ON
+        - -DCMAKE_INSTALL_LIBDIR=lib
     sources:
       - type: git
         tag: release-3.4.4
