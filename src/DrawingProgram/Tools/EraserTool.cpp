@@ -108,6 +108,14 @@ void EraserTool::erase_between_points(const Vector2f& start, const Vector2f& end
             const float localRadius = (probe - localStart).norm();
             layer.erase_along_segment(localStart, localEnd, localRadius);
             container.commit_update(drawP);
+            // Broadcast the mutated component to remote peers. Without
+            // this, the eraser is local-only — commit_update just
+            // invalidates the local draw cache. Mirrors the
+            // change_stroke_color path in DrawingProgramSelection.cpp.
+            // finalUpdate=false: this is one segment of a continuous
+            // eraser stroke; the delayed-update manager batches
+            // segments and flushes at the natural end-of-frame point.
+            container.send_comp_update(drawP, false);
             drawP.drawCache.invalidate_cache_at_optional_aabb(container.get_world_bounds());
             return false;
         }
