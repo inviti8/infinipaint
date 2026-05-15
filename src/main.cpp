@@ -101,6 +101,7 @@
 #include "CustomEvents.hpp"
 #include "Brushes/LibMyPaintBridgeTest.hpp"
 #include "Brushes/LibMyPaintStrokeTest.hpp"
+#include "Distribution/ProcessTests.hpp"
 
 // Use dedicated graphics card on Windows
 #ifdef _WIN32
@@ -399,6 +400,16 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv) {
         }
     }
 #endif // HVYM_HAS_LIBMYPAINT
+
+    // DP1-B test harness (DISTRIBUTION-PHASE1.md §4): cross-platform
+    // spawn / kill / stdin-stop / parent-death / lock-handoff exercises
+    // for the side-instance auto-host plumbing. Same bypass-before-init
+    // pattern as the mypaint flags above. See ProcessTests.hpp for the
+    // full flag list.
+    ProcessTests::set_self_exe_path(ProcessTests::resolve_self_exe(argv[0]));
+    if (auto rc = ProcessTests::dispatch(argc, argv)) {
+        return *rc == 0 ? SDL_APP_SUCCESS : SDL_APP_FAILURE;
+    }
 
     std::vector<std::filesystem::path> listOfFilesToOpenFromCommand;
     for(int i = 1; i < argc; i++)

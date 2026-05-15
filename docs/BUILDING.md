@@ -51,6 +51,22 @@ cmake --build . --config Release
 translation units (notably `src/Toolbar.cpp`) hit C1060 "compiler is out
 of heap space" on the default 32-bit `cl.exe`.
 
+### Incremental rebuilds on Windows
+`cmake` itself is fetched by Conan and **is not on `PATH`** unless you've
+sourced the Conan build env (`generators\conanbuild.bat`) for the
+current shell. If a tool/agent reports `cmake: command not found` while
+in this repo, that's why. Two ways to invoke it:
+
+- Source the env first: `cd build && .\generators\conanbuild.bat`, then
+  `cmake --build . --config Release`.
+- Or call cmake by full path, which the cache records:
+  ```
+  for /f "tokens=2 delims==" %p in ('findstr CMAKE_COMMAND:INTERNAL= build\CMakeCache.txt') do "%p" --build build --config Release --target main -- -m:2
+  ```
+  In PowerShell, watch for arg-splitting on `-m:2` — wrap the MSBuild
+  flags in single quotes via `cmd /c '... -- -m:2'` if PowerShell splits
+  them.
+
 After building the project, the repo's `assets/data/` folder must be
 reachable as `data/` next to `inkternity.exe` — either copy it or, more
 conveniently, create a directory junction:
