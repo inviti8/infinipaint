@@ -353,71 +353,120 @@ Host menu's SUBSCRIPTION button.
 
 ### 4.3 App-launch sequence
 
+> **Implementation reality found mid-build:** the cap-of-3 simultaneous
+> hosts originally scoped in §8.5 is **not currently buildable** — see the
+> NetLibrary architectural constraint below. Phase 1 ships **cap-of-1**;
+> the cap-3 promise reverts to a future workstream gated on a NetLibrary
+> refactor. The §8.5 decision is amended accordingly.
+
 In `main.cpp` after `MainProgram` construction, before the file-select
 screen renders its first frame:
 
 ```cpp
-for each .inkternity file in saves directory:
-    parse just the metadata header (cheap)
-    if published == true and has_subscription_metadata():
-        spawn a background-hosted World for it
-        register its NetServer with NetLibrary
+PublishRegistry r;
+r.load(configPath);
+if (auto p = r.published_path(); p.has_value() && file_exists(*p)) {
+    // Spawn the single background-hosted World for this file.
+    main.backgroundHost = make_background_world(*p);
+}
 ```
 
-The current code assumes one active `World` at a time (the one the
-user is editing). Auto-hosting multiple canvases simultaneously means
-either:
+**NetLibrary single-host constraint.** The current `NetLibrary` is
+process-singleton on `globalID` and the signaling websocket — the WSS
+URL is built once in `init()` as `signalingAddr + "/" + globalID`, with
+one `ws` connection. Two `World` instances trying to host SUBSCRIPTION
+mode in parallel would each need their own websocket on their own
+WSS-path globalID, which the current code can't open. This is not a
+memory or perf concern — it's a structural one.
 
-- **Multiple `World` instances.** Each gets its own NetServer +
-  NetObjManager + in-memory canvas state. Memory cost roughly N ×
-  current per-canvas footprint. Probably fine for a handful of
-  published canvases; needs investigation for dozens.
-- **A lighter "serve-only `World`" variant.** Same NetServer / NetObj
-  state but skips the rendering scaffolding. Cheaper, more refactor.
+Until a future workstream rebuilds NetLibrary's signaling lifecycle to
+be per-NetServer (separate `ws` + `globalID` per active host), Phase 1
+auto-hosts **at most one canvas in the background at a time**. The
+artist marks a canvas "published"; on app launch, that single canvas
+gets a background-hosted `World`. Toggling Publish on a different
+canvas un-publishes the previous one (with confirmation: *"This will
+replace the currently published canvas <name>. Continue?"*).
 
-Recommend starting with multiple full `World` instances and only
-slimming down if memory pressure shows up. Premature.
+For the single background `World`: spawn a full `World` instance
+(rendering scaffolding included — slim-down is premature per the
+original §4.3 reasoning). The instance lives alongside `main.world`
+in a new `main.backgroundHost` slot; the main loop only renders
+`main.world`. The background instance ticks via the existing
+NetLibrary update path which already iterates registered NetServers.
 
-### 4.4 What happens when the artist opens a published canvas?
+**Power-user escape hatch — multi-instance.** Inkternity has no
+single-instance lock. An artist who genuinely needs N>1 canvases
+hosted simultaneously today can launch N copies of the desktop app;
+each process gets its own NetLibrary singleton, its own ws connection,
+and can independently host one published canvas. Caveat: all
+instances share `configPath` (correct — same `inkternity_dev_keys.json`,
+same Stellar identity), and would race on the single
+`inkternity_published.json` registry — so this works in practice only
+once the registry is overridable per-process. A future small
+iteration adds an `--auto-host=<path>` CLI flag that bypasses the
+registry on that process. Documented here so the architectural option
+isn't lost; not built into Phase 1.
 
-Open question. Two reasonable answers:
+### 4.4 What happens when the artist opens the published canvas?
 
-- **Disable foreground editing while auto-hosted.** Show the canvas
-  read-only with a banner: *"This canvas is currently published.
-  Stop publishing to edit."* Simple but annoying.
-- **Promote the auto-host session to the foreground.** The
-  background `World` becomes the active editing surface; auto-host
-  keeps running; artist's edits go live to connected subscribers
-  immediately. This is essentially the existing COLLAB-style live
-  hosting but with viewer-only clients. Better UX but more state
-  shuffling.
+Two-step lifecycle, made simple by the cap-1 constraint:
 
-Lean toward (B) — promotion to foreground — because it matches the
-artist's intuition: "I published this, now I'm working on it, my
-subscribers should see updates." The viewer-only enforcement at the
-wire level (§12.2) already guarantees subscribers can't write back.
+1. **Open the published canvas → tear down background, foreground hosts.**
+   The background `World` instance is destroyed (its NetServer shuts down,
+   its WSS connection drops). The newly-loaded foreground `World` then
+   starts hosting normally as if the artist had clicked Host. Subscribers
+   experience a brief drop + reconnect.
+2. **Close the foreground canvas → restart background.** When the artist
+   leaves the canvas (back to file-select), if it's still in the publish
+   registry, spawn a fresh background `World` for it.
+
+**Open a *different* (unpublished) canvas → background keeps running.**
+The two `World`s coexist; one ticks visibly (foreground), the other
+ticks invisibly (background) servicing subscribers. Memory cost is 2 ×
+per-canvas footprint while both are active.
+
+This avoids the §4.4 "promote to foreground" state-shuffling entirely —
+the foreground always loads from disk, the background always loads
+from disk, they never share state. Subscribers see a brief
+disconnection on open and another on close; for a publishing flow
+where the artist mostly *isn't* editing the published canvas, that's
+fine.
 
 ### 4.5 UI surfaces
 
 ```
-src/Screens/FileSelectScreen.cpp Files tab: a small "● Published"
-                                 badge on tagged files. Right-click
-                                 (or long-press) → "Stop publishing".
-                                 An "Auto-hosting" status panel
-                                 listing currently-served canvases
-                                 + connection counts.
+src/Screens/FileSelectScreen.cpp Files tab: a "● Published" badge on
+                                 the single published file. Settings
+                                 panel: a small "Auto-hosting" block
+                                 showing what's published (or "Nothing
+                                 published") + connection count. The
+                                 badge doubles as the click target to
+                                 unpublish.
 src/Toolbar.cpp                  Canvas Settings menu: "Publish to
                                  subscribers" toggle. Disabled when
                                  has_subscription_metadata()==false
                                  with the same explanatory note as
                                  the existing Host menu SUBSCRIPTION
-                                 button.
-src/World.cpp                    new ctor / start-mode for "headless
-                                 hosting": skip rendering init, load
-                                 NetObj state, register NetServer.
-                                 World::is_auto_published() helper.
-src/main.cpp                     post-init pass: scan saves, spin up
-                                 auto-hosts for tagged files.
+                                 button. Enabling on canvas Y when
+                                 canvas X is already published prompts:
+                                 "This will replace the currently
+                                 published canvas <name>. Continue?"
+src/World.cpp                    Reused as-is — the background instance
+                                 is a full `World`, just never gets
+                                 main-loop draw/update calls. No new
+                                 ctor or "headless" mode (deferred per
+                                 the original §4.3 "premature" note).
+src/main.cpp                     post-init pass: read PublishRegistry,
+                                 if present spawn the single background
+                                 World; on file-open / file-close,
+                                 stop/restart the background slot.
+NEW src/PublishRegistry.{hpp,cpp}
+                                 Single-file JSON helper:
+                                 inkternity_published.json holds the
+                                 single { path, publishedAt } entry.
+                                 Cap-1 by structure (single field,
+                                 not a collection). Future cap-N
+                                 revisits this shape.
 ```
 
 ### 4.6 Surfaces NOT touched
@@ -536,15 +585,18 @@ audit trail.)_
    writing back, so promoting the live `World` to the editing
    surface is safe.
 
-5. **Auto-host cap: hard cap at 3 canvases.** Reasonable starting
-   point for both performance (3 simultaneous `World` instances
-   should be well within memory budget on a typical artist machine)
-   and real-world publishing volume (most artists won't have more
-   than a handful of concurrent published works). Bump later if
-   measurements + artist feedback support it. UI shows a clear note
-   in the file-select Settings panel when the cap is hit:
-   *"Publishing limit reached (3 canvases). Stop publishing one to
-   add another."*
+5. **Auto-host cap: hard cap at 3 canvases — AMENDED to cap-of-1.**
+   Original cap-3 was set on the assumption that "multiple full World
+   instances" was the only constraint (per §4.3). When implementation
+   started, NetLibrary turned out to be process-singleton on `globalID`
+   and the signaling websocket — multiple simultaneous SUBSCRIPTION
+   hosts would each need their own ws-on-different-WSS-path, which the
+   current code doesn't support. Phase 1 ships **cap-of-1**. UI surfaces
+   exactly one "Publish" toggle that's mutually exclusive across all
+   canvases (toggling on one auto-unpublishes the previously-published
+   one, with an explicit confirmation). A future workstream that
+   refactors NetLibrary to per-NetServer signaling lifecycle will
+   restore the cap-3 (or higher) intent.
 
 6. **Horizon polling: on Settings-open only.** No background poll,
    no periodic refresh. Minimal network chatter for the vast

@@ -17,6 +17,7 @@
 #include "GUIHolder.hpp"
 #include "GlobalConfig.hpp"
 #include "DevKeys.hpp"
+#include "PublishRegistry.hpp"
 #include "Screens/Screen.hpp"
 
 #ifdef USE_SKIA_BACKEND_GRAPHITE
@@ -136,6 +137,23 @@ class MainProgram {
         // <configPath>/inkternity_dev_keys.json. Stand-in for the
         // proper credential store coming in P0-C1/C3. See DevKeys.hpp.
         DevKeys devKeys;
+
+        // DISTRIBUTION-PHASE1.md §4 — single-slot record of "the canvas
+        // this Inkternity install auto-hosts in the background on
+        // launch." Cap-1 by structure pending a NetLibrary refactor;
+        // see PublishRegistry.hpp.
+        PublishRegistry publishRegistry;
+
+        // The single background-hosted World spawned at app launch from
+        // the publish registry, when applicable. Distinct from
+        // `world` (the foreground editing surface). Lifecycle:
+        //   - Spawned in main.cpp after MainProgram construction if the
+        //     registry has a published path that exists on disk.
+        //   - Torn down when the artist opens the published canvas in
+        //     foreground (the foreground World takes over hosting).
+        //   - Restarted on close-back-to-file-select if the canvas is
+        //     still in the registry.
+        std::shared_ptr<World> backgroundHost;
 
         std::optional<unsigned> keybindWaiting;
         void input_add_file_to_canvas_callback(const CustomEvents::AddFileToCanvasEvent& addFile);

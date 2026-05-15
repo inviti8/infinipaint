@@ -151,6 +151,12 @@ class Toolbar {
         bool optionsMenuOpen = false;
         bool playerMenuOpen = false;
 
+        // DISTRIBUTION-PHASE1.md §4 — two-stage confirmation when toggling
+        // Publish on canvas Y while canvas X is already the published one
+        // (cap-1 architecture; replacing X is destructive — X stops being
+        // auto-hosted on next launch).
+        bool publishReplaceConfirmStage = false;
+
         float finalCalculatedGuiScale = 1.0f;
 
         bool chatboxOpen = false;

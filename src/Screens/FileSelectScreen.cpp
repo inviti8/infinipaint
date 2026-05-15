@@ -257,6 +257,25 @@ void FileSelectScreen::settings_view() {
         } else {
             text_label(gui, "Not configured. Set up via your Heavymeta Portal settings.");
         }
+
+        // DISTRIBUTION-PHASE1.md §4 — auto-hosting status. Cap-1 means
+        // at most one canvas is shown here; the badge in the file list
+        // is the per-file mirror of this state.
+        text_label_centered(gui, "Auto-hosting");
+        if (auto p = main.publishRegistry.published(); p.has_value()) {
+            text_label(gui, ("Publishing: " + p->path.filename().string()).c_str());
+            text_label_light(gui, ("Since " + p->publishedAt).c_str());
+            text_button(gui, "stop publishing settings", "Stop publishing", {
+                .wide = true,
+                .onClick = [this] {
+                    main.publishRegistry.clear(main.conf.configPath);
+                }
+            });
+        } else {
+            text_label(gui,
+                "Nothing published. Open a canvas with portal subscription "
+                "metadata, then use Canvas Settings -> Publish to subscribers.");
+        }
     }
 }
 
@@ -835,6 +854,7 @@ void FileSelectScreen::file_view() {
 
     auto fileButton = [&] (size_t i, bool isList, const Vector2f& iconSize) {
         std::filesystem::path filePath = folderPath / (fileList[i].fileName + fileList[i].fileExtension);
+        const bool isPublished = main.publishRegistry.is_published(filePath);
         gui.element<SelectableButton>("file button", SelectableButton::Data{
             .isSelected = editMode && fileList[i].selected,
             .onClick = [&, filePath, i] {
@@ -877,6 +897,7 @@ void FileSelectScreen::file_view() {
                         }) {
                             text_label(gui, fileList[i].fileName);
                             text_label_light(gui, fileList[i].lastModifyDate);
+                            if (isPublished) text_label(gui, "* Published");
                         }
                     }
                 }
@@ -917,6 +938,7 @@ void FileSelectScreen::file_view() {
                             }
                         });
                         text_label_light(gui, fileList[i].lastModifyDate);
+                        if (isPublished) text_label(gui, "* Published");
                     }
                 }
             }

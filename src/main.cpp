@@ -470,6 +470,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv) {
         mS.m->load_config();
         mS.m->devKeys.ensure_app_keypair(mS.m->conf.configPath);
         mS.m->devKeys.load(mS.m->conf.configPath);
+        mS.m->publishRegistry.load(mS.m->conf.configPath);
         #ifdef __EMSCRIPTEN__
             emscripten_set_beforeunload_callback((void*)mSPtr, emscripten_before_unload);
         #endif
