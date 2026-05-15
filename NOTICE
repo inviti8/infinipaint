@@ -1,1 +1,25 @@
-Third party libraries are used in this project. The licenses for these libraries are included in data/third_party_licenses. This directory includes licenses for direct dependencies, as well as for some of the dependencies for libraries used by this project.
+Inkternity is a fork of InfiniPaint by Yousef Khadadeh
+(https://github.com/ErrorAtLine0/infinipaint). The code inherited
+from InfiniPaint was received under the MIT License; its verbatim
+text and Yousef Khadadeh's copyright notice are preserved at
+`assets/data/third_party_licenses/InfiniPaint/LICENSE.txt`. The MIT
+grant remains in effect perpetually for the portions of Inkternity
+that originate from InfiniPaint.
+
+Inkternity as a whole is distributed under BUSL-1.1 — see the
+`LICENSE` file at the repository root for terms, change-date, and
+change-license.
+
+Upstream InfiniPaint relicensed its master branch from MIT to
+GPL-3.0 on 2026-05-11 (upstream commit `fc8f414`). Inkternity's
+fork point predates that relicense (last shared upstream commit:
+`8b3e321`), so Inkternity carries only MIT-era code from upstream
+and no GPL-3.0 obligation. Any future upstream commits Inkternity
+chooses to incorporate must either predate 2026-05-11 or be
+relicensed separately; the BUSL-1.1 / GPL-3.0 incompatibility
+blocks any direct merge of post-relicense upstream changes.
+
+Third-party libraries are used in this project. The licenses for
+these libraries are included in `assets/data/third_party_licenses`.
+That directory includes licenses for direct dependencies as well
+as for some of the dependencies of libraries used by this project.
