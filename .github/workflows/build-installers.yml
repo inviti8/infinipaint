@@ -483,7 +483,14 @@ jobs:
 
             - **Windows**: download the `.exe` installer, run, accept the (HEAVYMETA-signed) installer prompt.
             - **macOS** (Apple Silicon): download the `.dmg`, open, drag Inkternity into Applications.
-            - **Linux**: install the Flatpak with `flatpak install Inkternity-*.flatpak` then `flatpak run com.inkternity.inkternity`.
+            - **Linux** (Flatpak): if you haven't used Flatpak / Flathub before, add the Flathub remote and pull the runtime first, then sideload the bundle:
+              ```
+              flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+              flatpak install flathub org.freedesktop.Platform//25.08
+              flatpak install Inkternity-*.flatpak
+              flatpak run com.inkternity.inkternity
+              ```
+              The first two commands are one-time setup; future Inkternity updates only need the third + fourth.
 
             ### Known issues
             - <bullet>
