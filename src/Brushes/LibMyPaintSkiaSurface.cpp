@@ -150,6 +150,15 @@ void LibMyPaintSkiaSurface::load_tiles_from_archive(cereal::PortableBinaryInputA
     }
 }
 
+void LibMyPaintSkiaSurface::copy_tiles_from(const LibMyPaintSkiaSurface& other) {
+    tiles_.clear();
+    for (const auto& [key, srcBuf] : other.tiles_) {
+        auto buf = std::make_unique<uint16_t[]>(kU16PerTile);
+        std::memcpy(buf.get(), srcBuf.get(), kU16PerTile * sizeof(uint16_t));
+        tiles_.emplace(key, std::move(buf));
+    }
+}
+
 }  // namespace HVYM::Brushes
 
 #endif  // HVYM_HAS_LIBMYPAINT

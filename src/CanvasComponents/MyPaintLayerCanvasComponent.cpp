@@ -27,11 +27,31 @@ void MyPaintLayerCanvasComponent::mark_dirty() {
     boundsCacheValid_ = false;
 }
 
-void MyPaintLayerCanvasComponent::save(cereal::PortableBinaryOutputArchive&) const {
-    // M3-minimum stub — see header.
+void MyPaintLayerCanvasComponent::save(cereal::PortableBinaryOutputArchive& a) const {
+    // DISTRIBUTION-PHASE1 / RASTER-WIRE-SYNC.md — wire payload mirrors
+    // the disk payload (save_file below). Both halves of the on-the-wire
+    // bytes for a libmypaint stroke are exactly what save_file writes:
+    // tile data via save_tiles_to_archive + the v0.9+ stroke-recording
+    // fields. Wire is between peers running the same build, so no
+    // version gating — both sides will read what we wrote in the same
+    // order. The recording fields cost ~16 bytes + ~12 bytes per sample
+    // on top of the tile data; cheap.
+    surface_->save_tiles_to_archive(a);
+    a(strokeRecordingValid_);
+    a(recordedColor_.x(), recordedColor_.y(), recordedColor_.z());
+    a(recordedBaseRadius_);
+    a(recordedSamples_);
 }
 
-void MyPaintLayerCanvasComponent::load(cereal::PortableBinaryInputArchive&) {
+void MyPaintLayerCanvasComponent::load(cereal::PortableBinaryInputArchive& a) {
+    surface_->load_tiles_from_archive(a);
+    boundsCacheValid_ = false;
+    a(strokeRecordingValid_);
+    float r, g, b;
+    a(r, g, b);
+    recordedColor_ = Eigen::Vector3f{r, g, b};
+    a(recordedBaseRadius_);
+    a(recordedSamples_);
 }
 
 void MyPaintLayerCanvasComponent::save_file(cereal::PortableBinaryOutputArchive& a) const {
@@ -66,10 +86,24 @@ void MyPaintLayerCanvasComponent::load_file(cereal::PortableBinaryInputArchive& 
 }
 
 std::unique_ptr<CanvasComponent> MyPaintLayerCanvasComponent::get_data_copy() const {
-    return std::make_unique<MyPaintLayerCanvasComponent>();
+    auto toRet = std::make_unique<MyPaintLayerCanvasComponent>();
+    toRet->surface_->copy_tiles_from(*surface_);
+    toRet->strokeRecordingValid_ = strokeRecordingValid_;
+    toRet->recordedColor_       = recordedColor_;
+    toRet->recordedBaseRadius_  = recordedBaseRadius_;
+    toRet->recordedSamples_     = recordedSamples_;
+    toRet->boundsCacheValid_    = false;
+    return toRet;
 }
 
-void MyPaintLayerCanvasComponent::set_data_from(const CanvasComponent&) {
+void MyPaintLayerCanvasComponent::set_data_from(const CanvasComponent& other) {
+    const auto& src = static_cast<const MyPaintLayerCanvasComponent&>(other);
+    surface_->copy_tiles_from(*src.surface_);
+    strokeRecordingValid_ = src.strokeRecordingValid_;
+    recordedColor_        = src.recordedColor_;
+    recordedBaseRadius_   = src.recordedBaseRadius_;
+    recordedSamples_      = src.recordedSamples_;
+    boundsCacheValid_     = false;
 }
 
 void MyPaintLayerCanvasComponent::draw(SkCanvas* canvas, const DrawData&, const std::shared_ptr<void>&) const {

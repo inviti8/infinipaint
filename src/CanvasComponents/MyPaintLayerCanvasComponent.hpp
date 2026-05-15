@@ -16,9 +16,14 @@
 // in component-local pixel coordinates; the container's CoordSpaceHelper
 // places the layer in world space, exactly like BrushStroke.
 //
-// Serialization is intentionally a stub for the M3 minimum slice — Phase 1
-// §8 spells out the full PNG-per-tile format (M4 file-format work). For now
-// strokes are session-only.
+// Serialization (both disk and wire) goes through the surface's
+// save_tiles_to_archive / load_tiles_from_archive helpers plus the
+// v0.9+ stroke-recording fields. See RASTER-WIRE-SYNC.md for the wire
+// path's design — the wire payload mirrors the disk payload because
+// raster strokes can't be cheaply re-derived the way vector strokes
+// can. Bandwidth: typical strokes ~50-200 KB on the wire; large
+// strokes up to ~1 MB. Acceptable for Phase 1; recording-replay
+// optimization deferred.
 class MyPaintLayerCanvasComponent : public CanvasComponent {
     public:
         MyPaintLayerCanvasComponent();

@@ -79,6 +79,12 @@ public:
     // Drops any existing tiles, then loads the count + tiles back.
     void load_tiles_from_archive(cereal::PortableBinaryInputArchive& a);
 
+    // Deep-copy every tile from `other` into this surface, dropping any
+    // tiles this surface previously held. Used by
+    // MyPaintLayerCanvasComponent::get_data_copy / set_data_from for
+    // NetObj replication — see RASTER-WIRE-SYNC.md.
+    void copy_tiles_from(const LibMyPaintSkiaSurface& other);
+
 private:
     static void s_tile_request_start(MyPaintTiledSurface*, MyPaintTileRequest*);
     static void s_tile_request_end(MyPaintTiledSurface*, MyPaintTileRequest*);
