@@ -1558,10 +1558,18 @@ void Toolbar::options_menu() {
     switch(optionsMenuType) {
         case HOST_MENU: {
             center_obstructing_window_gui("host menu", CLAY_SIZING_FIT(650), CLAY_SIZING_FIT(0), [&] {
-                // Hosting-mode selector. SUBSCRIPTION is only clickable
-                // when the canvas has portal metadata; otherwise the
-                // button is rendered but inert + a note explains why.
-                const bool subEligible = main.world->has_subscription_metadata();
+                // Hosting-mode selector. SUBSCRIPTION is clickable when
+                // the canvas already has portal metadata, OR when dev
+                // keys can stand in for it (the auto-populate path in
+                // World::start_hosting fills the three subscription
+                // fields from devKeys at host time). Without either,
+                // the button is rendered inert + a note explains why.
+                const bool subEligible =
+                    main.world->has_subscription_metadata() ||
+                    (main.devKeys.is_loaded() &&
+                     !main.devKeys.canvas_id().empty() &&
+                     !main.devKeys.member_pubkey().empty() &&
+                     !main.devKeys.app_pubkey().empty());
                 text_label(gui, "Hosting mode:");
                 left_to_right_line_layout(gui, [&]() {
                     text_button(gui, "collab mode", "Collab", {
@@ -1589,14 +1597,25 @@ void Toolbar::options_menu() {
                                     // DISTRIBUTION-PHASE0.md §12.5: stable share code derived
                                     // from (app_seed_bytes, canvas_id); preview-only here, install
                                     // on NetLibrary happens in World::start_hosting.
+                                    //
+                                    // Use the canvas's own canvasId if it has one; otherwise
+                                    // fall back to devKeys.canvas_id() — same fallback the
+                                    // auto-populate in start_hosting will apply at host time,
+                                    // so the preview matches what subscribers will see.
+                                    const std::string effectiveCanvasId =
+                                        !main.world->canvasId.empty()
+                                            ? main.world->canvasId
+                                            : (main.devKeys.is_loaded()
+                                                ? main.devKeys.canvas_id()
+                                                : std::string{});
                                     std::string previewGlobal;
                                     if (main.devKeys.is_loaded()) {
-                                        previewGlobal = CanvasShareId::derive_global_id(main.devKeys.app_seed_bytes(), main.world->canvasId);
-                                        serverLocalID = CanvasShareId::derive_local_id(main.devKeys.app_seed_bytes(), main.world->canvasId);
+                                        previewGlobal = CanvasShareId::derive_global_id(main.devKeys.app_seed_bytes(), effectiveCanvasId);
+                                        serverLocalID = CanvasShareId::derive_local_id(main.devKeys.app_seed_bytes(), effectiveCanvasId);
                                     }
                                     if (previewGlobal.empty() || serverLocalID.empty()) {
                                         previewGlobal = NetLibrary::get_global_id();
-                                        serverLocalID = NetLibrary::deterministic_local_id_from_seed(main.world->canvasId);
+                                        serverLocalID = NetLibrary::deterministic_local_id_from_seed(effectiveCanvasId);
                                     }
                                     serverToConnectTo = previewGlobal + serverLocalID;
                                 }
@@ -1605,7 +1624,7 @@ void Toolbar::options_menu() {
                     });
                 });
                 if(!subEligible) {
-                    text_label(gui, "(Publish via portal first to enable Subscription mode)");
+                    text_label(gui, "(Publish via portal first, or set dev keys, to enable Subscription mode)");
                 }
 
                 input_text_field(gui, "lobby", "Lobby", &serverToConnectTo);
@@ -1702,7 +1721,16 @@ void Toolbar::options_menu() {
                 //     race during a multi-tab session), this cleans it
                 //     up. stop() is idempotent when we're not managing
                 //     the path, so the common case is a no-op.
-                const bool subEligible = main.world->has_subscription_metadata();
+                // SUBSCRIPTION-eligible if the canvas has its own portal
+                // metadata, OR if dev keys can supply it via the auto-
+                // populate path in World::start_hosting. Same rule the
+                // HOST_MENU uses for the SUBSCRIPTION button gate.
+                const bool subEligible =
+                    main.world->has_subscription_metadata() ||
+                    (main.devKeys.is_loaded() &&
+                     !main.devKeys.canvas_id().empty() &&
+                     !main.devKeys.member_pubkey().empty() &&
+                     !main.devKeys.app_pubkey().empty());
                 const bool hasPath = !main.world->filePath.empty();
                 const auto thisPath = main.world->filePath;
                 const bool thisIsPublished = hasPath && PublishedCanvases::is_published(thisPath);
@@ -1710,7 +1738,7 @@ void Toolbar::options_menu() {
                 if (!hasPath) {
                     text_label(gui, "Publish: save the canvas first.");
                 } else if (!subEligible) {
-                    text_label(gui, "Publish: requires portal-issued subscription metadata.");
+                    text_label(gui, "Publish: requires portal-issued subscription metadata, or dev keys.");
                 } else if (thisIsPublished) {
                     text_button_wide("unpublish canvas", "Stop publishing this canvas", [&, thisPath] {
                         PublishedCanvases::clear_published(thisPath);
