@@ -1678,13 +1678,30 @@ void Toolbar::options_menu() {
                     }
                 });
 
-                // DISTRIBUTION-PHASE1.md §4 — Publish toggle. Per-canvas
-                // marker file (lives next to the canvas) + per-instance
-                // PID lock. Multiple canvases can be marked published;
-                // each running Inkternity instance grabs the first one
-                // it can lock at startup. No global "replace" semantics
-                // any more — toggling on canvas Y is independent of
-                // canvas X's marker.
+                // DISTRIBUTION-PHASE1.md §4 — Publish toggle. Writes
+                // a per-canvas `.publish` marker; hosting runtime is
+                // delivered by a headless `--host-only` side-instance
+                // OS process owned by MainProgram.sideInstances.
+                //
+                // Side-effect ordering with the foreground edit:
+                //   - Toggle ON while this canvas is in foreground
+                //     (the only situation this menu is reachable from):
+                //     just write the marker. No immediate side-instance
+                //     spawn — the foreground process owns the canvas
+                //     right now; a side-instance would race for the
+                //     same lock and broadcast a stale on-disk view
+                //     of any unsaved edits. The side-instance spawn
+                //     happens when the artist navigates back to
+                //     file-select (§4.4 reverse-handoff hook,
+                //     pending) or on the next app launch
+                //     (main.cpp scan_and_spawn).
+                //   - Toggle OFF: remove the marker. Defensively call
+                //     sideInstances->stop(path) — if a side-instance
+                //     is somehow running for this canvas (e.g. a stale
+                //     one we forgot to kill at canvas-open time, or a
+                //     race during a multi-tab session), this cleans it
+                //     up. stop() is idempotent when we're not managing
+                //     the path, so the common case is a no-op.
                 const bool subEligible = main.world->has_subscription_metadata();
                 const bool hasPath = !main.world->filePath.empty();
                 const auto thisPath = main.world->filePath;
@@ -1697,11 +1714,20 @@ void Toolbar::options_menu() {
                 } else if (thisIsPublished) {
                     text_button_wide("unpublish canvas", "Stop publishing this canvas", [&, thisPath] {
                         PublishedCanvases::clear_published(thisPath);
+                        if (main.sideInstances) {
+                            main.sideInstances->stop(thisPath);
+                        }
                     });
+                    text_label(gui,
+                        "Published. Hosting runs in a background process "
+                        "when this canvas isn't open in the foreground.");
                 } else {
                     text_button_wide("publish canvas", "Publish to subscribers", [&, thisPath] {
                         PublishedCanvases::set_published(thisPath);
                     });
+                    text_label(gui,
+                        "Background hosting starts when you close this "
+                        "canvas, or on next app launch.");
                 }
 
                 text_button_wide("done", "Done", [&] {
