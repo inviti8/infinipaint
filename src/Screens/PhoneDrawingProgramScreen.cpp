@@ -352,12 +352,11 @@ void PhoneDrawingProgramScreen::main_menu_popup(Element* triggerButton) {
                         ? HostMode::SUBSCRIPTION : HostMode::COLLAB;
                     if (phoneHostMode == HostMode::SUBSCRIPTION) {
                         // DISTRIBUTION-PHASE0.md §12.5: stable share code
-                        // derived from (app_secret, canvas_id).
-                        const std::string& appSec = main.devKeys.app_secret();
+                        // derived from (app_seed_bytes, canvas_id).
                         std::string previewGlobal;
-                        if (!appSec.empty()) {
-                            previewGlobal = CanvasShareId::derive_global_id(appSec, main.world->canvasId);
-                            phoneNetLocalID = CanvasShareId::derive_local_id(appSec, main.world->canvasId);
+                        if (main.devKeys.is_loaded()) {
+                            previewGlobal = CanvasShareId::derive_global_id(main.devKeys.app_seed_bytes(), main.world->canvasId);
+                            phoneNetLocalID = CanvasShareId::derive_local_id(main.devKeys.app_seed_bytes(), main.world->canvasId);
                         }
                         if (previewGlobal.empty() || phoneNetLocalID.empty()) {
                             previewGlobal = NetLibrary::get_global_id();
@@ -440,11 +439,10 @@ void PhoneDrawingProgramScreen::network_menu_popup() {
                                         if (phoneHostMode != HostMode::SUBSCRIPTION) {
                                             phoneHostMode = HostMode::SUBSCRIPTION;
                                             // DISTRIBUTION-PHASE0.md §12.5
-                                            const std::string& appSec = main.devKeys.app_secret();
                                             std::string previewGlobal;
-                                            if (!appSec.empty()) {
-                                                previewGlobal = CanvasShareId::derive_global_id(appSec, main.world->canvasId);
-                                                phoneNetLocalID = CanvasShareId::derive_local_id(appSec, main.world->canvasId);
+                                            if (main.devKeys.is_loaded()) {
+                                                previewGlobal = CanvasShareId::derive_global_id(main.devKeys.app_seed_bytes(), main.world->canvasId);
+                                                phoneNetLocalID = CanvasShareId::derive_local_id(main.devKeys.app_seed_bytes(), main.world->canvasId);
                                             }
                                             if (previewGlobal.empty() || phoneNetLocalID.empty()) {
                                                 previewGlobal = NetLibrary::get_global_id();

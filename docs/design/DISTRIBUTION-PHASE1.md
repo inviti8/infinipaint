@@ -157,37 +157,68 @@ Properties this enables:
 The artist owns their keys. The cooperative never sees the secret.
 There is **no portal-mediated restore** in Phase 1.
 
+**Critical UX constraint:** Inkternity's user base is crypto-averse
+artists, not crypto power users. The crypto-identity surface stays
+*invisible* by default — no first-run modal, no "back up your seed"
+nag, no onboarding friction. Keys are generated silently the way
+they are today; the artist who never touches Settings never sees a
+mnemonic. Those who *do* want crypto functionality (receive payments,
+move to a different machine, back up the recovery phrase) find it
+behind an explicit Settings → Export affordance.
+
 First-run flow:
 
-1. `ensure_app_keypair` generates a fresh BIP-39 mnemonic (24 words,
-   ~256 bits of entropy), derives the Stellar keypair from it via
-   SEP-0005, writes all three fields to `inkternity_dev_keys.json`.
-2. First time the user opens **Settings → Identity**, the app shows a
-   one-time "back this up now" modal: displays the 24-word mnemonic,
-   asks the user to confirm they've written it down or saved it to a
-   password manager. Includes the warning: *"If you lose this and
-   reinstall, every canvas's permanent share code is lost forever.
-   There is no recovery path."*
-3. After confirmation, the modal is dismissed and won't reappear; the
-   mnemonic stays accessible via Settings → Identity → "Reveal
-   secret" (password-prompt-style affordance, or a hold-to-reveal
-   button — small UX touch).
+1. `ensure_app_keypair` silently generates a fresh BIP-39 mnemonic (12
+   words, 128 bits of entropy — see §8.2), derives the Stellar keypair
+   via SEP-0005, writes all three fields (`app_pub` G..., `app_secret`
+   S..., `app_mnemonic`) to `inkternity_dev_keys.json`. No UI. No
+   modal. No artist-visible event.
+2. The artist sees no difference from today — the file-select screen
+   loads as normal.
+
+Settings → Identity surface (when the artist eventually opens it):
+
+- The existing G... pubkey copy field (already shipped in Phase 0).
+- A new **"Export App Key"** button that opens a popup showing the
+  S... secret + mnemonic with copy-to-clipboard buttons. Plain-text
+  display, no hold-to-reveal theater — this matches the threat
+  model: not a high-security wallet, just a recovery path for users
+  who care.
+- A symmetric **"Restore App Key"** button that opens a popup with
+  a single paste field auto-detecting S... vs. 12/24-word BIP-39
+  mnemonic. Destructive: re-derives the keypair from the input,
+  overwrites `inkternity_dev_keys.json`. Gated on an explicit
+  confirmation: *"This replaces your current identity. Share codes
+  derived from your current keys will become unreachable until you
+  restore them again."*
+- (Optional) Horizon balance probe on Settings-open per §3.4.
 
 Fresh-install / restore flow:
 
-1. On startup, if `inkternity_dev_keys.json` doesn't exist, the file-
-   select screen offers two options before generating a new key:
-   - **Generate new** (the existing default — fresh keypair)
-   - **Import existing** (paste a `S...` secret, or paste a 12/24-word
-     BIP-39 mnemonic, app re-derives the keypair, writes the file)
-2. After import, every share code the artist has ever published
-   resolves to the same lobby address as before. Subscribers'
-   bookmarks keep working.
+1. On startup, if `inkternity_dev_keys.json` doesn't exist, generate
+   silently (default behavior). No prompts.
+2. Restore is reachable only via the Settings → Identity → Restore
+   App Key affordance described above — *not* at first launch (same
+   crypto-averse principle).
+
+Migration of existing hex-format installs:
+
+The artist's machine may already hold an `inkternity_dev_keys.json`
+with hex-format `app_pub` (64 chars) + `app_secret` (128 chars) from
+the Phase 0 alpha. On load, `DevKeys` detects hex format, extracts
+the existing 32-byte seed (the first half of the hex secret), re-encodes
+it as `S...`, computes the matching G... pubkey, rewrites the file in
+strkey form. The mnemonic field stays empty for these installs (we
+never had a mnemonic associated with that random seed); Export shows
+just the S... and a note. New installs get S... + mnemonic both;
+migrated installs get S... only. No share codes break either way —
+the seed bytes are preserved byte-for-byte.
 
 That's it. No portal endpoints, no server-side state, no encrypted
-bundles. The user-experience cost is the standard self-custodial
-warning (lose the seed = lose the keys); the engineering cost is one
-BIP-39 implementation + one UI surface.
+bundles, no first-run friction. The user-experience cost is the
+standard self-custodial warning (which we surface only when the
+artist opens Export, not at launch); the engineering cost is one
+BIP-39 implementation + one Export popup.
 
 ### 3.4 Self-funded on-ledger activation
 

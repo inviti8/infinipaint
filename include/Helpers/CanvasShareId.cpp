@@ -34,27 +34,6 @@ constexpr size_t HMAC_OUT = 32;
 // which is well under the SHA-512 block size, so we zero-pad to the block.
 constexpr size_t KEY_LEN = 32;
 
-int hex_nibble(char c) {
-    if (c >= '0' && c <= '9') return c - '0';
-    if (c >= 'a' && c <= 'f') return 10 + (c - 'a');
-    if (c >= 'A' && c <= 'F') return 10 + (c - 'A');
-    return -1;
-}
-
-// Decodes the first `expected_bytes` of hex from `hex` into `out`. Returns
-// false if `hex` is too short or contains a non-hex character. Used for
-// the app_secret seed extraction (first 32 bytes = 64 hex chars).
-bool hex_decode(std::string_view hex, size_t expected_bytes, unsigned char* out) {
-    if (hex.size() < expected_bytes * 2) return false;
-    for (size_t i = 0; i < expected_bytes; ++i) {
-        const int hi = hex_nibble(hex[2 * i]);
-        const int lo = hex_nibble(hex[2 * i + 1]);
-        if (hi < 0 || lo < 0) return false;
-        out[i] = static_cast<unsigned char>((hi << 4) | lo);
-    }
-    return true;
-}
-
 // SHA-512 wrapper around tweetnacl's crypto_hash. Returns out[0..63].
 void sha512(unsigned char out[SHA512_OUT], const unsigned char* msg, size_t msg_len) {
     crypto_hash(out, msg, static_cast<unsigned long long>(msg_len));
@@ -135,32 +114,30 @@ std::string base32_truncated(const std::array<unsigned char, HMAC_OUT>& tag,
     return out;
 }
 
-std::string derive(std::string_view app_secret_hex,
+std::string derive(const uint8_t app_seed[KEY_LEN],
                     std::string_view canvas_id,
                     std::string_view label,
                     size_t out_len) {
-    unsigned char key[KEY_LEN];
-    if (!hex_decode(app_secret_hex, KEY_LEN, key)) return {};
-    const auto tag = hmac_sha512_256(key, label, canvas_id);
+    const auto tag = hmac_sha512_256(app_seed, label, canvas_id);
     return base32_truncated(tag, out_len);
 }
 
 }  // namespace
 
-std::string derive_global_id(std::string_view app_secret_hex,
+std::string derive_global_id(const uint8_t app_seed[32],
                               std::string_view canvas_id) {
-    return derive(app_secret_hex, canvas_id, GLOBAL_ID_LABEL, GLOBAL_ID_LEN);
+    return derive(app_seed, canvas_id, GLOBAL_ID_LABEL, GLOBAL_ID_LEN);
 }
 
-std::string derive_local_id(std::string_view app_secret_hex,
+std::string derive_local_id(const uint8_t app_seed[32],
                              std::string_view canvas_id) {
-    return derive(app_secret_hex, canvas_id, LOCAL_ID_LABEL, LOCAL_ID_LEN);
+    return derive(app_seed, canvas_id, LOCAL_ID_LABEL, LOCAL_ID_LEN);
 }
 
-std::string derive_share_code(std::string_view app_secret_hex,
+std::string derive_share_code(const uint8_t app_seed[32],
                                std::string_view canvas_id) {
-    auto g = derive_global_id(app_secret_hex, canvas_id);
-    auto l = derive_local_id(app_secret_hex, canvas_id);
+    auto g = derive_global_id(app_seed, canvas_id);
+    auto l = derive_local_id(app_seed, canvas_id);
     if (g.empty() || l.empty()) return {};
     return g + l;
 }

@@ -672,6 +672,31 @@ int crypto_sign_keypair(u8 *pk, u8 *sk)
   return 0;
 }
 
+/* Local addition — matches standard NaCl/libsodium crypto_sign_seed_keypair.
+ * Identical to crypto_sign_keypair above, except the 32-byte seed is
+ * supplied by the caller instead of being drawn from randombytes. Lets us
+ * derive a public key from a pre-existing seed (SLIP-0010 derived, or
+ * decoded from a Stellar S... strkey) without dragging in ed25519-donna.
+ */
+int crypto_sign_ed25519_tweet_seed_keypair(u8 *pk, u8 *sk, const u8 *seed)
+{
+  u8 d[64];
+  gf p[4];
+  int i;
+
+  FOR(i,32) sk[i] = seed[i];
+  crypto_hash(d, sk, 32);
+  d[0] &= 248;
+  d[31] &= 127;
+  d[31] |= 64;
+
+  scalarbase(p,d);
+  pack(pk,p);
+
+  FOR(i,32) sk[32 + i] = pk[i];
+  return 0;
+}
+
 static const u64 L[32] = {0xed, 0xd3, 0xf5, 0x5c, 0x1a, 0x63, 0x12, 0x58, 0xd6, 0x9c, 0xf7, 0xa2, 0xde, 0xf9, 0xde, 0x14, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x10};
 
 sv modL(u8 *r,i64 x[64])

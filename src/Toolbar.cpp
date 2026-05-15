@@ -582,14 +582,13 @@ void Toolbar::top_toolbar() {
                                         ? HostMode::SUBSCRIPTION : HostMode::COLLAB;
                                     if (hostMenuMode == HostMode::SUBSCRIPTION) {
                                         // DISTRIBUTION-PHASE0.md §12.5: stable share code derived
-                                        // from (app_secret, canvas_id). World::start_hosting will
+                                        // from (app_seed_bytes, canvas_id). World::start_hosting will
                                         // install the same globalID on NetLibrary before connect,
                                         // so the preview here matches the actual WSS path.
-                                        const std::string& appSec = main.devKeys.app_secret();
                                         std::string previewGlobal;
-                                        if (!appSec.empty()) {
-                                            previewGlobal = CanvasShareId::derive_global_id(appSec, main.world->canvasId);
-                                            serverLocalID = CanvasShareId::derive_local_id(appSec, main.world->canvasId);
+                                        if (main.devKeys.is_loaded()) {
+                                            previewGlobal = CanvasShareId::derive_global_id(main.devKeys.app_seed_bytes(), main.world->canvasId);
+                                            serverLocalID = CanvasShareId::derive_local_id(main.devKeys.app_seed_bytes(), main.world->canvasId);
                                         }
                                         if (previewGlobal.empty() || serverLocalID.empty()) {
                                             // Fallback: degraded path with localID-only stability
@@ -1588,13 +1587,12 @@ void Toolbar::options_menu() {
                                 if (hostMenuMode != HostMode::SUBSCRIPTION) {
                                     hostMenuMode = HostMode::SUBSCRIPTION;
                                     // DISTRIBUTION-PHASE0.md §12.5: stable share code derived
-                                    // from (app_secret, canvas_id); preview-only here, install
+                                    // from (app_seed_bytes, canvas_id); preview-only here, install
                                     // on NetLibrary happens in World::start_hosting.
-                                    const std::string& appSec = main.devKeys.app_secret();
                                     std::string previewGlobal;
-                                    if (!appSec.empty()) {
-                                        previewGlobal = CanvasShareId::derive_global_id(appSec, main.world->canvasId);
-                                        serverLocalID = CanvasShareId::derive_local_id(appSec, main.world->canvasId);
+                                    if (main.devKeys.is_loaded()) {
+                                        previewGlobal = CanvasShareId::derive_global_id(main.devKeys.app_seed_bytes(), main.world->canvasId);
+                                        serverLocalID = CanvasShareId::derive_local_id(main.devKeys.app_seed_bytes(), main.world->canvasId);
                                     }
                                     if (previewGlobal.empty() || serverLocalID.empty()) {
                                         previewGlobal = NetLibrary::get_global_id();

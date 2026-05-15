@@ -93,6 +93,14 @@ set(sources "src/main.cpp"
             "src/Subscription/TokenVerifier.cpp"
             "deps/tweetnacl/tweetnacl.c"
             "deps/tweetnacl/randombytes.cpp"
+            "src/crypto/stellar/StellarStrkey.cpp"
+            "src/crypto/stellar/StellarMnemonic.cpp"
+            "src/crypto/stellar/trezor/bip39.c"
+            "src/crypto/stellar/trezor/bip39_english.c"
+            "src/crypto/stellar/trezor/hmac.c"
+            "src/crypto/stellar/trezor/pbkdf2.c"
+            "src/crypto/stellar/trezor/sha2.c"
+            "src/crypto/stellar/trezor/memzero.c"
             "src/RichTextUserInput.cpp"
             "src/CustomEvents.cpp"
             "src/Screens/Screen.cpp"
@@ -401,6 +409,13 @@ if(ANDROID)
 endif()
 
 target_compile_definitions(main PRIVATE IS_CLIENT)
+
+# Trezor BIP-39 sources vendored under src/crypto/stellar/trezor/ — disable
+# the in-memory mnemonic cache (default-on in Trezor's options.h) so the
+# artist's plaintext seed words don't linger in the process address space
+# across their session. Inkternity calls mnemonic_to_seed at most a handful
+# of times per launch; the cache buys nothing for our use case.
+target_compile_definitions(main PRIVATE USE_BIP39_CACHE=0)
 if(WIN32)
     target_compile_definitions(main PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
 endif()

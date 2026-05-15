@@ -469,19 +469,19 @@ void World::start_hosting(HostMode mode, const std::string& initNetSource, const
     // URL. Missing app_secret falls through to the random path (degraded
     // behavior, logged) rather than aborting the host attempt.
     if (hostMode == HostMode::SUBSCRIPTION) {
-        const std::string& appSec = main.devKeys.app_secret();
-        if (!appSec.empty()) {
-            const auto derivedGlobal = CanvasShareId::derive_global_id(appSec, canvasId);
+        if (main.devKeys.is_loaded()) {
+            const auto derivedGlobal = CanvasShareId::derive_global_id(
+                main.devKeys.app_seed_bytes(), canvasId);
             if (!derivedGlobal.empty()) {
                 NetLibrary::set_global_id(derivedGlobal);
             } else {
                 Logger::get().log("USERINFO",
-                    "SUBSCRIPTION host: derive_global_id returned empty (malformed app_secret?) — "
+                    "SUBSCRIPTION host: derive_global_id returned empty — "
                     "falling back to random globalID; share code WILL change across launches");
             }
         } else {
             Logger::get().log("USERINFO",
-                "SUBSCRIPTION host: no app_secret available — falling back to random globalID; "
+                "SUBSCRIPTION host: no app keypair available — falling back to random globalID; "
                 "share code WILL change across launches");
         }
     }
@@ -492,9 +492,9 @@ void World::start_hosting(HostMode mode, const std::string& initNetSource, const
     std::string effectiveNetSource = initNetSource;
     if (hostMode == HostMode::SUBSCRIPTION) {
         effectiveLocalID = NetLibrary::deterministic_local_id_from_seed(canvasId);
-        const std::string& appSec = main.devKeys.app_secret();
-        if (!appSec.empty()) {
-            const auto derivedLocal = CanvasShareId::derive_local_id(appSec, canvasId);
+        if (main.devKeys.is_loaded()) {
+            const auto derivedLocal = CanvasShareId::derive_local_id(
+                main.devKeys.app_seed_bytes(), canvasId);
             if (!derivedLocal.empty()) effectiveLocalID = derivedLocal;
         }
         effectiveNetSource = NetLibrary::get_global_id() + effectiveLocalID;
