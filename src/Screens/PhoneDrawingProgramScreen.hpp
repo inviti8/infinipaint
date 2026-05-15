@@ -64,6 +64,14 @@ class PhoneDrawingProgramScreen : public DrawingProgramScreen {
         HostMode phoneHostMode = HostMode::COLLAB;
         void main_menu_popup(GUIStuff::Element* triggerButton);
         void network_menu_popup();
+
+        // DISTRIBUTION-PHASE1.md §4 polish — inline canvas rename for
+        // the phone top toolbar. Same pattern as Toolbar::canvasNameInput
+        // on desktop: per-frame sync from filePath.stem() unless the
+        // input is currently focused, commit on Enter via
+        // World::rename_on_disk.
+        std::string canvasNameInput;
+        bool canvasNameInputFocused = false;
         struct ColorPickerPopupData {
             enum class ScreenType {
                 NORMAL,

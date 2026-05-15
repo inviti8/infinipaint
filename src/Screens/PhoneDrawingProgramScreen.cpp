@@ -16,6 +16,8 @@
 #include "FileSelectScreen.hpp"
 #include "../Brushes/BrushPresets.hpp"
 #include "../CustomEvents.hpp"
+#include "../PublishedCanvases.hpp"
+#include "../Distribution/SideInstances.hpp"
 #include <Helpers/Networking/NetLibrary.hpp>
 #include <Helpers/Logger.hpp>
 
@@ -111,10 +113,35 @@ void PhoneDrawingProgramScreen::top_toolbar() {
                     // a "Viewing live: ..." string so the subscriber knows
                     // they're in read-only mode on someone else's canvas.
                     const bool ownIsViewer = main.world->ownClientData && main.world->ownClientData->is_viewer();
-                    if (ownIsViewer)
+                    if (ownIsViewer) {
                         text_label(gui, "Viewing live: " + main.world->name);
-                    else
+                    } else if (main.world->netServer || main.world->netClient) {
+                        // Hosting or connected to a session — can't rename
+                        // mid-flight (subscribers would lose the file).
                         text_label(gui, main.world->name);
+                    } else {
+                        // DISTRIBUTION-PHASE1.md §4 polish — inline rename.
+                        // Per-frame sync when not focused so the field
+                        // tracks tab switches + completed renames.
+                        if (!canvasNameInputFocused) {
+                            canvasNameInput = main.world->filePath.empty()
+                                ? main.world->name
+                                : main.world->filePath.stem().string();
+                        }
+                        input_text(gui, "phone canvas filename", &canvasNameInput, {
+                            .emptyText = "Canvas name",
+                            .onEnter = [&] {
+                                if (!main.world->rename_on_disk(canvasNameInput)) {
+                                    canvasNameInput = main.world->filePath.empty()
+                                        ? main.world->name
+                                        : main.world->filePath.stem().string();
+                                }
+                                canvasNameInputFocused = false;
+                            },
+                            .onSelect = [&] { canvasNameInputFocused = true; },
+                            .onDeselect = [&] { canvasNameInputFocused = false; },
+                        });
+                    }
                     // Spacer that pushes the layer dropdown + reader toggle to the right edge.
                     CLAY_AUTO_ID({
                         .layout = {.sizing = {.width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_GROW(0)}}
@@ -348,19 +375,37 @@ void PhoneDrawingProgramScreen::main_menu_popup(Element* triggerButton) {
                 menu_item("phone host", "Host", [&] {
                     // Pre-generate the lobby address so the user sees it
                     // before confirming. Mirrors Toolbar.cpp host action.
-                    phoneHostMode = main.world->has_subscription_metadata()
+                    // SUBSCRIPTION is the default when either the canvas
+                    // has its own portal metadata OR dev keys can supply
+                    // it (auto-populate path in World::start_hosting).
+                    const bool devKeysCanSupplyMetadata =
+                        main.devKeys.is_loaded() &&
+                        !main.devKeys.canvas_id().empty() &&
+                        !main.devKeys.member_pubkey().empty() &&
+                        !main.devKeys.app_pubkey().empty();
+                    phoneHostMode = (main.world->has_subscription_metadata() ||
+                                     devKeysCanSupplyMetadata)
                         ? HostMode::SUBSCRIPTION : HostMode::COLLAB;
                     if (phoneHostMode == HostMode::SUBSCRIPTION) {
                         // DISTRIBUTION-PHASE0.md §12.5: stable share code
-                        // derived from (app_seed_bytes, canvas_id).
+                        // derived from (app_seed_bytes, canvas_id). If the
+                        // canvas's own canvasId is empty, use devKeys'
+                        // canvas_id — same fallback the start_hosting
+                        // auto-populate will apply.
+                        const std::string effectiveCanvasId =
+                            !main.world->canvasId.empty()
+                                ? main.world->canvasId
+                                : (main.devKeys.is_loaded()
+                                    ? main.devKeys.canvas_id()
+                                    : std::string{});
                         std::string previewGlobal;
                         if (main.devKeys.is_loaded()) {
-                            previewGlobal = CanvasShareId::derive_global_id(main.devKeys.app_seed_bytes(), main.world->canvasId);
-                            phoneNetLocalID = CanvasShareId::derive_local_id(main.devKeys.app_seed_bytes(), main.world->canvasId);
+                            previewGlobal = CanvasShareId::derive_global_id(main.devKeys.app_seed_bytes(), effectiveCanvasId);
+                            phoneNetLocalID = CanvasShareId::derive_local_id(main.devKeys.app_seed_bytes(), effectiveCanvasId);
                         }
                         if (previewGlobal.empty() || phoneNetLocalID.empty()) {
                             previewGlobal = NetLibrary::get_global_id();
-                            phoneNetLocalID = NetLibrary::deterministic_local_id_from_seed(main.world->canvasId);
+                            phoneNetLocalID = NetLibrary::deterministic_local_id_from_seed(effectiveCanvasId);
                         }
                         phoneNetLobbyAddress = previewGlobal + phoneNetLocalID;
                     } else {
@@ -373,6 +418,35 @@ void PhoneDrawingProgramScreen::main_menu_popup(Element* triggerButton) {
                     phoneNetLobbyAddress.clear();
                     phoneNetMenu = PhoneNetMenu::CONNECT;
                 });
+                // DISTRIBUTION-PHASE1.md §4 — Publish toggle. Writes/
+                // removes the per-canvas marker; the launch-time scan
+                // and §4.4 navigate-away handoff spawn the side-instance.
+                // Defensive sideInstances->stop on unpublish in case
+                // we have a lingering background host for this path.
+                if (main.world && !main.world->filePath.empty()) {
+                    const auto thisPath = main.world->filePath;
+                    const bool subEligible =
+                        main.world->has_subscription_metadata() ||
+                        (main.devKeys.is_loaded() &&
+                         !main.devKeys.canvas_id().empty() &&
+                         !main.devKeys.member_pubkey().empty() &&
+                         !main.devKeys.app_pubkey().empty());
+                    if (!subEligible) {
+                        // Skip the menu entry entirely on phone; the
+                        // desktop shows a greyed explanation but on
+                        // phone the popup is space-constrained.
+                    } else if (PublishedCanvases::is_published(thisPath)) {
+                        menu_item("phone unpublish", "Unpublish", [&, thisPath] {
+                            PublishedCanvases::clear_published(thisPath);
+                            if (main.sideInstances)
+                                main.sideInstances->stop(thisPath);
+                        });
+                    } else {
+                        menu_item("phone publish", "Publish to subscribers", [&, thisPath] {
+                            PublishedCanvases::set_published(thisPath);
+                        });
+                    }
+                }
             }
         }, LayoutElement::Callbacks {
             .onClick = [&, triggerButton] (LayoutElement* l, const InputManager::MouseButtonCallbackArgs& button) {
@@ -411,10 +485,17 @@ void PhoneDrawingProgramScreen::network_menu_popup() {
                 switch (phoneNetMenu) {
                     case PhoneNetMenu::HOST: {
                         text_label_centered(gui, "Host this canvas");
-                        // Hosting-mode toggle. SUBSCRIPTION is greyed out
-                        // unless the canvas has portal-issued metadata
-                        // (same rule as the desktop host menu).
-                        const bool subEligible = main.world->has_subscription_metadata();
+                        // Hosting-mode toggle. SUBSCRIPTION is clickable
+                        // when the canvas has portal-issued metadata OR
+                        // when dev keys can supply it via the auto-
+                        // populate path in World::start_hosting. Same
+                        // rule the desktop HOST_MENU uses.
+                        const bool subEligible =
+                            main.world->has_subscription_metadata() ||
+                            (main.devKeys.is_loaded() &&
+                             !main.devKeys.canvas_id().empty() &&
+                             !main.devKeys.member_pubkey().empty() &&
+                             !main.devKeys.app_pubkey().empty());
                         text_label(gui, "Mode:");
                         left_to_right_line_layout(gui, [&]() {
                             text_button(gui, "phone host mode collab", "Collab", {
@@ -438,15 +519,24 @@ void PhoneDrawingProgramScreen::network_menu_popup() {
                                     ? std::function<void()>([&] {
                                         if (phoneHostMode != HostMode::SUBSCRIPTION) {
                                             phoneHostMode = HostMode::SUBSCRIPTION;
-                                            // DISTRIBUTION-PHASE0.md §12.5
+                                            // DISTRIBUTION-PHASE0.md §12.5 — preview the share
+                                            // code; use devKeys.canvas_id() as a fallback when
+                                            // the canvas has no canvasId of its own (same
+                                            // fallback start_hosting auto-populate applies).
+                                            const std::string effectiveCanvasId =
+                                                !main.world->canvasId.empty()
+                                                    ? main.world->canvasId
+                                                    : (main.devKeys.is_loaded()
+                                                        ? main.devKeys.canvas_id()
+                                                        : std::string{});
                                             std::string previewGlobal;
                                             if (main.devKeys.is_loaded()) {
-                                                previewGlobal = CanvasShareId::derive_global_id(main.devKeys.app_seed_bytes(), main.world->canvasId);
-                                                phoneNetLocalID = CanvasShareId::derive_local_id(main.devKeys.app_seed_bytes(), main.world->canvasId);
+                                                previewGlobal = CanvasShareId::derive_global_id(main.devKeys.app_seed_bytes(), effectiveCanvasId);
+                                                phoneNetLocalID = CanvasShareId::derive_local_id(main.devKeys.app_seed_bytes(), effectiveCanvasId);
                                             }
                                             if (previewGlobal.empty() || phoneNetLocalID.empty()) {
                                                 previewGlobal = NetLibrary::get_global_id();
-                                                phoneNetLocalID = NetLibrary::deterministic_local_id_from_seed(main.world->canvasId);
+                                                phoneNetLocalID = NetLibrary::deterministic_local_id_from_seed(effectiveCanvasId);
                                             }
                                             phoneNetLobbyAddress = previewGlobal + phoneNetLocalID;
                                         }
@@ -455,7 +545,7 @@ void PhoneDrawingProgramScreen::network_menu_popup() {
                             });
                         });
                         if(!subEligible) {
-                            text_label(gui, "(Publish via portal to enable Subscription)");
+                            text_label(gui, "(Publish via portal first, or set dev keys, to enable Subscription)");
                         }
                         input_text_field(gui, "phone host lobby field", "Lobby", &phoneNetLobbyAddress);
                         left_to_right_line_layout(gui, [&]() {
