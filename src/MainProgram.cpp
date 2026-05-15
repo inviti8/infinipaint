@@ -241,17 +241,48 @@ sk_sp<SkSurface> MainProgram::create_native_surface(Vector2i resolution, bool is
 }
 
 void MainProgram::create_new_tab(const CustomEvents::OpenInfiniPaintFileEvent& openFile) {
+    // DISTRIBUTION-PHASE1.md §4.4 — foreground-open hook. If we have a
+    // side-instance currently hosting this canvas, stop it before the
+    // foreground World loads — otherwise both processes have the file
+    // open and the side-instance keeps broadcasting stale on-disk state
+    // while the artist edits in foreground. SideInstances::stop sends
+    // STOP via stdin → side-instance saves + releases lock + exits → we
+    // wait synchronously with a 3s timeout.
+    bool wasManagingSideInstance = false;
+    if (openFile.filePathSource.has_value() && sideInstances &&
+        sideInstances->is_managing(openFile.filePathSource.value()))
+    {
+        sideInstances->stop(openFile.filePathSource.value());
+        wasManagingSideInstance = true;
+    }
+
     std::shared_ptr<World> newWorld;
     try {
         newWorld = std::make_shared<World>(*this, openFile);
     }
     catch(const std::runtime_error& e) {
         Logger::get().log("WORLDFATAL", "Failed to open canvas: " + (openFile.filePathSource.has_value() ? openFile.filePathSource.value().string() : "NO PATH") + " with error: " + e.what());
+        // If we stopped a side-instance for this canvas, respawn it so
+        // background hosting resumes — without this, a failed-open would
+        // silently drop the canvas off subscribers.
+        if (wasManagingSideInstance && sideInstances)
+            sideInstances->spawn(openFile.filePathSource.value());
         return;
     }
     worlds.emplace_back(newWorld);
     switch_to_tab(worlds.size() - 1);
     g.gui.set_to_layout();
+
+    // §4.4 step 6: auto-resume hosting in foreground for continuity.
+    // The side-instance was serving on the canvas-seed-derived globalID;
+    // start_hosting re-registers the same globalID via the signaling
+    // server's "supersede" path, so subscribers reconnect to the same
+    // address. No-op if start_hosting falls back to COLLAB (e.g. no dev
+    // keys / no portal metadata) — we only handoff hosting that was
+    // already SUBSCRIPTION.
+    if (wasManagingSideInstance) {
+        newWorld->start_hosting(HostMode::SUBSCRIPTION, "", "");
+    }
 }
 
 void MainProgram::set_tab_to_close(World* world) {
@@ -454,6 +485,17 @@ void MainProgram::set_screen(std::function<std::unique_ptr<Screen>(std::unique_p
 
 void MainProgram::close_set_to_close_tabs() {
     if(!tabsToClose.empty()) {
+        // DISTRIBUTION-PHASE1.md §4.4 — reverse handoff. Capture the
+        // disk paths of every canvas being closed BEFORE we erase them
+        // from `worlds`, so the spawn pass below can spin up a side-
+        // instance for each one whose marker is still present.
+        std::vector<std::filesystem::path> closedPaths;
+        for (auto& w : worlds) {
+            if (tabsToClose.contains(w.get()) && !w->filePath.empty()) {
+                closedPaths.emplace_back(w->filePath);
+            }
+        }
+
         std::erase_if(worlds, [&](auto& w) {
             if(tabsToClose.contains(w.get())) {
                 if(w == world)
@@ -470,6 +512,25 @@ void MainProgram::close_set_to_close_tabs() {
             worldIndex = std::find(worlds.begin(), worlds.end(), world) - worlds.begin();
         else
             switch_to_tab(0);
+
+        // §4.4 reverse handoff: respawn a side-instance for each closed
+        // canvas that still has a publish marker, so background hosting
+        // resumes once foreground is no longer holding the file. Skip
+        // during app shutdown — the SideInstances dtor would reap the
+        // new processes immediately. Skip if the lock is still held by
+        // someone (e.g. our own foreground started a new tab for the
+        // same path before we got here, or another Inkternity instance
+        // raced us).
+        if (!setToQuit && sideInstances) {
+            for (const auto& p : closedPaths) {
+                if (PublishedCanvases::is_published(p) &&
+                    !PublishedCanvases::is_locked_by_anyone(p))
+                {
+                    sideInstances->spawn(p);
+                }
+            }
+        }
+
         tabsToClose.clear();
         g.gui.set_to_layout();
     }
