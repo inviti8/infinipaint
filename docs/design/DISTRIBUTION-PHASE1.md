@@ -300,22 +300,33 @@ NEW src/crypto/stellar/          per decision §8.1 — small in-tree
 
 ## 4. Workstream B — Tagged-file auto-hosting
 
-> **Architectural reality, baked in from the start of this section.** The
-> initial scoping (cap-of-3 in §8.5, single shared
-> `inkternity_published.json` under `configPath`) ran into two real
-> constraints during build:
+> **Architectural reality, baked in from the start of this section.**
+> The §4 design below has been through three iterations:
 >
-> 1. `NetLibrary` is process-singleton on `globalID` + the signaling
->    websocket. A single Inkternity process can host **at most one**
->    canvas in SUBSCRIPTION mode at a time.
-> 2. `configPath` is shared across every Inkternity process on the
->    machine — a central single-slot registry under it can't represent
->    "instance A hosts canvas X, instance B hosts canvas Y."
+> 1. **Initial:** cap-of-3 in §8.5, single shared
+>    `inkternity_published.json` under `configPath`.
+> 2. **First redesign:** per-canvas marker + per-canvas runtime lock +
+>    artist manually launches N Inkternity instances to host N canvases.
+>    Forced by two implementation constraints:
+>    1. `NetLibrary` is process-singleton on `globalID` + the signaling
+>       websocket. A single Inkternity process can host **at most one**
+>       canvas in SUBSCRIPTION mode at a time.
+>    2. `configPath` is shared across every Inkternity process on the
+>       machine — a central single-slot registry under it can't
+>       represent "instance A hosts canvas X, instance B hosts canvas Y."
+> 3. **Current — multi-process, headless side-instances.** The artist
+>    runs *one* Inkternity. On launch, it spawns one headless
+>    side-instance per published canvas (no window, no Skia GPU
+>    context, ~30–80 MB each). Each side-instance hosts its assigned
+>    canvas; the main process stays focused on editing. The cap-1 /
+>    config-shared constraints from (2) still hold structurally — the
+>    multi-process model is how we get N hosts without forcing the
+>    artist to launch multiple windows.
 >
-> The §4 design below is the *redesigned* model that takes both as
-> givens. Per-canvas marker + per-canvas runtime lock + multi-instance
-> as the multi-canvas story. The original cap-of-3 / central registry
-> framing is gone; §8.5 is amended.
+> The current model takes (3) as the design contract. The cap-3
+> framing is gone (§8.5 amended). The "manually launch N instances"
+> framing from iteration 2 is gone too — the main process now
+> orchestrates the side-instance fleet automatically.
 
 ### 4.1 The shape
 
@@ -330,28 +341,51 @@ After Workstream B:
    Canvas Settings menu.
 2. A `<name>.inkternity.publish` sidecar JSON is written next to the
    canvas file.
-3. From now on, when Inkternity launches with that canvas in its
-   saves directory, it claims a per-canvas runtime lock and serves
-   the canvas in the background — no button press required.
+3. The next time the artist launches Inkternity (or immediately, if
+   it's already running — see §4.3), the main process **spawns a
+   headless side-instance** of itself, passing `--host-only <path>`.
+   That side-instance is a child OS process: no SDL window, no Skia
+   GPU context, no UI — just `World` + NetLibrary serving the canvas.
+   The artist's main window is unaffected.
 4. The artist can flip the toggle off (deletes the sidecar) to stop
-   publishing.
+   publishing. The main process signals the corresponding
+   side-instance to exit.
 
-**Per-instance vs per-canvas.** Cap-of-1 hosted canvas per process is
-*structural* (NetLibrary). The artist who needs N hosted canvases
-launches N Inkternity instances; each instance grabs the first
-published canvas it can lock. No central cap. No CLI flags, no
-single-instance lock — just `Open another Inkternity window` and a
-second canvas comes online.
+**One artist, one main window, N background hosts.** Cap-of-1 hosted
+canvas per process is structural (NetLibrary is all-static). We get
+N concurrent hosts by spawning N processes — but the artist never
+manages those processes directly. The main process is the
+orchestrator; the side-instances are short-lived workers it owns.
+
+**Why headless side-instances rather than in-process background
+`World`s.** Two reasons fall out of the spike (§4.8):
+
+1. **Structural fit.** `NetLibrary` is process-singleton (`alreadyInitialized`
+   atomic + all-static state, all-static `peers` map / `globalID` /
+   `ws`). One process really can host only one canvas. Building two
+   `World`s in the same process would fight over the same NetLibrary
+   slot.
+2. **Memory and resource cost.** A side-instance with no window, no
+   `GrDirectContext`, and no `SDL_INIT_VIDEO` is ~30–80 MB instead of
+   the ~200–500 MB a full UI process would cost. 10 published canvases
+   becomes ~500 MB instead of ~3 GB. Phase 1 cost concern essentially
+   evaporates.
 
 The wire format and signaling server are unchanged. Each running
-hosted canvas drives the same `World::start_hosting` code path the
+side-instance drives the same `World::start_hosting` code path the
 Host button already drives, with `hostMode = SUBSCRIPTION` and the
-§12.5-derived share code.
+§12.5-derived share code. Signaling-server handoff is trivially
+clean: `inkternity-server/signaling/server.py` explicitly replaces
+prior connections from the same `globalID` (`code=1000 reason="superseded"`),
+so when the main process takes over a canvas from its side-instance,
+subscribers' WebRTC peer connections re-negotiate against the new
+holder without manual coordination.
 
-This is **not** a daemon. Closing the Inkternity instance hosting
-canvas X stops X. Launching another Inkternity instance picks up
-where the previous one left off (it claims X via the lock-file
-mechanism described below).
+This is **not** a daemon. Closing the artist's Inkternity stops *all*
+of its side-instances — they're children of the main process and
+exit when the main process does (orphan detection in the
+side-instance polls for parent PID and self-terminates if main
+dies abnormally; see §4.4).
 
 ### 4.2 Per-canvas state files
 
@@ -386,15 +420,20 @@ controls, expiry, etc.).
 
 **Lock semantics.**
 - Acquisition is atomic via `O_CREAT | O_EXCL` (POSIX) /
-  `CREATE_NEW` (Windows). Two instances calling
+  `CREATE_NEW` (Windows). Two processes calling
   `try_acquire_lock(canvas)` simultaneously — exactly one wins.
-- Lock content is the holder's PID. On scan, a lock whose PID is no
-  longer alive (process crashed, killed, or closed without RAII
-  release) is treated as **stale** and silently reclaimed by the next
-  instance that wants it.
+- Lock content is the holder's PID. The holder can be either a
+  side-instance (the normal case, when the canvas is background-hosted)
+  or the main process (the takeover case, when the artist is editing
+  the published canvas in foreground). The acquire-release semantics
+  are identical for both.
+- On scan, a lock whose PID is no longer alive (process crashed,
+  killed, or closed without RAII release) is treated as **stale**
+  and silently reclaimed by the next process that wants it.
 - Released via RAII on graceful shutdown
-  (`PublishedCanvases::release_all_held()` from MainProgram dtor),
-  or by stale-detection on subsequent launches.
+  (`PublishedCanvases::release_all_held()` from MainProgram dtor in
+  the main process, or from the `--host-only` shutdown path in a
+  side-instance), or by stale-detection on subsequent launches.
 
 The marker is independent of `has_subscription_metadata()` — but the
 Toolbar gates *setting* the marker on
@@ -405,76 +444,137 @@ work lands).
 
 ### 4.3 App-launch sequence
 
-In `main.cpp` after `MainProgram` construction, before the file-select
-screen renders its first frame:
+There are two distinct startup paths in the same binary now:
+
+**Main process (UI):** unchanged through `MainProgram` construction.
+After config + DevKeys load, before the file-select screen renders
+its first frame:
 
 ```cpp
-mS.m->hostedCanvasPath = PublishedCanvases::claim_first_available(
+// Scan saves/ for canvases with publish markers. For each one we can
+// claim (i.e. nobody else holds the lock), spawn a side-instance.
+auto candidates = PublishedCanvases::scan_published(
     mS.m->conf.configPath / "saves");
-if (mS.m->hostedCanvasPath) {
-    main.backgroundHost = make_background_world(*mS.m->hostedCanvasPath);
+for (const auto& canvasPath : candidates) {
+    if (PublishedCanvases::is_locked_by_anyone(canvasPath)) continue;
+    mS.m->sideInstances.spawn(canvasPath);  // SDL_CreateProcess
 }
 ```
 
-`claim_first_available` walks `saves/`, gathers every canvas with a
-marker, and tries to acquire each lock in turn. Returns the first
-canvas it successfully locked, or `nullopt` (no published canvases,
-or all are locked by other live Inkternity instances). The returned
-path is the canvas this process will background-host.
+`sideInstances.spawn(path)` builds argv =
+`{self_exe, "--host-only", path.string(), nullptr}` and calls
+`SDL_CreateProcess(argv, /*pipe_stdio=*/true)`. The piped stdio is
+how the main process signals graceful shutdown later (write `"STOP\n"`).
+It keeps the `SDL_Process*` and the canvas path in a map keyed by
+canonical path, used for handoff and shutdown.
 
-**For the single background `World`** (deferred — see §4.6 known
-gap): spawn a full `World` instance. The instance lives alongside
-`main.world` in a `main.backgroundHost` slot; the main loop only
-renders `main.world`. The background instance ticks via the existing
-NetLibrary update path which already iterates registered NetServers.
-No new "headless" mode — slim-down is premature per the original §4.3
-reasoning.
+**Side-instance (`--host-only`):** an early dispatch in `main.cpp`,
+*before* `initialize_sdl` / `MainProgram` / window creation — same
+bypass pattern as the existing `--mypaint-*` flags and the
+`--test-*` harness flags (§4.8). The headless path:
 
-**Multi-instance flow:**
-1. Artist launches Inkternity. It scans `saves/`, locks canvas A
-   (which has a marker), spawns the background-hosted `World` for A.
-2. Artist launches a second Inkternity. It scans `saves/`, sees A
-   is locked (live PID), tries B (also marked), locks it, spawns the
-   background-hosted `World` for B.
-3. Artist launches a third. Sees A and B locked, tries C, etc.
-4. Closing instance #2 releases B's lock. A subsequent fourth launch
-   picks B back up.
+```cpp
+if (auto rc = HostOnly::dispatch(argc, argv)) {
+    return *rc == 0 ? SDL_APP_SUCCESS : SDL_APP_FAILURE;
+}
+```
 
-No CLI args. No per-instance config dirs. The OS process boundary
-*is* the per-instance scope; the per-canvas lock file is the
-coordination primitive between instances.
+Inside `HostOnly::dispatch`, when the flag matches:
+
+1. Minimal SDL init (no `SDL_INIT_VIDEO`).
+2. Logger to a per-canvas file (e.g. `<configPath>/logs/host-<name>.log`).
+3. Construct a `MainProgram` instance whose `window` struct stays
+   uninitialised (no `sdlWindow`, no GPU `ctx`, no surfaces). Set
+   `window.size` to a placeholder so `World`'s ctor doesn't trip.
+4. Load DevKeys.
+5. `try_acquire_lock(canvas_path)` — if it fails (another process beat
+   us), exit 2.
+6. Construct `World` for the canvas via the normal load path.
+7. `world.start_hosting(SUBSCRIPTION, ...)`.
+8. Idle loop: tick `NetLibrary::update()` and a single check per
+   iteration of (a) parent-process alive (PPID poll on POSIX,
+   `OpenProcess`+`WaitForSingleObject` on Windows), (b) stdin has
+   "STOP\n" pending. Either trigger → graceful exit: save canvas,
+   release lock, return 0.
+
+`World::update()` is a one-liner (`connection_update()`), so the
+side-instance's main loop is small. `World::draw()` is never called.
+
+**Result, in artist-visible terms:**
+1. Artist launches Inkternity. Main process appears. In the background,
+   side-instances for each published canvas come online over the next
+   ~1–2s and start serving subscribers.
+2. The artist edits a *different* canvas in foreground; the
+   side-instances keep running undisturbed.
+3. Closing Inkternity stops everything (main signals all side-instances,
+   waits for their exits, then itself exits).
+
+No CLI args for the artist. No `Open another window` instructions.
+The OS-process boundary is the per-host scope; the per-canvas lock
+file remains the coordination primitive between the main process,
+its side-instances, and (for resilience) any leftover processes from
+a prior session.
 
 ### 4.4 What happens when the artist opens the published canvas?
 
-Cap-1-per-process makes this clean:
+Cross-process kill-and-takeover handles this cleanly. Hosting moves
+between processes; the canvas keypair and `globalID` derive from
+`(app_secret, canvas_id)` and are stable across the transfer, so
+subscribers see a brief reconnect rather than a session reset.
 
-1. **Artist opens the canvas this instance is currently background-
-   hosting.** The lock is released, the background `World` is torn
-   down, the foreground `World` loads from disk and re-acquires the
-   lock + starts hosting normally. Subscribers see a brief drop +
-   reconnect.
-2. **Artist closes back to file-select.** If the canvas is still
-   marked published, foreground releases the lock, the background
-   `World` is re-spawned, takes the lock, resumes hosting.
+**Artist opens a canvas the main process knows is being background-
+hosted by one of its side-instances:**
+1. Main process looks up the side-instance for that canvas path in
+   `sideInstances` map.
+2. Main writes `"STOP\n"` to the side-instance's stdin.
+3. Side-instance receives STOP → saves canvas → releases lock → exits 0.
+4. Main waits on `SDL_WaitProcess` with a timeout (~2s). If the
+   side-instance doesn't exit gracefully, `SDL_KillProcess` it and
+   reclaim the lock via stale-PID detection.
+5. Main acquires the lock for the canvas.
+6. Main loads the canvas in foreground (`MainProgram::create_new_tab`)
+   and starts hosting via the existing Host menu code path.
+7. Subscribers' WebRTC peer connections drop, reconnect through
+   signaling, and the server replaces the old globalID slot with the
+   main process's WSS connection (`code=1000 reason="superseded"`
+   from `signaling/server.py`).
 
-**Artist opens a *different* canvas (any state).** Background keeps
-running. Two `World`s coexist; foreground for editing, background for
-serving. Memory cost is 2 × per-canvas footprint while both are
-active.
+**Artist navigates back from the published canvas to file-select:**
+1. Foreground world is destroyed normally (existing tab-close path).
+2. As part of that destruction (or in a follow-up step), main
+   releases the canvas's lock.
+3. If the publish marker is still present, main spawns a fresh
+   side-instance for that canvas.
+4. Side-instance acquires the lock and resumes hosting. Subscribers
+   reconnect again.
 
-**Artist opens a published canvas hosted by a *different* Inkternity
-instance.** The other instance owns the lock. This instance can still
-load the file for editing — but trying to Host (manual or auto)
-fails because the lock can't be acquired. UI shows
-"Hosting (another instance)" on the file in the file list; the
-Toolbar's Host menu disables SUBSCRIPTION mode with a note pointing
-the artist to the other window.
+**Artist opens a *different* canvas (any state).** Side-instances
+keep running untouched. The main process holds zero hosting work and
+just edits in foreground. No memory doubling — the foreground
+`World` is the only `World` in the main process; the host `World`s
+live in their respective side-instances.
 
-This avoids the original §4.4 "promote to foreground" state-shuffling
-entirely — foreground and background always load from disk, never
-share state. Subscribers see a brief disconnection on open and
-another on close; for a publishing flow where the artist mostly
-*isn't* editing the published canvas, that's fine.
+**Artist opens a canvas published in a corrupt or unknown state**
+(e.g., marker present but no side-instance is alive holding the
+lock — possible if the side-instance crashed). Main's
+`is_locked_by_anyone()` returns false (stale-PID path), main
+acquires the lock for foreground hosting normally. Side-instance
+respawns when the artist navigates back.
+
+**Edge: subscriber connected during the handoff window.** Between
+step 3 (side-instance exits) and step 6 (main starts hosting), there
+is a brief window — typically <500ms — where a new subscriber
+trying to connect finds no signaling-server entry for the globalID.
+Their client retries; reconnect succeeds once main is up. Acceptable
+for Phase 1.
+
+**Edge: main process killed -9 with side-instances running.** The
+orphan-detect path in each side-instance polls for parent PID (~200ms
+cadence per the test harness, §4.8) and self-terminates on
+parent-gone. Worst case is a ~1s window of "main is dead, side
+still serving" — harmless. Lock files are released by the
+side-instances' own RAII shutdown handlers (graceful exit triggered
+by the orphan-detect path).
 
 ### 4.5 UI surfaces
 
@@ -482,69 +582,109 @@ another on close; for a publishing flow where the artist mostly
 src/Screens/FileSelectScreen.cpp Files tab: per-file caption row
                                  reflecting the lock state:
                                    "* Hosting (this instance)"
-                                   "* Hosting (another instance)"
+                                   "* Hosting (a side-instance)"
+                                   "* Hosting (another Inkternity)"
                                    "* Published (idle)"
-                                 Settings tab: a small "Auto-hosting"
-                                 block showing what THIS instance has
-                                 locked at startup + a count of
-                                 markers found in saves/. When
-                                 nothing is locked but markers exist,
-                                 explains the lock-by-other-instance
-                                 case.
+                                 Settings tab: an "Auto-hosting" block
+                                 listing each canvas this Inkternity
+                                 is hosting (via main process or a
+                                 side-instance), with a summary count.
 src/Toolbar.cpp                  Canvas Settings menu: "Publish to
                                  subscribers" toggle (writes the
                                  marker sidecar). Disabled when
                                  has_subscription_metadata()==false
                                  with the same explanatory note as
                                  the existing Host menu SUBSCRIPTION
-                                 button. No "replace" confirmation —
-                                 multiple canvases can be published
-                                 independently.
-src/World.cpp                    Reused as-is — the background
-                                 instance is a full `World`, just
-                                 never gets main-loop draw/update
-                                 calls. No new ctor or "headless"
-                                 mode.
-src/main.cpp                     post-init pass: scan saves/, claim
-                                 first available, record on
-                                 `hostedCanvasPath`. (Spawning the
-                                 background World is the deferred
-                                 piece.)
-NEW src/PublishedCanvases.{hpp,cpp}
-                                 Namespace with marker + lock helpers:
-                                 is_published / set_published /
-                                 clear_published, try_acquire_lock /
+                                 button. Side effect of enabling: main
+                                 process spawns a side-instance for
+                                 this canvas immediately. Side effect
+                                 of disabling: main signals the
+                                 side-instance to exit, removes marker.
+                                 No "replace" confirmation — canvases
+                                 are published independently.
+src/World.cpp                    Reused as-is for the foreground
+                                 hosting path. The headless side-
+                                 instance reuses the same World ctor +
+                                 World::start_hosting; the
+                                 differentiation is that the host-only
+                                 path runs in a process with no
+                                 SDL window / no Skia GPU context. See
+                                 §4.6 for the architectural risk on
+                                 the subscriber-wire-op ingestion path
+                                 (DrawingProgram), which the runtime
+                                 implementation pass will verify.
+src/main.cpp                     Two new early-dispatch branches
+                                 (before SDL/MainProgram init):
+                                   --host-only <path>  side-instance
+                                                       entry point
+                                   --test-* (§4.8)     harness flags
+                                 After MainProgram init: scan saves/,
+                                 spawn side-instances for each marked
+                                 canvas not already locked.
+src/PublishedCanvases.{hpp,cpp}  (already landed) marker + lock
+                                 helpers: is_published / set_published
+                                 / clear_published, try_acquire_lock /
                                  release_lock / is_locked_by_us /
-                                 is_locked_by_anyone,
-                                 scan_published / claim_first_available /
-                                 release_all_held.
-                                 Stale-PID detection cross-platform
-                                 (OpenProcess on Windows, kill(pid,0)
-                                 on POSIX).
+                                 is_locked_by_anyone, scan_published /
+                                 claim_first_available /
+                                 release_all_held. Stale-PID detection
+                                 cross-platform (OpenProcess on
+                                 Windows, kill(pid,0) on POSIX).
+NEW src/MainProgram side-instance map
+                                 std::unordered_map<canonical path,
+                                                    SDL_Process*>
+                                 plus spawn/signal/wait helpers. RAII
+                                 dtor signals STOP to all + waits.
+src/Distribution/ProcessTests.*  (already landed) process spawn/IPC/
+                                 lock-handoff/orphan-detect test
+                                 harness. See §4.8.
+NEW src/Distribution/HostOnly.*  --host-only entry: minimal SDL init,
+                                 stub MainProgram window, load
+                                 DevKeys, construct World, start
+                                 hosting, idle on stdin + parent-PID
+                                 poll, graceful exit on STOP.
 ```
 
 ### 4.6 Surfaces NOT touched
 
-- No new binary.
+- **No new binary.** Same `inkternity.exe` / `inkternity.app`; the
+  side-instance is the same executable invoked with `--host-only`.
 - No CMake target split.
-- No platform service / launchd / systemd integration.
+- No platform service / launchd / systemd integration. Side-instances
+  are short-lived OS children of the artist's running Inkternity,
+  not OS-managed services.
 - No portal endpoint.
-- No signaling-server change.
+- No signaling-server change. The existing
+  `inkternity-server/signaling/server.py` "new connection wins"
+  behavior is exactly what we need; verified during the spike.
 - No notarization complexity (one app, one DMG, like today).
 - **No central registry** — the previously-scoped
-  `inkternity_published.json` under `configPath` is gone, removed
-  during the redesign. State that needs to be per-canvas lives with
-  the canvas (sidecars); state that needs to be per-instance lives
-  in process memory + the lock file's PID.
+  `inkternity_published.json` under `configPath` is gone. State that
+  needs to be per-canvas lives with the canvas (sidecars); state that
+  needs to be per-instance lives in process memory + the lock file's
+  PID.
 
-**Known gap (intentional, not a regression):** the marker + lock
-machinery and the launch-time `claim_first_available` are wired up,
-but spawning the actual background-hosted `World` for the locked
-canvas is not yet built. Today the lock is acquired and recorded on
-`MainProgram::hostedCanvasPath`; the artist still has to open the
-canvas and click Host manually. That last step (constructing a
-non-foreground `World` from disk + driving it through
-`init_net_library` + `start_hosting`) is the next iteration of B.
+**Known architectural risk to resolve during implementation:**
+the brush-stroke ingestion path on the host side. When a subscriber
+in SUBSCRIPTION mode paints, the wire op routes through
+`NetServer` → `DrawingProgram` on the host. If that path lazily
+uploads tiles to a `GrDirectContext` for display caching, a headless
+side-instance (with no GPU context) will crash on the first
+incoming stroke. The libmypaint backing surfaces are CPU
+(`MyPaintFixedTiledSurface`), so the underlying tile updates are
+fine; what needs verification is that no intermediate cache or
+display-pre-rasterization step assumes a GPU context exists. We'll
+resolve this during the runtime implementation pass and either
+confirm it's fine or carve a narrow guard. The test harness (§4.8)
+proves the process plumbing in isolation, so this is the only
+canvas-side unknown left.
+
+**Known gaps (intentional, in order of remaining work):**
+1. `HostOnly::dispatch` / `--host-only` entry point.
+2. `MainProgram::sideInstances` map + spawn/signal/wait helpers.
+3. Launch-time scan-and-spawn pass.
+4. Toolbar Publish-toggle side effects (spawn/kill).
+5. Foreground-open / foreground-close hooks for the handoff in §4.4.
 
 ### 4.7 Risks
 
@@ -556,21 +696,89 @@ non-foreground `World` from disk + driving it through
 - **PID reuse on long-running systems.** A reclaimed PID could in
   principle be a different process unrelated to Inkternity. The
   acquire-then-write atomicity protects against the wrong-process
-  case for *new* lock acquisitions; for *stale-detection*, a
-  reused PID just means we leave the lock file alone (treat as
-  alive). Result: a marker stays "Hosting (another instance)" until
+  case for *new* lock acquisitions; for *stale-detection*, a reused
+  PID just means we leave the lock file alone (treat as alive).
+  Result: a marker stays "Hosting (a side-instance)" until
   Inkternity actually launches and reclaims it. Tolerable.
 - **Marker drift on file moves.** If the user moves
   `mycanvas.inkternity` without also moving `mycanvas.inkternity.publish`,
   publish state is lost. Same risk class as the existing `.jpg`
   thumbnail. Document; consider a future `World::save_to_file` hook
   that renames sidecars.
-- **Memory cost of 2 × `World` (foreground + background) when the
-  artist has the published canvas open in foreground.** Acceptable;
-  this is an artist's primary publishing flow, not the common case.
+- **Side-instance memory cost.** ~30–80 MB per side-instance with
+  headless build (no SDL_INIT_VIDEO, no GrDirectContext, no font
+  caching, no Clay UI state). Linear in number of published canvases.
+  For an artist with 10 published canvases the total background
+  footprint is ~500 MB, well within Phase 1 cost tolerance.
+- **Subscriber reconnect storm on takeover.** When the artist opens a
+  published canvas for editing, all live subscribers' WebRTC peer
+  connections drop and re-negotiate against the new holder via the
+  signaling server's "supersede" path. For canvases with many
+  subscribers this is a brief burst of signaling traffic. Acceptable;
+  not a Phase 1 scaling concern.
+- **Process orphans.** Main process killed -9 without warning leaves
+  side-instances running. Mitigated by parent-PID polling in each
+  side-instance (~200ms cadence per the test harness); orphan
+  side-instances self-terminate within ~1s of main's death. Lock
+  files are released via their RAII shutdown paths.
+- **Cross-platform process management quirks.** SDL3
+  `SDL_CreateProcess` is portable; the test harness (§4.8) verifies
+  the full spawn / kill / stdin-stop / orphan-detect / lock-handoff
+  cycle on Windows. macOS and Linux verification deferred to the
+  release-readiness pass; no platform-specific code in the side-
+  instance entry point, so risk is low.
 - **Artist confusion: "why is my CPU/network busy when I'm not
-  hosting anything?"** Mitigation: clear file-list captions + the
-  Settings auto-hosting block.
+  hosting anything?"** Mitigation: clear file-list captions ("a
+  side-instance is hosting this") and the Settings auto-hosting
+  block enumerating each background host.
+- **Handoff window during foreground takeover.** ~500ms gap between
+  side-instance exit and main process binding the globalID. New
+  subscriber connection attempts in that window get no response and
+  retry; Inkternity's existing client-side reconnect handles it.
+  Established subscribers see a WebRTC disconnect → reconnect with
+  one round-trip through signaling.
+
+### 4.8 Verification — test harness
+
+The multi-process side-instance design rests on several primitives we
+needed to confirm work reliably across platforms before betting the
+canvas-handoff flow on them. `src/Distribution/ProcessTests.{hpp,cpp}`
+is a self-contained harness exercising each primitive in isolation —
+no NetLibrary, no World, no canvas, no UI. Six `--test-*` argv flags
+dispatch *before* SDL/MainProgram init (same bypass pattern as
+`--mypaint-hello-dab`); each test reports PASS/FAIL on stderr and
+exits 0/1.
+
+| Flag | What it verifies |
+|---|---|
+| `--test-spawn-roundtrip` | `SDL_CreateProcess` + child exits cleanly with code 0 |
+| `--test-spawn-kill` | Long-running child + `SDL_KillProcess` + verify process is gone |
+| `--test-spawn-stdin-stop` | Piped stdio: parent writes `STOP\n` over stdin, child reads it on its `std::cin`, responds with `STOPPED\n` on stdout, exits 0 |
+| `--test-spawn-multi <N>` | N concurrent looping children, all spawned, all alive, all killed cleanly |
+| `--test-lock-handoff <path>` | Child claims `PublishedCanvases` lock, parent verifies via `is_locked_by_anyone()`, parent sends STOP, child releases lock + exits, parent verifies lock is gone |
+| `--test-spawn-orphan-detect <result>` (phase 1) + `--verify-orphan-detect <pid> <result>` (phase 2) | Side-instance detects parent process death via PPID polling and self-terminates with a result-file trace |
+
+All six pass on Windows as of the harness landing commit. Each test
+is small (≤150 LOC), exit-code-driven, and runnable from a script for
+CI integration once we wire that up.
+
+**What the harness leaves to the runtime implementation:**
+
+- `World` construction in a headless process (no
+  `SDL_CreateWindow`, no `GrDirectContext`). The spike showed
+  `World::update()` is a one-liner and `World::draw()` is the only
+  Skia-touching method; provisional plan is to stub the `MainProgram::Window`
+  fields and never invoke `draw`. Verified during implementation.
+- `NetLibrary` lifecycle inside a side-instance (init + start_hosting
+  + idle update loop + clean destroy on STOP). All-static; init/destroy
+  exist; signaling-server "supersede" semantics already confirmed
+  client-side from reading `inkternity-server/signaling/server.py`.
+- The brush-stroke ingestion path on the host (§4.6 architectural
+  risk). Verified by spinning up a side-instance, connecting a real
+  client, painting a stroke, and confirming the host doesn't crash.
+
+The split (harness for plumbing, runtime work for canvas-side) keeps
+each implementation phase honest about what it's proving.
 
 ---
 
@@ -588,15 +796,17 @@ migration) → A.2 (UI surface + import) → B (auto-hosting)**.
 
 ## 6. Out of scope / explicitly tabled
 
-- **True headless / background-service daemon.** Inkternity running
-  without a window (system-tray icon on Windows, menu-bar item on
-  macOS, systemd user service on Linux), serving canvases 24/7
-  whether or not the desktop app is launched. Not in Phase 1 — the
-  process-model change, packaging change, and notarization change
-  combined are a significant project, and the tagged-file approach
-  covers most practical scenarios. Revisit when there's a concrete
-  artist asking for 24/7 hosting they can't get from "leave my
-  machine on with Inkternity launched."
+- **True background-service daemon.** Inkternity running 24/7 as a
+  system service (system-tray icon on Windows, menu-bar item on
+  macOS, systemd user service on Linux), serving canvases whether
+  or not the artist has launched the desktop app. Not in Phase 1 —
+  the OS-service registration, packaging change, and notarization
+  change combined are a significant project. Note this is **distinct**
+  from the in-scope `--host-only` side-instances of §4.3: those are
+  short-lived OS children of the artist's running Inkternity, not
+  background OS services. Revisit a true daemon when there's a
+  concrete artist asking for 24/7 hosting they can't get from
+  "leave my machine on with Inkternity launched."
 - **Portal-mediated backup / restore.** Could be added later as an
   opt-in if artists ask for it, but Phase 1 stays self-custodial.
 - **Automatic on-ledger settlement of subscription payments.** Phase 0
@@ -667,28 +877,39 @@ audit trail.)_
    surface is safe.
 
 5. **Auto-host cap: hard cap at 3 canvases — REPLACED with per-canvas
-   marker + per-instance lock + multi-instance for multi-canvas.**
-   Two iterations on this:
+   marker + per-canvas lock + main-process-spawned headless
+   side-instances.** Three iterations on this:
 
    - First amendment: cap-of-1 in-process (hit when implementation
      surfaced the NetLibrary process-singleton constraint).
-   - Second redesign (current): per-canvas `.publish` marker + per-canvas
-     `.lock` PID file. The cap-1 *per process* is structural and stays;
-     the cap-N *globally* falls out of launching N Inkternity instances,
-     each grabbing a different published canvas from the per-canvas
-     lock-file pool (§4.2 / §4.3).
+   - Second redesign: per-canvas `.publish` marker + per-canvas
+     `.lock` PID file; artist launches N Inkternity instances
+     manually to host N canvases.
+   - Third (current): same per-canvas marker + lock model, but the
+     N instances are headless side-instance OS processes spawned
+     *automatically* by the artist's main Inkternity at launch — not
+     manually opened windows. Headless because `World::update()` is
+     a one-liner and `World::draw()` is the only Skia-touching
+     method; a process with no SDL window and no `GrDirectContext`
+     runs the host code path fine at ~30–80 MB instead of the
+     ~200–500 MB a full UI process would cost. See §4.1 / §4.3 /
+     §4.8 for the design and the verification.
 
    The original framing of "auto-host cap" doesn't apply any more —
    there's no central limit, just structural cap-1-per-process and
-   the artist's choice of how many instances to launch. UI shows
-   per-file lock state ("Hosting (this instance)" / "Hosting (another
-   instance)" / "Published (idle)") rather than a cap-vs-current
-   counter.
+   the main process spawning a side-instance per marked canvas. The
+   artist doesn't see processes at all; they see a "Publish" toggle
+   per canvas and Settings shows what's being hosted. UI shows
+   per-file lock state ("Hosting (this instance)" / "Hosting (a
+   side-instance)" / "Hosting (another Inkternity)" / "Published
+   (idle)") rather than a cap-vs-current counter.
 
    A future NetLibrary refactor (per-NetServer ws + globalID) would
-   raise the structural per-process cap above 1 — but the per-canvas
-   marker model already absorbs that change without UX rework: one
-   instance would just lock multiple canvases instead of one.
+   raise the structural per-process cap above 1 — at which point we
+   could consolidate side-instances into the main process. But the
+   current per-canvas marker + side-instance model already absorbs
+   that change without UX rework: the main process would just stop
+   spawning side-instances and own the hosts directly.
 
 6. **Horizon polling: on Settings-open only.** No background poll,
    no periodic refresh. Minimal network chatter for the vast
