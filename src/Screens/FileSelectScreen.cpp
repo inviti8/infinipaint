@@ -258,23 +258,39 @@ void FileSelectScreen::settings_view() {
             text_label(gui, "Not configured. Set up via your Heavymeta Portal settings.");
         }
 
-        // DISTRIBUTION-PHASE1.md §4 — auto-hosting status. Cap-1 means
-        // at most one canvas is shown here; the badge in the file list
-        // is the per-file mirror of this state.
+        // DISTRIBUTION-PHASE1.md §4 — auto-hosting status.
+        //
+        // With per-canvas markers there's no central "what is published"
+        // state on MainProgram — the marker travels with each canvas
+        // file. We surface two pieces here:
+        //   - what THIS instance has locked at startup (hostedCanvasPath)
+        //   - the count of all canvases marked published in saves/
+        // Per-file detail is in the file-list badge.
         text_label_centered(gui, "Auto-hosting");
-        if (auto p = main.publishRegistry.published(); p.has_value()) {
-            text_label(gui, ("Publishing: " + p->path.filename().string()).c_str());
-            text_label_light(gui, ("Since " + p->publishedAt).c_str());
-            text_button(gui, "stop publishing settings", "Stop publishing", {
-                .wide = true,
-                .onClick = [this] {
-                    main.publishRegistry.clear(main.conf.configPath);
-                }
-            });
+        if (main.hostedCanvasPath) {
+            text_label(gui, ("This instance hosts: " +
+                main.hostedCanvasPath->filename().string()).c_str());
+            text_label_light(gui,
+                "(Background hosting wiring is still pending — the canvas "
+                "is locked but not yet served. Open it manually + Host for "
+                "now.)");
+        } else {
+            text_label(gui, "This instance hosts: nothing");
+        }
+        const auto allPublished = PublishedCanvases::scan_published(savePath);
+        if (!allPublished.empty()) {
+            text_label_light(gui,
+                ("Marked published in saves/: " +
+                 std::to_string(allPublished.size()) + " canvas(es).").c_str());
+            if (!main.hostedCanvasPath) {
+                text_label_light(gui,
+                    "All published canvases are already locked by other "
+                    "Inkternity instances. Close one to free a slot.");
+            }
         } else {
             text_label(gui,
-                "Nothing published. Open a canvas with portal subscription "
-                "metadata, then use Canvas Settings -> Publish to subscribers.");
+                "Nothing marked published. Open a canvas with portal "
+                "subscription metadata, then Canvas Settings -> Publish.");
         }
     }
 }
@@ -854,7 +870,9 @@ void FileSelectScreen::file_view() {
 
     auto fileButton = [&] (size_t i, bool isList, const Vector2f& iconSize) {
         std::filesystem::path filePath = folderPath / (fileList[i].fileName + fileList[i].fileExtension);
-        const bool isPublished = main.publishRegistry.is_published(filePath);
+        const bool isPublished = PublishedCanvases::is_published(filePath);
+        const bool isHostedByUs = isPublished && PublishedCanvases::is_locked_by_us(filePath);
+        const bool isHostedByOther = isPublished && !isHostedByUs && PublishedCanvases::is_locked_by_anyone(filePath);
         gui.element<SelectableButton>("file button", SelectableButton::Data{
             .isSelected = editMode && fileList[i].selected,
             .onClick = [&, filePath, i] {
@@ -897,7 +915,9 @@ void FileSelectScreen::file_view() {
                         }) {
                             text_label(gui, fileList[i].fileName);
                             text_label_light(gui, fileList[i].lastModifyDate);
-                            if (isPublished) text_label(gui, "* Published");
+                            if (isHostedByUs)         text_label(gui, "* Hosting (this instance)");
+                            else if (isHostedByOther) text_label(gui, "* Hosting (another instance)");
+                            else if (isPublished)     text_label(gui, "* Published (idle)");
                         }
                     }
                 }

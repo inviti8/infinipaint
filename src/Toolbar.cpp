@@ -1678,48 +1678,34 @@ void Toolbar::options_menu() {
                     }
                 });
 
-                // DISTRIBUTION-PHASE1.md §4 — Publish toggle. Cap-1: at most
-                // one canvas is auto-hosted at a time. Replacing the
-                // currently-published canvas takes a two-stage confirmation.
+                // DISTRIBUTION-PHASE1.md §4 — Publish toggle. Per-canvas
+                // marker file (lives next to the canvas) + per-instance
+                // PID lock. Multiple canvases can be marked published;
+                // each running Inkternity instance grabs the first one
+                // it can lock at startup. No global "replace" semantics
+                // any more — toggling on canvas Y is independent of
+                // canvas X's marker.
                 const bool subEligible = main.world->has_subscription_metadata();
                 const bool hasPath = !main.world->filePath.empty();
                 const auto thisPath = main.world->filePath;
-                const auto pubEntry = main.publishRegistry.published();
-                const bool thisIsPublished = hasPath && main.publishRegistry.is_published(thisPath);
-                const bool somethingElsePublished = pubEntry.has_value() && !thisIsPublished;
+                const bool thisIsPublished = hasPath && PublishedCanvases::is_published(thisPath);
 
                 if (!hasPath) {
                     text_label(gui, "Publish: save the canvas first.");
                 } else if (!subEligible) {
                     text_label(gui, "Publish: requires portal-issued subscription metadata.");
                 } else if (thisIsPublished) {
-                    text_button_wide("unpublish canvas", "Stop publishing this canvas", [&] {
-                        main.publishRegistry.clear(main.conf.configPath);
-                        publishReplaceConfirmStage = false;
-                    });
-                } else if (somethingElsePublished && !publishReplaceConfirmStage) {
-                    text_button_wide("publish canvas (will replace)", "Publish (replace currently published)", [&] {
-                        publishReplaceConfirmStage = true;
-                    });
-                    text_label(gui, ("Currently published: " + pubEntry->path.filename().string()).c_str());
-                } else if (somethingElsePublished && publishReplaceConfirmStage) {
-                    text_label(gui, "Replace the currently-published canvas with this one? Subscribers of the old canvas will lose service when this install next launches.");
-                    text_button_wide("publish canvas confirm replace", "Yes, replace", [&, thisPath] {
-                        main.publishRegistry.set_published(thisPath, main.conf.configPath);
-                        publishReplaceConfirmStage = false;
-                    });
-                    text_button_wide("publish canvas cancel replace", "Cancel", [&] {
-                        publishReplaceConfirmStage = false;
+                    text_button_wide("unpublish canvas", "Stop publishing this canvas", [&, thisPath] {
+                        PublishedCanvases::clear_published(thisPath);
                     });
                 } else {
                     text_button_wide("publish canvas", "Publish to subscribers", [&, thisPath] {
-                        main.publishRegistry.set_published(thisPath, main.conf.configPath);
+                        PublishedCanvases::set_published(thisPath);
                     });
                 }
 
                 text_button_wide("done", "Done", [&] {
                     optionsMenuOpen = false;
-                    publishReplaceConfirmStage = false;
                 });
             });
             break;

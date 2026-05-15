@@ -300,6 +300,23 @@ NEW src/crypto/stellar/          per decision §8.1 — small in-tree
 
 ## 4. Workstream B — Tagged-file auto-hosting
 
+> **Architectural reality, baked in from the start of this section.** The
+> initial scoping (cap-of-3 in §8.5, single shared
+> `inkternity_published.json` under `configPath`) ran into two real
+> constraints during build:
+>
+> 1. `NetLibrary` is process-singleton on `globalID` + the signaling
+>    websocket. A single Inkternity process can host **at most one**
+>    canvas in SUBSCRIPTION mode at a time.
+> 2. `configPath` is shared across every Inkternity process on the
+>    machine — a central single-slot registry under it can't represent
+>    "instance A hosts canvas X, instance B hosts canvas Y."
+>
+> The §4 design below is the *redesigned* model that takes both as
+> givens. Per-canvas marker + per-canvas runtime lock + multi-instance
+> as the multi-canvas story. The original cap-of-3 / central registry
+> framing is gone; §8.5 is amended.
+
 ### 4.1 The shape
 
 Today, hosting requires the user to:
@@ -309,164 +326,201 @@ Today, hosting requires the user to:
 4. Keep the file open.
 
 After Workstream B:
-1. Open a canvas, hit a new **"Publish"** toggle on the file (or in
-   the Toolbar's Canvas Settings menu).
-2. The file's metadata stores `published: true`.
-3. From now on, every time Inkternity launches, that file is
-   auto-loaded as a background hosted SUBSCRIPTION session — no
-   button press required, no drawing UI loaded for it.
-4. The artist can still open one of those canvases for editing in
-   the foreground (which... raises a state question — see §4.4).
-5. The artist can flip `published: false` to stop auto-hosting.
+1. Open a canvas, hit a new **"Publish"** toggle in the Toolbar's
+   Canvas Settings menu.
+2. A `<name>.inkternity.publish` sidecar JSON is written next to the
+   canvas file.
+3. From now on, when Inkternity launches with that canvas in its
+   saves directory, it claims a per-canvas runtime lock and serves
+   the canvas in the background — no button press required.
+4. The artist can flip the toggle off (deletes the sidecar) to stop
+   publishing.
 
-The wire-format and signaling-server interaction are unchanged: each
-published canvas just runs the same `World::start_hosting` code path
-the Host button already runs, with `hostMode = SUBSCRIPTION` and the
+**Per-instance vs per-canvas.** Cap-of-1 hosted canvas per process is
+*structural* (NetLibrary). The artist who needs N hosted canvases
+launches N Inkternity instances; each instance grabs the first
+published canvas it can lock. No central cap. No CLI flags, no
+single-instance lock — just `Open another Inkternity window` and a
+second canvas comes online.
+
+The wire format and signaling server are unchanged. Each running
+hosted canvas drives the same `World::start_hosting` code path the
+Host button already drives, with `hostMode = SUBSCRIPTION` and the
 §12.5-derived share code.
 
-This is **not** a daemon. Closing Inkternity stops the hosting.
-Launching Inkternity (even just to file-select view) starts it again.
-The artist's mental model is: *"Inkternity launched = my published
-canvases are reachable. Inkternity closed = they're not."*
+This is **not** a daemon. Closing the Inkternity instance hosting
+canvas X stops X. Launching another Inkternity instance picks up
+where the previous one left off (it claims X via the lock-file
+mechanism described below).
 
-### 4.2 File-format change
+### 4.2 Per-canvas state files
 
-Adding to the existing `.inkternity` file metadata:
+Two sidecar files live next to each canvas (alongside the existing
+`.jpg` thumbnail):
 
-```json
-{
-  "schemaVersion": "...",
-  "canvasId": "...",
-  "artistMemberPubkey": "G...",
-  "appPubkeyAtPublish": "G...",
-  "published": true,         // NEW — auto-host on app launch
-  "publishedAt": "2026-05-14T18:30:00Z"   // NEW — for sort/display only
-  ...
-}
+```
+<name>.inkternity         the canvas itself (binary, opaque)
+<name>.inkternity.jpg     thumbnail (existing)
+<name>.inkternity.publish JSON marker — present iff "published"
+                          { "publishedAt": "2026-05-14T18:30:00Z" }
+<name>.inkternity.lock    PID file — present while a live Inkternity
+                          instance owns the runtime claim on this
+                          canvas. Format: { "pid": <int> }
 ```
 
-`published: false` (or absent) → existing behavior, no auto-host. The
-field is independent of `has_subscription_metadata()` — but UI
-gating should only let the artist *set* `published: true` when the
-canvas has portal-issued subscription metadata, same rule as the
-Host menu's SUBSCRIPTION button.
+**Why sidecars (not in-file metadata).**
+The `.inkternity` binary is ZSTD-compressed cereal — there's no cheap
+"read just the metadata header" path; reading `published` would mean
+deserializing the whole file at every directory scan. Sidecars are:
+- Cheap to scan (filesystem `exists()` check per file).
+- Trivially readable + writable in the file-select view, where the
+  app doesn't have the canvas loaded.
+- Travel with the file across `cp`/`mv`/cloud-sync if the user
+  preserves siblings (and we can recover gracefully if they don't —
+  the marker is just intent; absence means "not published").
+
+**Marker semantics.** Existence is the only authoritative bit; the
+JSON contents are advisory (currently just `publishedAt` for
+sort/display). Future fields go here if needed (per-canvas access
+controls, expiry, etc.).
+
+**Lock semantics.**
+- Acquisition is atomic via `O_CREAT | O_EXCL` (POSIX) /
+  `CREATE_NEW` (Windows). Two instances calling
+  `try_acquire_lock(canvas)` simultaneously — exactly one wins.
+- Lock content is the holder's PID. On scan, a lock whose PID is no
+  longer alive (process crashed, killed, or closed without RAII
+  release) is treated as **stale** and silently reclaimed by the next
+  instance that wants it.
+- Released via RAII on graceful shutdown
+  (`PublishedCanvases::release_all_held()` from MainProgram dtor),
+  or by stale-detection on subsequent launches.
+
+The marker is independent of `has_subscription_metadata()` — but the
+Toolbar gates *setting* the marker on
+`has_subscription_metadata() == true`, same rule as the Host menu's
+SUBSCRIPTION button. A canvas with the marker but no metadata is
+inert (the launch-time scanner ignores it once the runtime auto-host
+work lands).
 
 ### 4.3 App-launch sequence
-
-> **Implementation reality found mid-build:** the cap-of-3 simultaneous
-> hosts originally scoped in §8.5 is **not currently buildable** — see the
-> NetLibrary architectural constraint below. Phase 1 ships **cap-of-1**;
-> the cap-3 promise reverts to a future workstream gated on a NetLibrary
-> refactor. The §8.5 decision is amended accordingly.
 
 In `main.cpp` after `MainProgram` construction, before the file-select
 screen renders its first frame:
 
 ```cpp
-PublishRegistry r;
-r.load(configPath);
-if (auto p = r.published_path(); p.has_value() && file_exists(*p)) {
-    // Spawn the single background-hosted World for this file.
-    main.backgroundHost = make_background_world(*p);
+mS.m->hostedCanvasPath = PublishedCanvases::claim_first_available(
+    mS.m->conf.configPath / "saves");
+if (mS.m->hostedCanvasPath) {
+    main.backgroundHost = make_background_world(*mS.m->hostedCanvasPath);
 }
 ```
 
-**NetLibrary single-host constraint.** The current `NetLibrary` is
-process-singleton on `globalID` and the signaling websocket — the WSS
-URL is built once in `init()` as `signalingAddr + "/" + globalID`, with
-one `ws` connection. Two `World` instances trying to host SUBSCRIPTION
-mode in parallel would each need their own websocket on their own
-WSS-path globalID, which the current code can't open. This is not a
-memory or perf concern — it's a structural one.
+`claim_first_available` walks `saves/`, gathers every canvas with a
+marker, and tries to acquire each lock in turn. Returns the first
+canvas it successfully locked, or `nullopt` (no published canvases,
+or all are locked by other live Inkternity instances). The returned
+path is the canvas this process will background-host.
 
-Until a future workstream rebuilds NetLibrary's signaling lifecycle to
-be per-NetServer (separate `ws` + `globalID` per active host), Phase 1
-auto-hosts **at most one canvas in the background at a time**. The
-artist marks a canvas "published"; on app launch, that single canvas
-gets a background-hosted `World`. Toggling Publish on a different
-canvas un-publishes the previous one (with confirmation: *"This will
-replace the currently published canvas <name>. Continue?"*).
-
-For the single background `World`: spawn a full `World` instance
-(rendering scaffolding included — slim-down is premature per the
-original §4.3 reasoning). The instance lives alongside `main.world`
-in a new `main.backgroundHost` slot; the main loop only renders
-`main.world`. The background instance ticks via the existing
+**For the single background `World`** (deferred — see §4.6 known
+gap): spawn a full `World` instance. The instance lives alongside
+`main.world` in a `main.backgroundHost` slot; the main loop only
+renders `main.world`. The background instance ticks via the existing
 NetLibrary update path which already iterates registered NetServers.
+No new "headless" mode — slim-down is premature per the original §4.3
+reasoning.
 
-**Power-user escape hatch — multi-instance.** Inkternity has no
-single-instance lock. An artist who genuinely needs N>1 canvases
-hosted simultaneously today can launch N copies of the desktop app;
-each process gets its own NetLibrary singleton, its own ws connection,
-and can independently host one published canvas. Caveat: all
-instances share `configPath` (correct — same `inkternity_dev_keys.json`,
-same Stellar identity), and would race on the single
-`inkternity_published.json` registry — so this works in practice only
-once the registry is overridable per-process. A future small
-iteration adds an `--auto-host=<path>` CLI flag that bypasses the
-registry on that process. Documented here so the architectural option
-isn't lost; not built into Phase 1.
+**Multi-instance flow:**
+1. Artist launches Inkternity. It scans `saves/`, locks canvas A
+   (which has a marker), spawns the background-hosted `World` for A.
+2. Artist launches a second Inkternity. It scans `saves/`, sees A
+   is locked (live PID), tries B (also marked), locks it, spawns the
+   background-hosted `World` for B.
+3. Artist launches a third. Sees A and B locked, tries C, etc.
+4. Closing instance #2 releases B's lock. A subsequent fourth launch
+   picks B back up.
+
+No CLI args. No per-instance config dirs. The OS process boundary
+*is* the per-instance scope; the per-canvas lock file is the
+coordination primitive between instances.
 
 ### 4.4 What happens when the artist opens the published canvas?
 
-Two-step lifecycle, made simple by the cap-1 constraint:
+Cap-1-per-process makes this clean:
 
-1. **Open the published canvas → tear down background, foreground hosts.**
-   The background `World` instance is destroyed (its NetServer shuts down,
-   its WSS connection drops). The newly-loaded foreground `World` then
-   starts hosting normally as if the artist had clicked Host. Subscribers
-   experience a brief drop + reconnect.
-2. **Close the foreground canvas → restart background.** When the artist
-   leaves the canvas (back to file-select), if it's still in the publish
-   registry, spawn a fresh background `World` for it.
+1. **Artist opens the canvas this instance is currently background-
+   hosting.** The lock is released, the background `World` is torn
+   down, the foreground `World` loads from disk and re-acquires the
+   lock + starts hosting normally. Subscribers see a brief drop +
+   reconnect.
+2. **Artist closes back to file-select.** If the canvas is still
+   marked published, foreground releases the lock, the background
+   `World` is re-spawned, takes the lock, resumes hosting.
 
-**Open a *different* (unpublished) canvas → background keeps running.**
-The two `World`s coexist; one ticks visibly (foreground), the other
-ticks invisibly (background) servicing subscribers. Memory cost is 2 ×
-per-canvas footprint while both are active.
+**Artist opens a *different* canvas (any state).** Background keeps
+running. Two `World`s coexist; foreground for editing, background for
+serving. Memory cost is 2 × per-canvas footprint while both are
+active.
 
-This avoids the §4.4 "promote to foreground" state-shuffling entirely —
-the foreground always loads from disk, the background always loads
-from disk, they never share state. Subscribers see a brief
-disconnection on open and another on close; for a publishing flow
-where the artist mostly *isn't* editing the published canvas, that's
-fine.
+**Artist opens a published canvas hosted by a *different* Inkternity
+instance.** The other instance owns the lock. This instance can still
+load the file for editing — but trying to Host (manual or auto)
+fails because the lock can't be acquired. UI shows
+"Hosting (another instance)" on the file in the file list; the
+Toolbar's Host menu disables SUBSCRIPTION mode with a note pointing
+the artist to the other window.
+
+This avoids the original §4.4 "promote to foreground" state-shuffling
+entirely — foreground and background always load from disk, never
+share state. Subscribers see a brief disconnection on open and
+another on close; for a publishing flow where the artist mostly
+*isn't* editing the published canvas, that's fine.
 
 ### 4.5 UI surfaces
 
 ```
-src/Screens/FileSelectScreen.cpp Files tab: a "● Published" badge on
-                                 the single published file. Settings
-                                 panel: a small "Auto-hosting" block
-                                 showing what's published (or "Nothing
-                                 published") + connection count. The
-                                 badge doubles as the click target to
-                                 unpublish.
+src/Screens/FileSelectScreen.cpp Files tab: per-file caption row
+                                 reflecting the lock state:
+                                   "* Hosting (this instance)"
+                                   "* Hosting (another instance)"
+                                   "* Published (idle)"
+                                 Settings tab: a small "Auto-hosting"
+                                 block showing what THIS instance has
+                                 locked at startup + a count of
+                                 markers found in saves/. When
+                                 nothing is locked but markers exist,
+                                 explains the lock-by-other-instance
+                                 case.
 src/Toolbar.cpp                  Canvas Settings menu: "Publish to
-                                 subscribers" toggle. Disabled when
+                                 subscribers" toggle (writes the
+                                 marker sidecar). Disabled when
                                  has_subscription_metadata()==false
                                  with the same explanatory note as
                                  the existing Host menu SUBSCRIPTION
-                                 button. Enabling on canvas Y when
-                                 canvas X is already published prompts:
-                                 "This will replace the currently
-                                 published canvas <name>. Continue?"
-src/World.cpp                    Reused as-is — the background instance
-                                 is a full `World`, just never gets
-                                 main-loop draw/update calls. No new
-                                 ctor or "headless" mode (deferred per
-                                 the original §4.3 "premature" note).
-src/main.cpp                     post-init pass: read PublishRegistry,
-                                 if present spawn the single background
-                                 World; on file-open / file-close,
-                                 stop/restart the background slot.
-NEW src/PublishRegistry.{hpp,cpp}
-                                 Single-file JSON helper:
-                                 inkternity_published.json holds the
-                                 single { path, publishedAt } entry.
-                                 Cap-1 by structure (single field,
-                                 not a collection). Future cap-N
-                                 revisits this shape.
+                                 button. No "replace" confirmation —
+                                 multiple canvases can be published
+                                 independently.
+src/World.cpp                    Reused as-is — the background
+                                 instance is a full `World`, just
+                                 never gets main-loop draw/update
+                                 calls. No new ctor or "headless"
+                                 mode.
+src/main.cpp                     post-init pass: scan saves/, claim
+                                 first available, record on
+                                 `hostedCanvasPath`. (Spawning the
+                                 background World is the deferred
+                                 piece.)
+NEW src/PublishedCanvases.{hpp,cpp}
+                                 Namespace with marker + lock helpers:
+                                 is_published / set_published /
+                                 clear_published, try_acquire_lock /
+                                 release_lock / is_locked_by_us /
+                                 is_locked_by_anyone,
+                                 scan_published / claim_first_available /
+                                 release_all_held.
+                                 Stale-PID detection cross-platform
+                                 (OpenProcess on Windows, kill(pid,0)
+                                 on POSIX).
 ```
 
 ### 4.6 Surfaces NOT touched
@@ -477,19 +531,46 @@ NEW src/PublishRegistry.{hpp,cpp}
 - No portal endpoint.
 - No signaling-server change.
 - No notarization complexity (one app, one DMG, like today).
+- **No central registry** — the previously-scoped
+  `inkternity_published.json` under `configPath` is gone, removed
+  during the redesign. State that needs to be per-canvas lives with
+  the canvas (sidecars); state that needs to be per-instance lives
+  in process memory + the lock file's PID.
+
+**Known gap (intentional, not a regression):** the marker + lock
+machinery and the launch-time `claim_first_available` are wired up,
+but spawning the actual background-hosted `World` for the locked
+canvas is not yet built. Today the lock is acquired and recorded on
+`MainProgram::hostedCanvasPath`; the artist still has to open the
+canvas and click Host manually. That last step (constructing a
+non-foreground `World` from disk + driving it through
+`init_net_library` + `start_hosting`) is the next iteration of B.
 
 ### 4.7 Risks
 
-- **Memory cost of N simultaneously-loaded canvases.** Mitigation:
-  measure with 5 / 10 / 20 published canvases on a typical machine;
-  cap the auto-host count with a setting if it bites.
-- **State-shuffling bugs when promoting a background canvas to
-  foreground** (§4.4). The current code path assumes a clean
-  load-from-disk into a fresh `World`; reusing an already-live
-  `World` as the editing surface is new territory.
+- **Stale lock files surviving a hard crash.** Mitigated by the
+  PID-alive check on every acquisition attempt — if a lock exists
+  but its PID is gone, the lock is reclaimed silently. Worst case is
+  a brief delay on the next launch while the OS-process check
+  resolves.
+- **PID reuse on long-running systems.** A reclaimed PID could in
+  principle be a different process unrelated to Inkternity. The
+  acquire-then-write atomicity protects against the wrong-process
+  case for *new* lock acquisitions; for *stale-detection*, a
+  reused PID just means we leave the lock file alone (treat as
+  alive). Result: a marker stays "Hosting (another instance)" until
+  Inkternity actually launches and reclaims it. Tolerable.
+- **Marker drift on file moves.** If the user moves
+  `mycanvas.inkternity` without also moving `mycanvas.inkternity.publish`,
+  publish state is lost. Same risk class as the existing `.jpg`
+  thumbnail. Document; consider a future `World::save_to_file` hook
+  that renames sidecars.
+- **Memory cost of 2 × `World` (foreground + background) when the
+  artist has the published canvas open in foreground.** Acceptable;
+  this is an artist's primary publishing flow, not the common case.
 - **Artist confusion: "why is my CPU/network busy when I'm not
-  hosting?"** Mitigation: clear status panel in file-select Settings
-  showing what's published + what's connected.
+  hosting anything?"** Mitigation: clear file-list captions + the
+  Settings auto-hosting block.
 
 ---
 
@@ -585,18 +666,29 @@ audit trail.)_
    writing back, so promoting the live `World` to the editing
    surface is safe.
 
-5. **Auto-host cap: hard cap at 3 canvases — AMENDED to cap-of-1.**
-   Original cap-3 was set on the assumption that "multiple full World
-   instances" was the only constraint (per §4.3). When implementation
-   started, NetLibrary turned out to be process-singleton on `globalID`
-   and the signaling websocket — multiple simultaneous SUBSCRIPTION
-   hosts would each need their own ws-on-different-WSS-path, which the
-   current code doesn't support. Phase 1 ships **cap-of-1**. UI surfaces
-   exactly one "Publish" toggle that's mutually exclusive across all
-   canvases (toggling on one auto-unpublishes the previously-published
-   one, with an explicit confirmation). A future workstream that
-   refactors NetLibrary to per-NetServer signaling lifecycle will
-   restore the cap-3 (or higher) intent.
+5. **Auto-host cap: hard cap at 3 canvases — REPLACED with per-canvas
+   marker + per-instance lock + multi-instance for multi-canvas.**
+   Two iterations on this:
+
+   - First amendment: cap-of-1 in-process (hit when implementation
+     surfaced the NetLibrary process-singleton constraint).
+   - Second redesign (current): per-canvas `.publish` marker + per-canvas
+     `.lock` PID file. The cap-1 *per process* is structural and stays;
+     the cap-N *globally* falls out of launching N Inkternity instances,
+     each grabbing a different published canvas from the per-canvas
+     lock-file pool (§4.2 / §4.3).
+
+   The original framing of "auto-host cap" doesn't apply any more —
+   there's no central limit, just structural cap-1-per-process and
+   the artist's choice of how many instances to launch. UI shows
+   per-file lock state ("Hosting (this instance)" / "Hosting (another
+   instance)" / "Published (idle)") rather than a cap-vs-current
+   counter.
+
+   A future NetLibrary refactor (per-NetServer ws + globalID) would
+   raise the structural per-process cap above 1 — but the per-canvas
+   marker model already absorbs that change without UX rework: one
+   instance would just lock multiple canvases instead of one.
 
 6. **Horizon polling: on Settings-open only.** No background poll,
    no periodic refresh. Minimal network chatter for the vast

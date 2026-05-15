@@ -17,7 +17,8 @@
 #include "GUIHolder.hpp"
 #include "GlobalConfig.hpp"
 #include "DevKeys.hpp"
-#include "PublishRegistry.hpp"
+#include "PublishedCanvases.hpp"
+#include <optional>
 #include "Screens/Screen.hpp"
 
 #ifdef USE_SKIA_BACKEND_GRAPHITE
@@ -138,21 +139,27 @@ class MainProgram {
         // proper credential store coming in P0-C1/C3. See DevKeys.hpp.
         DevKeys devKeys;
 
-        // DISTRIBUTION-PHASE1.md §4 — single-slot record of "the canvas
-        // this Inkternity install auto-hosts in the background on
-        // launch." Cap-1 by structure pending a NetLibrary refactor;
-        // see PublishRegistry.hpp.
-        PublishRegistry publishRegistry;
+        // DISTRIBUTION-PHASE1.md §4 — tagged-file auto-hosting.
+        //
+        // Per-canvas state lives next to the canvas file (publish marker
+        // sidecar + lock file). See PublishedCanvases.hpp for the model.
+        // No central registry on MainProgram — `hostedCanvasPath` records
+        // the *one* canvas this process has locked at startup (cap-1 per
+        // process is structural; cap-N globally falls out from launching
+        // N Inkternity instances, each grabbing a different published
+        // canvas via PublishedCanvases::claim_first_available).
+        //
+        // Empty when this instance hosts nothing (no published canvases
+        // marked, or all of them already locked by other instances).
+        std::optional<std::filesystem::path> hostedCanvasPath;
 
-        // The single background-hosted World spawned at app launch from
-        // the publish registry, when applicable. Distinct from
-        // `world` (the foreground editing surface). Lifecycle:
-        //   - Spawned in main.cpp after MainProgram construction if the
-        //     registry has a published path that exists on disk.
-        //   - Torn down when the artist opens the published canvas in
-        //     foreground (the foreground World takes over hosting).
-        //   - Restarted on close-back-to-file-select if the canvas is
-        //     still in the registry.
+        // Future-spawned background World for `hostedCanvasPath` — the
+        // foreground editing surface (`world`) coexists with this once
+        // the runtime auto-host work lands. Distinct from `world`; the
+        // main loop only renders `world`. Currently unused (the runtime
+        // spawning is the deferred piece of B); the lock acquisition
+        // already lands so the multi-instance coordination is provable
+        // even before the World wiring exists.
         std::shared_ptr<World> backgroundHost;
 
         std::optional<unsigned> keybindWaiting;
