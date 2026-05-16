@@ -47,7 +47,14 @@ class PhoneDrawingProgramScreen : public DrawingProgramScreen {
             NONE,
             HOST,         // pre-host: showing the lobby address + Host/Cancel
             CONNECT,      // pre-connect: paste address, Connect/Cancel
-            LOBBY_INFO    // already hosting/connected: show address + copy
+            LOBBY_INFO,   // already hosting/connected: show address + copy
+            // Overloaded onto the same modal surface: not strictly a
+            // "network" menu, but `network_menu_popup` is just the generic
+            // submodal renderer. Desktop reaches canvas color via the
+            // Canvas Settings menu; phone surfaces it here so artists on
+            // the phone UI can actually set canvas background. Reported
+            // by zynx — the desktop Canvas Settings menu was never ported.
+            CANVAS_COLOR
         } phoneNetMenu = PhoneNetMenu::NONE;
         // Mirror of Toolbar's serverToConnectTo / serverLocalID. Held
         // here so HOST flow can pre-generate the address before the user

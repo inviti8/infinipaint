@@ -13,6 +13,9 @@
 #include "../GUIStuff/ElementHelpers/LayoutHelpers.hpp"
 #include "../GUIStuff/ElementHelpers/TextLabelHelpers.hpp"
 #include "../GUIStuff/ElementHelpers/TextBoxHelpers.hpp"
+#include "../GUIStuff/ElementHelpers/ColorPickerHelpers.hpp"
+#include "../CanvasTheme.hpp"
+#include <include/core/SkColor.h>
 #include "FileSelectScreen.hpp"
 #include "../Brushes/BrushPresets.hpp"
 #include "../CustomEvents.hpp"
@@ -418,6 +421,12 @@ void PhoneDrawingProgramScreen::main_menu_popup(Element* triggerButton) {
                     phoneNetLobbyAddress.clear();
                     phoneNetMenu = PhoneNetMenu::CONNECT;
                 });
+                // Canvas color (background). Desktop reaches this via
+                // Toolbar -> Canvas Settings; phone never had a path to
+                // it. Always available -- not gated on hosting state.
+                menu_item("phone canvas color", "Canvas color", [&] {
+                    phoneNetMenu = PhoneNetMenu::CANVAS_COLOR;
+                });
                 // DISTRIBUTION-PHASE1.md §4 — Publish toggle. Writes/
                 // removes the per-canvas marker; the launch-time scan
                 // and §4.4 navigate-away handoff spawn the side-instance.
@@ -609,6 +618,28 @@ void PhoneDrawingProgramScreen::network_menu_popup() {
                                 .onClick = [&] { main.input.set_clipboard_str(main.world->netSource); }
                             });
                             text_button(gui, "phone lobby info close", "Close", {
+                                .wide = true,
+                                .onClick = [&] { phoneNetMenu = PhoneNetMenu::NONE; }
+                            });
+                        });
+                        break;
+                    }
+                    case PhoneNetMenu::CANVAS_COLOR: {
+                        text_label_centered(gui, "Canvas color");
+                        // Mirrors the desktop CANVAS_SETTINGS_MENU pattern in
+                        // Toolbar.cpp ~1728. Fresh shared_ptr each render
+                        // initialized from the current canvas color; the
+                        // picker edits it; onEdit pushes the new value back
+                        // to canvasTheme via the NetObj-synced setter.
+                        auto newColorToSet = std::make_shared<SkColor4f>(main.world->canvasTheme.get_back_color());
+                        color_picker_button_field(gui, "phone canvas color picker", "Background", newColorToSet.get(), {
+                            .hasAlpha = false,
+                            .onEdit = [&, newColorToSet] {
+                                main.world->canvasTheme.set_back_color(convert_vec3<Vector3f>(*newColorToSet));
+                            }
+                        });
+                        left_to_right_line_layout(gui, [&]() {
+                            text_button(gui, "phone canvas color close", "Close", {
                                 .wide = true,
                                 .onClick = [&] { phoneNetMenu = PhoneNetMenu::NONE; }
                             });
