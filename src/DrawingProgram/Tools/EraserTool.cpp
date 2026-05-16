@@ -11,7 +11,25 @@
 
 EraserTool::EraserTool(DrawingProgram& initDrawP):
     DrawingProgramToolBase(initDrawP)
-{}
+{
+    // Bound per-segment eraser cost up-front. Every prior brush stroke's
+    // end_stroke pulls its component into unsortedComponents via
+    // commit_update → preupdate_component. That bucket only drains on
+    // BVH rebuild (default threshold: 1000 components, which is rarely
+    // hit in a normal session). Each eraser motion event runs
+    // traverse_bvh_run_function, which begins with f(nullptr) — a linear
+    // scan of unsortedComponents per segment, per touched-component
+    // predicate. After ~100 strokes the scan dominates eraser cost.
+    //
+    // Rebuilding here moves everything back into the BVH cleanly, so
+    // the upcoming eraser-stroke's segment work stays bounded to
+    // BVH traversal (log N) instead of scanning the entire unsorted
+    // bucket. Cost: one-time ~O(total component count) at tool entry;
+    // pays itself off after ~1 second of eraser motion in any non-trivial
+    // canvas. Skipped when nothing's unsorted to avoid pointless work.
+    if (drawP.drawCache.unsorted_component_count() > 0)
+        drawP.drawCache.build({});
+}
 
 DrawingProgramToolType EraserTool::get_type() {
     return DrawingProgramToolType::ERASER;
@@ -25,11 +43,6 @@ void EraserTool::gui_toolbox(Toolbar& t) {
     gui.new_id("eraser tool", [&] {
         text_label_centered(gui, "Eraser");
         drawP.world.main.toolConfig.relative_width_gui(drawP, "Size");
-        text_label(gui, "Erase from:");
-        radio_button_selector(gui, "layer selector", &drawP.controls.layerSelector, {
-            {"Layer being edited", DrawingProgramLayerManager::LayerSelector::LAYER_BEING_EDITED},
-            {"All visible layers", DrawingProgramLayerManager::LayerSelector::ALL_VISIBLE_LAYERS}
-        });
     });
 }
 
@@ -41,11 +54,6 @@ void EraserTool::gui_phone_toolbox(PhoneDrawingProgramScreen& t) {
 
     gui.new_id("eraser tool", [&] {
         drawP.world.main.toolConfig.relative_width_gui(drawP, "Size");
-        text_label(gui, "Erase from:");
-        radio_button_selector(gui, "layer selector", &drawP.controls.layerSelector, {
-            {"Layer being edited", DrawingProgramLayerManager::LayerSelector::LAYER_BEING_EDITED},
-            {"All visible layers", DrawingProgramLayerManager::LayerSelector::ALL_VISIBLE_LAYERS}
-        });
     });
 }
 
@@ -82,6 +90,16 @@ void EraserTool::erase_between_points(const Vector2f& start, const Vector2f& end
     SCollision::generate_wide_line(cC, start, end, width * 2.0f, true);
     auto cCWorld = drawP.world.drawData.cam.c.collider_to_world<SCollision::ColliderCollection<WorldScalar>, SCollision::ColliderCollection<float>>(cC);
 
+    // Single up-front cache invalidation covering the entire segment
+    // area. Raster (MyPaintLayer) erases only modify pixels inside this
+    // AABB, so per-touched-component invalidates were doing redundant
+    // work proportional to (touched components × cached nodes). One
+    // call here costs the same regardless of how many strokes overlap
+    // the segment. Vector erases still need a per-component invalidate
+    // below (the deleted component may extend past the segment, and
+    // the cache outside the segment also needs refresh).
+    drawP.drawCache.invalidate_cache_at_aabb(cCWorld.bounds);
+
     // Dispatch helper: vector components are deleted whole (existing
     // behavior); MyPaintLayer components get a destination-out dab pass on
     // their raster surface (PHASE1.md §4 "eraser interaction"). Returns
@@ -107,16 +125,15 @@ void EraserTool::erase_between_points(const Vector2f& start, const Vector2f& end
             const Vector2f probe = container.coords.from_cam_space_to_this(drawP.world, start + Vector2f(width, 0));
             const float localRadius = (probe - localStart).norm();
             layer.erase_along_segment(localStart, localEnd, localRadius);
-            container.commit_update(drawP);
-            // Broadcast the mutated component to remote peers. Without
-            // this, the eraser is local-only — commit_update just
-            // invalidates the local draw cache. Mirrors the
-            // change_stroke_color path in DrawingProgramSelection.cpp.
-            // finalUpdate=false: this is one segment of a continuous
-            // eraser stroke; the delayed-update manager batches
-            // segments and flushes at the natural end-of-frame point.
+            // No commit_update / no per-component invalidate. The empty-tile
+            // skip in erase_along_segment keeps bounds stable across a
+            // pure-erase stroke, so calculate_world_bounds (which iterates
+            // every allocated tile in the hash map) would be redundant
+            // work. mark_dirty inside erase_along_segment already cleared
+            // the per-component SkImage cache + bounds cache; the upfront
+            // invalidate_cache_at_aabb above covers the node-cache. Wire
+            // broadcast still fires; no-op offline.
             container.send_comp_update(drawP, false);
-            drawP.drawCache.invalidate_cache_at_optional_aabb(container.get_world_bounds());
             return false;
         }
 #endif
@@ -124,6 +141,11 @@ void EraserTool::erase_between_points(const Vector2f& start, const Vector2f& end
         drawP.drawCache.invalidate_cache_at_optional_aabb(container.get_world_bounds());
         return true;
     };
+
+    // Layer selector dropped per zynx — "Erase from all visible layers"
+    // wasn't desired behavior. Eraser always operates on the layer being
+    // edited. The shared LayerSelector type is kept for the select tools.
+    constexpr auto kEditedLayer = DrawingProgramLayerManager::LayerSelector::LAYER_BEING_EDITED;
 
     drawP.drawCache.traverse_bvh_run_function(cCWorld.bounds, [&](const auto& bvhNode) {
         if(bvhNode &&
@@ -134,7 +156,7 @@ void EraserTool::erase_between_points(const Vector2f& start, const Vector2f& end
             drawP.drawCache.invalidate_cache_at_aabb(bvhNode->bounds);
             drawP.drawCache.traverse_bvh_run_function_starting_at_node_no_collision_check(bvhNode, [&](const auto& bvhNodeChild) {
                 drawP.drawCache.node_loop_erase_if_components(bvhNodeChild, [&](auto c) {
-                    if(drawP.layerMan.component_passes_layer_selector(c, drawP.controls.layerSelector))
+                    if(drawP.layerMan.component_passes_layer_selector(c, kEditedLayer))
                         return try_punch_or_mark(c);
                     return false;
                 });
@@ -143,7 +165,7 @@ void EraserTool::erase_between_points(const Vector2f& start, const Vector2f& end
             return false;
         }
         drawP.drawCache.node_loop_erase_if_components(bvhNode, [&](auto c) {
-            if(drawP.layerMan.component_passes_layer_selector(c, drawP.controls.layerSelector) && c->obj->collides_with(drawP.world.drawData.cam.c, cCWorld, cC))
+            if(drawP.layerMan.component_passes_layer_selector(c, kEditedLayer) && c->obj->collides_with(drawP.world.drawData.cam.c, cCWorld, cC))
                 return try_punch_or_mark(c);
             return false;
         });

@@ -63,6 +63,16 @@ public:
     };
     PxRect allocated_tile_bounds_px() const;
 
+    // True if at least one already-allocated tile overlaps the pixel rect
+    // [pxX0, pxX0+pxW) x [pxY0, pxY0+pxH). Used by EraserTool to skip
+    // destination-out dabs whose footprint would only touch empty
+    // (unallocated) tile space — without this guard libmypaint allocates
+    // a fresh transparent tile for every dab on blank canvas, growing
+    // both per-tile bookkeeping and the component bounds without any
+    // visual change. Cheap: O(tiles in rect), and the dab's tile span
+    // is small (1-4 tiles for typical eraser sizes).
+    bool has_any_tile_in_pixel_rect(int pxX0, int pxY0, int pxW, int pxH) const;
+
     // Composite every currently allocated tile into dst. dst must already be
     // allocated as kRGBA_8888 / kUnpremul, sized large enough to cover the
     // pixels at (dstOriginPxX, dstOriginPxY) through (dstOriginPxX + dst.width(),

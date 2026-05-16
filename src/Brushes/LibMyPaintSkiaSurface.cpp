@@ -81,6 +81,26 @@ LibMyPaintSkiaSurface::PxRect LibMyPaintSkiaSurface::allocated_tile_bounds_px() 
     };
 }
 
+bool LibMyPaintSkiaSurface::has_any_tile_in_pixel_rect(int pxX0, int pxY0, int pxW, int pxH) const {
+    if (tiles_.empty() || pxW <= 0 || pxH <= 0) return false;
+    // Convert inclusive pixel rect to inclusive tile-index rect via
+    // floor-div that's correct for negative coordinates.
+    auto floor_div = [](int a, int b) {
+        int q = a / b;
+        return (a % b != 0 && ((a < 0) != (b < 0))) ? q - 1 : q;
+    };
+    const int tx0 = floor_div(pxX0, kTilePx);
+    const int ty0 = floor_div(pxY0, kTilePx);
+    const int tx1 = floor_div(pxX0 + pxW - 1, kTilePx);
+    const int ty1 = floor_div(pxY0 + pxH - 1, kTilePx);
+    for (int ty = ty0; ty <= ty1; ++ty) {
+        for (int tx = tx0; tx <= tx1; ++tx) {
+            if (tiles_.find(TileKey{tx, ty}) != tiles_.end()) return true;
+        }
+    }
+    return false;
+}
+
 void LibMyPaintSkiaSurface::composite_to_bitmap(SkBitmap& dst, int dstOriginPxX, int dstOriginPxY) const {
     if (dst.colorType() != kRGBA_8888_SkColorType) return;
     uint8_t* dstPixels = static_cast<uint8_t*>(dst.getPixels());

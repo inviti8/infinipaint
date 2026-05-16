@@ -175,10 +175,23 @@ void MyPaintLayerCanvasComponent::erase_along_segment(const Vector2f& localStart
     // zero-length segment (single click) still punches one dab.
     const float spacing = std::max(localRadius * 0.5f, 1.0f);
     const int steps = std::max(1, static_cast<int>(std::ceil(segLen / spacing)) + 1);
+    const int r = static_cast<int>(std::ceil(localRadius));
+    bool anyDab = false;
     mypaint_surface_begin_atomic(surf);
     for (int i = 0; i < steps; ++i) {
         const float t = (steps == 1) ? 0.0f : static_cast<float>(i) / static_cast<float>(steps - 1);
         const Vector2f p = localStart + delta * t;
+        // Skip dabs whose footprint covers only unallocated tiles. Without
+        // this, sweeping the eraser past a stroke's edge into blank canvas
+        // makes libmypaint allocate fresh transparent tiles for every dab
+        // — growing component bounds, serialized payload, and BVH AABBs
+        // for zero visual effect. Reported as eraser sluggishness after
+        // repeated use; see docs/design/PERF-INVESTIGATION.md.
+        const int pxX0 = static_cast<int>(std::floor(p.x())) - r;
+        const int pxY0 = static_cast<int>(std::floor(p.y())) - r;
+        if (!surface_->has_any_tile_in_pixel_rect(pxX0, pxY0, 2 * r, 2 * r))
+            continue;
+        anyDab = true;
         mypaint_surface_draw_dab(
             surf,
             p.x(), p.y(),
@@ -195,7 +208,7 @@ void MyPaintLayerCanvasComponent::erase_along_segment(const Vector2f& localStart
         );
     }
     mypaint_surface_end_atomic(surf, nullptr);
-    mark_dirty();
+    if (anyDab) mark_dirty();
 }
 
 void MyPaintLayerCanvasComponent::begin_recorded_stroke(const Eigen::Vector3f& color, float baseRadius) {

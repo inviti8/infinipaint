@@ -34,6 +34,10 @@ class DrawingProgramCache {
         void node_loop_erase_if_components(const std::shared_ptr<DrawingProgramCacheBVHNode>& bvhNode, std::function<bool(CanvasComponentContainer::ObjInfo* comp)> f);
         void node_loop_components(const std::shared_ptr<DrawingProgramCacheBVHNode>& bvhNode, std::function<void(CanvasComponentContainer::ObjInfo* comp)> f);
         bool should_rebuild() const;
+        // Public for tools that want to make eager rebuild decisions
+        // (e.g. EraserTool rebuilds on entry to bound per-segment cost
+        // — see EraserTool ctor).
+        size_t unsorted_component_count() const { return unsortedComponents.size(); }
         bool check_rebuild_needed_from_framerate();
         void update_and_draw_cached_canvas(SkCanvas* canvas, const DrawData& drawData);
         void draw_components_to_canvas(SkCanvas* canvas, const DrawData& drawData, const std::optional<SCollision::AABB<WorldScalar>>& drawBounds);
