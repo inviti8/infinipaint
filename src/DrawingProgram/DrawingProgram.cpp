@@ -438,8 +438,16 @@ void DrawingProgram::toolbar_gui(Toolbar& t) {
                     *newRotationAngle = world.drawData.cam.c.rotation;
                 });
 
-                t.color_button_left("Foreground color", &world.main.toolConfig.globalConf.foregroundColor);
-                t.color_button_left("Background color", &world.main.toolConfig.globalConf.backgroundColor);
+                t.color_button_left("Brush color (primary)", &world.main.toolConfig.globalConf.foregroundColor);
+                // The legacy name for this is "background color" -- inherited
+                // from classic paint apps where fg/bg meant primary/secondary
+                // tool color. Modern users read "background" as "canvas
+                // background," which this is NOT (canvas background lives on
+                // CanvasTheme and is set via the Canvas Settings menu). This
+                // swatch is the SECONDARY tool color, used as the fill color
+                // for shape tools (Ellipse, Rectangle) and as the second slot
+                // on the eye-dropper. Labeled accordingly. Reported by zynx.
+                t.color_button_left("Fill color (secondary)", &world.main.toolConfig.globalConf.backgroundColor);
 
                 // Tree-view panel toggle (M6-a). Placeholder list.svg icon
                 // until a graph icon ships.

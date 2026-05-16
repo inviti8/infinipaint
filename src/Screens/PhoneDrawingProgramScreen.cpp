@@ -1078,7 +1078,7 @@ void PhoneDrawingProgramScreen::bottom_extra_toolbar_gui() {
         }
     });
 
-    color_button(gui, "foreground color", &main.toolConfig.globalConf.foregroundColor, {
+    color_button(gui, "brush color primary", &main.toolConfig.globalConf.foregroundColor, {
         .drawType = SelectableButton::DrawType::TRANSPARENT_ALL,
         .isSelected = settingsMenuPopup == SettingsMenuPopup::FG_COLOR,
         .hasAlpha = true,
@@ -1087,7 +1087,12 @@ void PhoneDrawingProgramScreen::bottom_extra_toolbar_gui() {
         }
     });
 
-    color_button(gui, "background color", &main.toolConfig.globalConf.backgroundColor, {
+    // Phone parity for the desktop rename in DrawingProgram.cpp::442:
+    // this swatch is the SECONDARY tool color (fill color for shape
+    // tools + eye-dropper second slot), NOT the canvas background.
+    // Labeled accordingly to avoid the recurring "I thought this set
+    // canvas background" confusion.
+    color_button(gui, "fill color secondary", &main.toolConfig.globalConf.backgroundColor, {
         .drawType = SelectableButton::DrawType::TRANSPARENT_ALL,
         .isSelected = settingsMenuPopup == SettingsMenuPopup::BG_COLOR,
         .hasAlpha = true,
