@@ -12,7 +12,26 @@
     #include <include/gpu/ganesh/SkSurfaceGanesh.h>
 #endif
 
-size_t DrawingProgramCache::MINIMUM_COMPONENTS_TO_START_REBUILD = 1000;
+// Default lowered from 1000 to 100 in PERF-INVESTIGATION pass.
+//
+// Original 1000 was tuned for vector strokes, where per-frame
+// `drawPath` is cheap (Skia caches paths on GPU). For raster
+// strokes (MyPaintLayerCanvasComponent), each uncached component
+// pays a per-frame heap-allocate-bitmap + tile-pixel-walk +
+// GPU-upload, which dominates frame time long before 1000
+// components pile up. At ~60-100 strokes/min of active drawing,
+// 1000 means the BVH cache doesn't kick in for 10-17 minutes —
+// exactly the "sluggish after a few minutes" symptom.
+//
+// 100 is a 10x reduction that should trigger the cache hierarchy
+// after ~1 minute of active drawing; BVH rebuild hitch is paid
+// once at that point and subsequent strokes get cached.
+//
+// User-tunable live via Settings -> Debug ("Number of components
+// to force cache rebuild") and persisted in config.json, so an
+// artist can adjust to taste. See docs/design/PERF-INVESTIGATION.md
+// for the full investigation.
+size_t DrawingProgramCache::MINIMUM_COMPONENTS_TO_START_REBUILD = 100;
 size_t DrawingProgramCache::MAXIMUM_COMPONENTS_IN_SINGLE_NODE = 50;
 #ifdef __EMSCRIPTEN__
     size_t DrawingProgramCache::MAXIMUM_DRAW_CACHE_SURFACES = 40; // Use less VRAM in web build
