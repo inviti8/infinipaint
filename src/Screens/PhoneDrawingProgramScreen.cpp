@@ -1132,6 +1132,31 @@ void PhoneDrawingProgramScreen::bottom_extra_toolbar_gui() {
         }
     });
 
+    // Canvas background color, third inline swatch. Per zynx:
+    // "the canvas color swatch can live in the top bar in phone ui.
+    // It doesnt need a label, if an artist tries it out, they'll
+    // quickly figure out what it does."
+    //
+    // Display buffer is synced from canvasTheme each frame so the
+    // swatch always reflects the live canvas background. The button
+    // itself never edits the buffer; clicking opens the CANVAS_COLOR
+    // submodal (added in commit a2742be) which is the actual editor
+    // that pushes back to canvasTheme.set_back_color (NetObj-synced).
+    {
+        const auto canvasBg = main.world->canvasTheme.get_back_color();
+        canvasColorSwatchBuf = Vector4f(canvasBg.fR, canvasBg.fG, canvasBg.fB, 1.0f);
+    }
+    color_button(gui, "canvas color", &canvasColorSwatchBuf, {
+        .drawType = SelectableButton::DrawType::TRANSPARENT_ALL,
+        .isSelected = phoneNetMenu == PhoneNetMenu::CANVAS_COLOR,
+        .hasAlpha = false,
+        .onClick = [&] {
+            phoneNetMenu = (phoneNetMenu == PhoneNetMenu::CANVAS_COLOR)
+                ? PhoneNetMenu::NONE
+                : PhoneNetMenu::CANVAS_COLOR;
+        }
+    });
+
     // Tree-view panel toggle (M6-a). Mirrors the desktop layout's button.
     svg_icon_button(gui, "Tree View Toggle Button", "data/icons/list.svg", {
         .drawType = SelectableButton::DrawType::TRANSPARENT_ALL,

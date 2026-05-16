@@ -79,6 +79,15 @@ class PhoneDrawingProgramScreen : public DrawingProgramScreen {
         // World::rename_on_disk.
         std::string canvasNameInput;
         bool canvasNameInputFocused = false;
+        // Display buffer for the inline canvas-color swatch in the
+        // bottom extra toolbar. Synced from canvasTheme.get_back_color
+        // each frame so the swatch reflects the live canvas color;
+        // clicking the swatch opens the CANVAS_COLOR submodal (it's
+        // the modal that actually mutates canvasTheme via
+        // set_back_color). The buffer itself is never the source of
+        // truth — canvasTheme is.
+        Vector4f canvasColorSwatchBuf{0.0f, 0.0f, 0.0f, 1.0f};
+
         struct ColorPickerPopupData {
             enum class ScreenType {
                 NORMAL,
