@@ -97,6 +97,26 @@ class MyPaintLayerCanvasComponent : public CanvasComponent {
         mutable bool boundsCacheValid_ = false;
         mutable SCollision::AABB<float> boundsCache_{};
 
+        // PERF-INVESTIGATION.md finding #2: composite_to_bitmap + heap
+        // alloc + GPU upload was happening every frame per stroke for
+        // any component not in the BVH draw cache. Particularly bad
+        // after an eraser pass: the eraser mutates many components at
+        // once, all get pulled back to unsortedComponents, and the
+        // per-frame redraw cost compounds until the BVH rebuilds.
+        //
+        // Cache the composited SkImage; invalidate only on mark_dirty
+        // (which is called after every surface mutation: begin/continue
+        // brush stroke and erase_along_segment). Subsequent draws with
+        // an unmutated surface just blit the cached image — no
+        // allocate, no per-tile composite, no per-pixel premul math.
+        //
+        // `mutable` because draw() is const; the cache is implementation
+        // detail, not part of logical state. Same thread for read/write
+        // (input + render thread), so no synchronization needed.
+        mutable sk_sp<SkImage> cachedDrawImage_;
+        mutable int cachedDrawX_ = 0;
+        mutable int cachedDrawY_ = 0;
+
         // PHASE2 M1: stroke recording state. Set on begin_recorded_stroke,
         // appended on record_stroke_sample, dropped on invalidate_recording.
         std::vector<RecordedStrokeSample> recordedSamples_;

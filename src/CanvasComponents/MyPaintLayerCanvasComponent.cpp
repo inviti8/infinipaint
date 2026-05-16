@@ -25,6 +25,9 @@ MyPaintLayerCanvasComponent::MyPaintLayerCanvasComponent()
 
 void MyPaintLayerCanvasComponent::mark_dirty() {
     boundsCacheValid_ = false;
+    // Drop the per-component draw cache so the next draw() recomposites
+    // from the (now-modified) tile data. See header for rationale.
+    cachedDrawImage_.reset();
 }
 
 void MyPaintLayerCanvasComponent::save(cereal::PortableBinaryOutputArchive& a) const {
@@ -108,21 +111,38 @@ void MyPaintLayerCanvasComponent::set_data_from(const CanvasComponent& other) {
 
 void MyPaintLayerCanvasComponent::draw(SkCanvas* canvas, const DrawData&, const std::shared_ptr<void>&) const {
     if (surface_->allocated_tile_count() == 0) return;
-    const auto bounds = surface_->allocated_tile_bounds_px();
-    if (bounds.empty()) return;
 
-    SkBitmap bmp;
-    if (!bmp.tryAllocPixels(SkImageInfo::Make(
-            bounds.w, bounds.h, kRGBA_8888_SkColorType, kUnpremul_SkAlphaType))) {
-        return;
+    // Per-component draw cache (PERF-INVESTIGATION.md finding #2). Build
+    // the bitmap + SkImage once per surface mutation; reuse the SkImage
+    // for every subsequent draw until mark_dirty() invalidates. Skia's
+    // own GPU texture cache then handles the upload-once, blit-many
+    // pattern across frames.
+    if (!cachedDrawImage_) {
+        const auto bounds = surface_->allocated_tile_bounds_px();
+        if (bounds.empty()) return;
+
+        SkBitmap bmp;
+        if (!bmp.tryAllocPixels(SkImageInfo::Make(
+                bounds.w, bounds.h, kRGBA_8888_SkColorType, kUnpremul_SkAlphaType))) {
+            return;
+        }
+        bmp.eraseARGB(0, 0, 0, 0);
+        surface_->composite_to_bitmap(bmp, bounds.x, bounds.y);
+
+        // setImmutable() before asImage() lets Skia share pixel memory
+        // with the resulting SkImage instead of making a defensive
+        // copy. The bitmap goes out of scope after this block; the
+        // SkImage owns the pixel data via the ref-counted backing.
+        bmp.setImmutable();
+        cachedDrawImage_ = bmp.asImage();
+        cachedDrawX_ = bounds.x;
+        cachedDrawY_ = bounds.y;
     }
-    bmp.eraseARGB(0, 0, 0, 0);
-    surface_->composite_to_bitmap(bmp, bounds.x, bounds.y);
 
     SkPaint paint;
-    canvas->drawImage(bmp.asImage(),
-                      static_cast<SkScalar>(bounds.x),
-                      static_cast<SkScalar>(bounds.y),
+    canvas->drawImage(cachedDrawImage_,
+                      static_cast<SkScalar>(cachedDrawX_),
+                      static_cast<SkScalar>(cachedDrawY_),
                       SkSamplingOptions{},
                       &paint);
 }
