@@ -12,26 +12,38 @@
     #include <include/gpu/ganesh/SkSurfaceGanesh.h>
 #endif
 
-// Default lowered from 1000 to 100 in PERF-INVESTIGATION pass.
+// Restored to 1000 after the PERF-INVESTIGATION iteration.
 //
-// Original 1000 was tuned for vector strokes, where per-frame
-// `drawPath` is cheap (Skia caches paths on GPU). For raster
-// strokes (MyPaintLayerCanvasComponent), each uncached component
-// pays a per-frame heap-allocate-bitmap + tile-pixel-walk +
-// GPU-upload, which dominates frame time long before 1000
-// components pile up. At ~60-100 strokes/min of active drawing,
-// 1000 means the BVH cache doesn't kick in for 10-17 minutes —
-// exactly the "sluggish after a few minutes" symptom.
+// First-pass lowered this to 100 to combat per-frame redraw cost
+// for raster strokes (MyPaintLayerCanvasComponent::draw was
+// recomposing every tile every frame). That fix has since been
+// landed properly — the per-component cached SkImage on
+// MyPaintLayer makes per-frame draw cheap regardless of how many
+// components are in unsortedComponents, so the threshold no
+// longer needs to be low to keep frame times reasonable.
 //
-// 100 is a 10x reduction that should trigger the cache hierarchy
-// after ~1 minute of active drawing; BVH rebuild hitch is paid
-// once at that point and subsequent strokes get cached.
+// Lowering to 100 had a downside that showed up under heavy
+// eraser use: each eraser segment can dirty several components
+// (every overlapping stroke under the cursor), and the rebuild
+// triggered at the 100 threshold reconstructs the ENTIRE BVH
+// (internal_build walks the full flattened component list, not
+// just the unsorted set), plus re-renders every BVH-node cache
+// surface. That cost scales with total component count, so as
+// the artist accumulates strokes, each rebuild hitch grows. At
+// threshold 100, the eraser was triggering rebuilds every few
+// segments, compounding the cost across multiple eraser strokes
+// — reported by zynx as "the eraser itself becomes sluggish
+// after multiple strokes."
+//
+// 1000 amortizes that cost across many more mutations. Combined
+// with the SkImage per-component cache, per-frame draw stays
+// cheap while rebuild thrash drops back to historical levels.
 //
 // User-tunable live via Settings -> Debug ("Number of components
 // to force cache rebuild") and persisted in config.json, so an
 // artist can adjust to taste. See docs/design/PERF-INVESTIGATION.md
 // for the full investigation.
-size_t DrawingProgramCache::MINIMUM_COMPONENTS_TO_START_REBUILD = 100;
+size_t DrawingProgramCache::MINIMUM_COMPONENTS_TO_START_REBUILD = 1000;
 size_t DrawingProgramCache::MAXIMUM_COMPONENTS_IN_SINGLE_NODE = 50;
 #ifdef __EMSCRIPTEN__
     size_t DrawingProgramCache::MAXIMUM_DRAW_CACHE_SURFACES = 40; // Use less VRAM in web build
