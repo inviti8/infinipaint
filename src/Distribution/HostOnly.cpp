@@ -120,7 +120,7 @@ std::filesystem::path resolve_config_path() {
     std::filesystem::create_directories(p, ec);
     return p;
 #else
-    char* configPathSDL = SDL_GetPrefPath("ErrorAtLine0", "infinipaint");
+    char* configPathSDL = SDL_GetPrefPath("HEAVYMETA", "Inkternity");
     std::filesystem::path p(configPathSDL ? configPathSDL : "");
     SDL_free(configPathSDL);
     return p;

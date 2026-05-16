@@ -218,7 +218,7 @@ You can fully exercise the desktop side without changing any Inkternity code:
 2. Generate a dev keys file (this stand-in is the credential-store the portal will eventually replace):
    ```bash
    cd D:\repos\inkternity-server
-   python scripts/dev_mint_token.py --gen-keys --save-state "$env:APPDATA\ErrorAtLine0\infinipaint\inkternity_dev_keys.json"
+   python scripts/dev_mint_token.py --gen-keys --save-state "$env:APPDATA\HEAVYMETA\Inkternity\inkternity_dev_keys.json"
    ```
    Save the printed `member_pub` and `canvas_id` — you'll need them for the portal-side mint.
 3. **From your portal-side `mint_inkternity_token` function**: produce a token using the same `member_pub` (i.e., simulate that the artist's member key on the portal matches the one in the dev keys file). Your token is structurally identical to what the dev mint script produces.

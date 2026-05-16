@@ -356,7 +356,7 @@ void init_logs(MainStruct& mS) {
     std::filesystem::create_directory(CONFIG_FOLDER_NAME);
     mS.configPath = mS.homePath / CONFIG_FOLDER_NAME;
 #else
-    char* configPathSDL = SDL_GetPrefPath("ErrorAtLine0", "infinipaint");
+    char* configPathSDL = SDL_GetPrefPath("HEAVYMETA", "Inkternity");
     mS.configPath = std::filesystem::path(configPathSDL);
     SDL_free(configPathSDL);
 #endif
